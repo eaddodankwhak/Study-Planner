@@ -14,3 +14,9 @@ app = Flask(
 def home():
     """Render the first Study Planner page."""
     return render_template("index.html")
+
+
+@app.get("/about")
+def about():
+    """Render the About page."""
+    return render_template("about.html")
