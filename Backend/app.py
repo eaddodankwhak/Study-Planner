@@ -20,3 +20,15 @@ def home():
 def about():
     """Render the About page."""
     return render_template("about.html")
+
+
+@app.get("/task")
+def task():
+    """Render the Task page."""
+    return render_template("task.html")
+
+
+@app.get("/progress")
+def progress():
+    """Render the Progress page."""
+    return render_template("progress.html")
