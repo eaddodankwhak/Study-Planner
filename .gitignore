@@ -1,0 +1,17 @@
+# Python
+Backend/.venv/
+__pycache__/
+*.py[cod]
+
+# Local database files
+Database/instance/*.db
+Database/instance/*.sqlite
+Database/instance/*.sqlite3
+
+# Environment and editor files
+.env
+.vscode/
+.idea/
+
+# Separate local repository; not part of this project
+Study-Planner/
