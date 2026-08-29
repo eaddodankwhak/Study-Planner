@@ -9,121 +9,135 @@
 </head>
 
 <body>
-    <header>
-        <nav>
-            <a href="{{ url_for('home') }}">Home</a>
-            <a href="{{ url_for('task') }}">Task</a>
-            <a href="{{ url_for('progress') }}">Progress</a>
-            <a href="{{ url_for('about') }}">About</a>
-        </nav>
-        <h1 id="title">My Study Planner</h1>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <h1 class="page-header__title">My Study Planner</h1>
+            <nav class="nav-bar">
+                <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('about') }}">About</a>
+            </nav>
+        </div>
     </header>
-    # About Study Planner<br>
-    <img src="{{ url_for('static', filename='images/woman-8601818_1280.jpg') }}" alt="Study Planner" width="600"
-        height="400"><br>
 
+    <main class="container page-main">
+        <h1>About Study Planner</h1>
+        <img src="{{ url_for('static', filename='images/woman-8601818_1280.jpg') }}" alt="Study Planner" width="600"
+            height="400"><br>
 
-    ## Plan Smarter. Study Better. Achieve More.
+        <h2>Plan Smarter. Study Better. Achieve More.</h2>
 
-    Welcome to **[App Name]**, a modern study planning platform designed to help students take control of their academic
-    journey.
+        <p>Welcome to <strong>Study Planner</strong>, a modern study planning platform designed to help students take
+            control of their academic journey.</p>
 
-    We believe that studying effectively is not simply about spending more hours with your books. It is about **having a
-    clear plan, managing your time wisely, staying consistent, and knowing what to focus on next**.
+        <p>We believe that studying effectively is not simply about spending more hours with your books. It is about
+            <strong>having a clear plan, managing your time wisely, staying consistent, and knowing what to focus on
+                next</strong>.</p>
 
-    [App Name] brings these elements together in one simple and organized platform, helping students transform their
-    academic goals into realistic, manageable study plans.
+        <p>Study Planner brings these elements together in one simple and organized platform, helping students transform
+            their academic goals into realistic, manageable study plans.</p>
 
-    ## Our Mission
+        <h2>Our Mission</h2>
 
-    Our mission is to make academic planning **simple, structured, and achievable for every student**.
+        <p>Our mission is to make academic planning <strong>simple, structured, and achievable for every
+                student</strong>.</p>
 
-    Students often have multiple courses, assignments, examinations, projects, and personal commitments competing for
-    their attention. Without proper planning, it can become difficult to know where to start or how to stay on track.
+        <p>Students often have multiple courses, assignments, examinations, projects, and personal commitments competing
+            for their attention. Without proper planning, it can become difficult to know where to start or how to stay
+            on track.</p>
 
-    [App Name] was created to solve this problem by providing students with the tools they need to organize their
-    workload, schedule their study sessions, monitor their progress, and build productive study habits.
+        <p>Study Planner was created to solve this problem by providing students with the tools they need to organize
+            their workload, schedule their study sessions, monitor their progress, and build productive study habits.
+        </p>
 
-    ## What We Offer
+        <h2>What We Offer</h2>
 
-    ### 📅 Smart Study Planning
+        <h3>Smart Study Planning</h3>
 
-    Create structured study schedules that fit your academic goals, available time, and priorities.
+        <p>Create structured study schedules that fit your academic goals, available time, and priorities.</p>
 
-    ### 🎯 Goal Management
+        <h3>Goal Management</h3>
 
-    Set academic goals and break them into smaller, achievable tasks so you always know what you are working toward.
+        <p>Set academic goals and break them into smaller, achievable tasks so you always know what you are working
+            toward.</p>
 
-    ### 📚 Course Organization
+        <h3>Course Organization</h3>
 
-    Keep your courses, subjects, topics, assignments, and study activities organized in one central place.
+        <p>Keep your courses, subjects, topics, assignments, and study activities organized in one central place.</p>
 
-    ### ⏱️ Time Management
+        <h3>Time Management</h3>
 
-    Make better use of your available study time by planning sessions and prioritizing important academic tasks.
+        <p>Make better use of your available study time by planning sessions and prioritizing important academic tasks.
+        </p>
 
-    ### 📊 Progress Tracking
+        <h3>Progress Tracking</h3>
 
-    Monitor your progress and see how consistently you are working toward your academic goals.
+        <p>Monitor your progress and see how consistently you are working toward your academic goals.</p>
 
-    ### 🔔 Reminders
+        <h3>Reminders</h3>
 
-    Stay informed about upcoming study sessions, deadlines, examinations, and other important academic activities.
+        <p>Stay informed about upcoming study sessions, deadlines, examinations, and other important academic
+            activities.</p>
 
-    ## Why We Built [App Name]
+        <h2>Why We Built Study Planner</h2>
 
-    Academic life can become overwhelming when everything is kept in your head.
+        <p>Academic life can become overwhelming when everything is kept in your head.</p>
 
-    You may know that you have an examination coming up, an assignment due next week, and several topics you still need
-    to study—but knowing these things is different from having a **clear plan for handling them**.
+        <p>You may know that you have an examination coming up, an assignment due next week, and several topics you
+            still need to study—but knowing these things is different from having a <strong>clear plan for handling
+                them</strong>.</p>
 
-    [App Name] helps bridge that gap.
+        <p>Study Planner helps bridge that gap.</p>
 
-    Instead of asking:
+        <p>Instead of asking:</p>
 
-    > **"What should I study today?"**
+        <blockquote>
+            <p><strong>"What should I study today?"</strong></p>
+        </blockquote>
 
-    you can have a clear answer based on your goals, priorities, schedule, and progress.
+        <p>you can have a clear answer based on your goals, priorities, schedule, and progress.</p>
 
-    ## Built for Students
+        <h2>Built for Students</h2>
 
-    [App Name] is designed with students at the center of the experience.
+        <p>Study Planner is designed with students at the center of the experience.</p>
 
-    Whether you are preparing for examinations, managing university courses, working on assignments, or simply trying to
-    develop better study habits, the platform is designed to help you stay organized without making planning
-    complicated.
+        <p>Whether you are preparing for examinations, managing university courses, working on assignments, or simply
+            trying to develop better study habits, the platform is designed to help you stay organized without making
+            planning complicated.</p>
 
-    Our goal is not to give you more things to manage.
+        <p>Our goal is not to give you more things to manage.</p>
 
-    **Our goal is to make managing your academic life easier.**
+        <p><strong>Our goal is to make managing your academic life easier.</strong></p>
 
-    ## Our Philosophy
+        <h2>Our Philosophy</h2>
 
-    We believe that effective studying is built on three principles:
+        <p>We believe that effective studying is built on three principles:</p>
 
-    **Plan → Focus → Progress**
+        <p><strong>Plan → Focus → Progress</strong></p>
 
-    **Plan:** Know what needs to be done and when it needs to be done.
+        <p><strong>Plan:</strong> Know what needs to be done and when it needs to be done.</p>
 
-    **Focus:** Give your attention to the right task at the right time.
+        <p><strong>Focus:</strong> Give your attention to the right task at the right time.</p>
 
-    **Progress:** Track your efforts, learn from your habits, and keep improving.
+        <p><strong>Progress:</strong> Track your efforts, learn from your habits, and keep improving.</p>
 
-    Small, consistent actions can lead to significant academic results.
+        <p>Small, consistent actions can lead to significant academic results.</p>
 
-    ## Looking Ahead
+        <h2>Looking Ahead</h2>
 
-    We are continuously working to make [App Name] a more intelligent, accessible, and useful study companion.
+        <p>We are continuously working to make Study Planner a more intelligent, accessible, and useful study
+            companion.</p>
 
-    As the platform evolves, our focus will remain the same:
+        <p>As the platform evolves, our focus will remain the same:</p>
 
-    **Helping students spend less time worrying about what to study and more time actually studying.**
+        <p><strong>Helping students spend less time worrying about what to study and more time actually studying.</strong>
+        </p>
 
-    ### Study with purpose. Plan with confidence. Grow with consistency.
+        <h3>Study with purpose. Plan with confidence. Grow with consistency.</h3>
 
-    **Welcome to [App Name].**
-
-
+        <p><strong>Welcome to Study Planner.</strong></p>
+    </main>
 </body>
 
 </html>

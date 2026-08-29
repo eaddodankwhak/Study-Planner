@@ -23,6 +23,11 @@
   padding-block: var(--space-4);
 }
 
+.page-header__title {
+  margin-bottom: 0;
+  font-size: 1.25rem;
+}
+
 .nav-bar {
   display: flex;
   gap: var(--space-4);
