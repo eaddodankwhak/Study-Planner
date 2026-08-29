@@ -1,1 +1,12 @@
-/* Stage 2: add the Study Planner's layout and responsive styles here. */
+/*
+ * styles.css — global entry point for the Study Planner.
+ *
+ * This file only imports the layer files. Add page-specific or one-off
+ * overrides at the bottom if needed, but prefer adding reusable styles to the
+ * relevant layer file. See docs/css-architecture.md for the structure guide.
+ */
+@import url("variables.css");
+@import url("base.css");
+@import url("layout.css");
+@import url("components.css");
+@import url("utilities.css");

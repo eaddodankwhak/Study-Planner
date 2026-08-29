@@ -1,0 +1,30 @@
+/*
+ * Design tokens for the Study Planner.
+ * See docs/css-architecture.md for the full structure guide.
+ */
+:root {
+  /* colours */
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+
+  /* spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* typography */
+  --font-sans: "Segoe UI", system-ui, Arial, sans-serif;
+  --radius: 0.5rem;
+
+  /* effects */
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.1);
+}

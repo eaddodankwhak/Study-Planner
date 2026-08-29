@@ -9,46 +9,59 @@
 </head>
 
 <body>
-    <header>
-        <nav>
-            <a href="{{ url_for('home') }}">Home</a>
-            <a href="{{ url_for('task') }}">Task</a>
-            <a href="{{ url_for('progress') }}">Progress</a>
-            <a href="{{ url_for('about') }}">About</a>
-        </nav>
-        <h1 id="title">My Study Planner</h1>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <h1 class="page-header__title">My Study Planner</h1>
+            <nav class="nav-bar">
+                <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('home') }}">Home</a>
+                <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+            </nav>
+        </div>
     </header>
-    <p>Welcome to my study planner.</p>
-    <main>
-        <p>Today's tasks</p>
-        <ul>
-            <li class="task">
-                <input type="checkbox">
-                Animal Nutrition
-            </li>
-            <li class="task">
-                <input type="checkbox">
-                Genetics
-            </li>
-            <li class="task">
-                <input type="checkbox">
-                Plant Pathology
-            </li>
-        </ul>
-        <h3>Add a New Task</h3>
-        <form>
-            <label for="task">Task:</label>
-            <input type="text" id="task">
-            <br><br>
-            <label for="deadline">Deadline:</label>
-            <input type="date" id="deadline">
-            <br><br>
-            <label for="category">Category:</label>
-            <input type="text" id="category">
-            <br><br>
-            <button type="submit">Add Task</button>
-        </form>
+
+    <main class="container page-main">
+        <p class="text-muted mb-4" >Welcome to my study planner.</p>
+
+        <section class="card mb-4">
+            <h2 class="card__title">Today's tasks</h2>
+            <ul class="task-list">
+                <li class="task">
+                    <input type="checkbox">
+                    Animal Nutrition
+                </li>
+                <li class="task">
+                    <input type="checkbox">
+                    Genetics
+                </li>
+                <li class="task">
+                    <input type="checkbox">
+                    Plant Pathology
+                </li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h3 class="card__title">Add a New Task</h3>
+            <form action="#" method="post">
+                <div class="form-field">
+                    <label for="task">Task:</label>
+                    <input type="text" id="task" name="task">
+                </div>
+                <div class="form-field">
+                    <label for="deadline">Deadline:</label>
+                    <input type="date" id="deadline" name="deadline">
+                </div>
+                <div class="form-field">
+                    <label for="category">Category:</label>
+                    <input type="text" id="category" name="category">
+                </div>
+                <button class="button" type="submit">Add Task</button>
+            </form>
+        </section>
     </main>
+
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 
