@@ -25,6 +25,8 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
+import collab
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
 USERS_FILE = os.path.join(DATABASE_DIR, "users.json")
@@ -115,6 +117,19 @@ def get_subject_files(subject):
     if not os.path.isdir(folder):
         return []
     return sorted(os.listdir(folder))
+
+
+def user_name(user_id, users=None):
+    """Resolve a user id to a display name (falls back to 'Unknown')."""
+    users = users if users is not None else load_users()
+    user = users.get(user_id)
+    return user["name"] if user else "Unknown"
+
+
+def member_names(slug):
+    """Return a list of member display names for a subject's collaboration."""
+    users = load_users()
+    return [user_name(uid, users) for uid in collab.get_members(slug)]
 
 
 def allowed_file(filename):
@@ -250,16 +265,27 @@ def subject(slug):
         return redirect(url_for("home"))
 
     tool = request.args.get("tool", "home")
-    if tool not in ("home", "resources", "assignments", "calendar", "grades"):
+    if tool not in ("home", "resources", "assignments", "calendar", "grades", "collab", "quizzes"):
         tool = "home"
+
+    users = load_users()
+    user = current_user()
+    is_member = collab.is_member(slug, user["id"]) if user else False
+    shared_files = collab.get_materials(slug)
 
     return render_template(
         "subject.html",
         active_tool=tool,
-        user=current_user(),
+        user=user,
         subject=subject_info,
         subjects=SUBJECTS,
         files=get_subject_files(subject_info),
+        is_member=is_member,
+        invite_code=collab.get_subject_code(slug),
+        member_names=member_names(slug),
+        shared_files=shared_files,
+        user_name=user_name,
+        quizzes=collab.list_quizzes(slug),
     )
 
 
@@ -296,6 +322,7 @@ def subject_upload(slug):
         count += 1
 
     file.save(os.path.join(folder, uniqued))
+    collab.add_material(slug, uniqued, current_user()["id"])
     flash(f"Uploaded '{uniqued}' successfully.", "success")
     return redirect(url_for("subject", slug=slug, tool="resources"))
 
@@ -311,6 +338,186 @@ def subject_download(slug, filepath):
 
     folder = os.path.join(UPLOADS_DIR, slug)
     return send_from_directory(folder, filepath, as_attachment=True)
+
+
+@app.post("/subject/<slug>/collab/join")
+@login_required
+def collab_join(slug):
+    """Join a subject's collaboration using its invite code."""
+    subject_info = get_subject(slug)
+    if not subject_info:
+        flash("Subject not found.", "error")
+        return redirect(url_for("home"))
+
+    code = request.form.get("code", "").strip()
+    user = current_user()
+
+    if not code:
+        flash("Please enter the collaboration code.", "error")
+        return redirect(url_for("subject", slug=slug, tool="collab"))
+
+    if not collab.subject_code_match(slug, code):
+        flash("That code is not valid for this collaboration.", "error")
+        return redirect(url_for("subject", slug=slug, tool="collab"))
+
+    if collab.is_member(slug, user["id"]):
+        flash("You are already part of this collaboration.", "success")
+        return redirect(url_for("subject", slug=slug, tool="collab"))
+
+    collab.add_member(slug, user["id"])
+    flash(f"Joined the {subject_info['title']} collaboration!", "success")
+    return redirect(url_for("subject", slug=slug, tool="collab"))
+
+
+@app.post("/subject/<slug>/collab/leave")
+@login_required
+def collab_leave(slug):
+    """Leave a subject's collaboration."""
+    if not get_subject(slug):
+        flash("Subject not found.", "error")
+        return redirect(url_for("home"))
+
+    collab.remove_member(slug, current_user()["id"])
+    flash("You left the collaboration.", "success")
+    return redirect(url_for("subject", slug=slug, tool="collab"))
+
+
+@app.get("/quiz/take")
+@login_required
+def quiz_take_page():
+    """A page to enter a quiz invite code and try it."""
+    quizzes = None
+    error = None
+    if request.args.get("code"):
+        quiz = collab.find_quiz_by_code(request.args.get("code"))
+        if quiz:
+            return redirect(url_for("quiz_take", quiz_id=quiz["id"]))
+        error = "No quiz found for that code."
+    return render_template("quiz_take.html", user=current_user(), subjects=SUBJECTS, error=error)
+
+
+@app.get("/quiz/<quiz_id>")
+@login_required
+def quiz_take(quiz_id):
+    """Render a quiz for a user to attempt."""
+    quiz = collab.get_quiz(quiz_id)
+    if not quiz:
+        flash("Quiz not found.", "error")
+        return redirect(url_for("home"))
+
+    subject_info = get_subject(quiz["subject"])
+    return render_template(
+        "quiz.html",
+        user=current_user(),
+        subjects=SUBJECTS,
+        quiz=quiz,
+        subject=subject_info,
+        user_name=user_name,
+    )
+
+
+@app.post("/quiz/<quiz_id>/attempt")
+@login_required
+def quiz_attempt(quiz_id):
+    """Grade a submitted quiz attempt."""
+    quiz = collab.get_quiz(quiz_id)
+    if not quiz:
+        flash("Quiz not found.", "error")
+        return redirect(url_for("home"))
+
+    if not collab.is_member(quiz["subject"], current_user()["id"]):
+        flash("You must join the course collaboration to take this quiz.", "error")
+        return redirect(url_for("quiz_take", quiz_id=quiz_id))
+
+    score = 0
+    total = len(quiz["questions"])
+    for i, question in enumerate(quiz["questions"]):
+        chosen = request.form.get(f"q{i}", "")
+        if chosen.isdigit() and int(chosen) == question["correct"]:
+            score += 1
+
+    collab.add_attempt(quiz_id, current_user()["id"], score, total)
+    flash(f"You scored {score} out of {total}.", "success")
+    return redirect(url_for("quiz_take", quiz_id=quiz_id))
+
+
+@app.post("/subject/<slug>/quiz")
+@login_required
+def quiz_create(slug):
+    """Create a new quiz for a subject's collaboration."""
+    subject_info = get_subject(slug)
+    if not subject_info:
+        flash("Subject not found.", "error")
+        return redirect(url_for("home"))
+
+    title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
+
+    questions = []
+    idx = 0
+    while request.form.get(f"q{idx}_prompt"):
+        prompt = request.form.get(f"q{idx}_prompt", "").strip()
+        options = [request.form.get(f"q{idx}_opt{o}", "").strip() for o in range(4)]
+        correct_raw = request.form.get(f"q{idx}_correct", "0")
+        correct = int(correct_raw) if correct_raw.isdigit() and 0 <= int(correct_raw) < 4 else 0
+
+        if prompt and any(options):
+            questions.append(
+                {
+                    "prompt": prompt,
+                    "options": options,
+                    "correct": correct,
+                }
+            )
+        idx += 1
+
+    if not title or not questions:
+        flash("Please provide a title and at least one complete question.", "error")
+        return redirect(url_for("subject", slug=slug, tool="quizzes"))
+
+    quiz = collab.create_quiz(slug, title, description, questions, current_user()["id"])
+    flash(f"Quiz '{quiz['title']}' created. Share the invite code: {quiz['invite_code']}", "success")
+    return redirect(url_for("subject", slug=slug, tool="quizzes"))
+
+
+@app.get("/quiz/<quiz_id>/results")
+@login_required
+def quiz_results(quiz_id):
+    """Show results/leaderboard for a quiz."""
+    quiz = collab.get_quiz(quiz_id)
+    if not quiz:
+        flash("Quiz not found.", "error")
+        return redirect(url_for("home"))
+
+    subject_info = get_subject(quiz["subject"])
+    users = load_users()
+    attempts = collab.get_attempts(quiz_id)
+
+    # Aggregate best score per user for the leaderboard.
+    best = {}
+    for a in attempts:
+        uid = a["user_id"]
+        if uid not in best or a["score"] > best[uid]["score"]:
+            best[uid] = {"score": a["score"], "total": a["total"]}
+
+    rows = [
+        {
+            "name": user_name(uid, users),
+            "score": v["score"],
+            "total": v["total"],
+            "is_you": uid == current_user()["id"],
+        }
+        for uid, v in sorted(best.items(), key=lambda kv: (-kv[1]["score"], kv[0]))
+    ]
+
+    return render_template(
+        "quiz_results.html",
+        user=current_user(),
+        subjects=SUBJECTS,
+        quiz=quiz,
+        subject=subject_info,
+        rows=rows,
+    )
 
 
 @app.get("/about")

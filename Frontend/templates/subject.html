@@ -54,6 +54,8 @@
                 <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'assignments' }}" href="{{ url_for('subject', slug=subject.slug, tool='assignments') }}">Assignments</a>
                 <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'calendar' }}" href="{{ url_for('subject', slug=subject.slug, tool='calendar') }}">Calendar</a>
                 <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'grades' }}" href="{{ url_for('subject', slug=subject.slug, tool='grades') }}">Grades</a>
+                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'collab' }}" href="{{ url_for('subject', slug=subject.slug, tool='collab') }}">Collaborate</a>
+                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'quizzes' }}" href="{{ url_for('subject', slug=subject.slug, tool='quizzes') }}">Quizzes</a>
             </nav>
 
             <div class="subject-content">
@@ -102,15 +104,122 @@
                         <h2 class="card__title">Course Materials</h2>
                         {% if files %}
                             <ul class="material-list">
-                                {% for f in files %}
+                                {% for m in shared_files %}
                                     <li class="material-list__item">
-                                        <span class="material-list__name">{{ f }}</span>
-                                        <a class="button button--small" href="{{ url_for('subject_download', slug=subject.slug, filepath=f) }}">Download</a>
+                                        <span class="material-list__name">{{ m.filename }}</span>
+                                        <span class="material-list__meta">shared by {{ user_name(m.uploader_id) }}</span>
+                                        <a class="button button--small" href="{{ url_for('subject_download', slug=subject.slug, filepath=m.filename) }}">Download</a>
                                     </li>
                                 {% endfor %}
                             </ul>
                         {% else %}
                             <p class="text-muted">No materials uploaded yet. Upload slides or documents above.</p>
+                        {% endif %}
+                    </section>
+                {% endif %}
+
+                {% if active_tool == 'collab' %}
+                    <section class="card">
+                        <h2 class="card__title">Collaboration</h2>
+                        <p class="text-muted mb-4">Work together to share course materials and take quizzes. Members share everything in this workspace.</p>
+
+                        {% if is_member %}
+                            <div class="collab-status collab-status--member">
+                                <strong>You're a member of this collaboration.</strong>
+                                <form class="inline-form" action="{{ url_for('collab_leave', slug=subject.slug) }}" method="post">
+                                    <button class="button button--small button--ghost" type="submit">Leave</button>
+                                </form>
+                            </div>
+                        {% else %}
+                            <div class="collab-status">
+                                <strong>You're not a member yet.</strong>
+                                <form class="inline-form" action="{{ url_for('collab_join', slug=subject.slug) }}" method="post">
+                                    <input class="form-input" type="text" name="code" placeholder="Enter collaboration code" required>
+                                    <button class="button" type="submit">Join</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </section>
+
+                    <section class="card">
+                        <h2 class="card__title">Invite Code</h2>
+                        <p class="text-muted">Share this code with classmates to invite them into the collaboration:</p>
+                        <div class="invite-code">{{ invite_code }}</div>
+                    </section>
+
+                    <section class="card">
+                        <h2 class="card__title">Members ({{ member_names|length }})</h2>
+                        {% if member_names %}
+                            <ul class="member-list">
+                                {% for name in member_names %}
+                                    <li class="member-list__item">{{ name }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="text-muted">No members yet. Invite classmates using the code above.</p>
+                        {% endif %}
+                    </section>
+                {% endif %}
+
+                {% if active_tool == 'quizzes' %}
+                    <section class="card">
+                        <h2 class="card__title">Create a Quiz</h2>
+                        <p class="text-muted mb-4">Build a quiz (up to 10 questions). Classmates can take it with the auto-generated invite code.</p>
+                        <form class="quiz-create" action="{{ url_for('quiz_create', slug=subject.slug) }}" method="post">
+                            <div class="form-field">
+                                <label class="form-label" for="q_title">Quiz title</label>
+                                <input class="form-input" id="q_title" type="text" name="title" required>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="q_desc">Description</label>
+                                <textarea class="form-input" id="q_desc" name="description" rows="2"></textarea>
+                            </div>
+
+                            <div class="quiz-builder" id="quiz-builder">
+                                <div class="quiz-question-block" data-q="0">
+                                    <h3 class="quiz-question-title">Question 1</h3>
+                                    <div class="form-field">
+                                        <label class="form-label">Question text</label>
+                                        <input class="form-input" type="text" name="q0_prompt" placeholder="e.g. What is photosynthesis?">
+                                    </div>
+                                    <label class="form-label">Options</label>
+                                    <div class="quiz-options">
+                                        <div class="form-field"><input class="form-input" type="text" name="q0_opt0" placeholder="Option A"></div>
+                                        <div class="form-field"><input class="form-input" type="text" name="q0_opt1" placeholder="Option B"></div>
+                                        <div class="form-field"><input class="form-input" type="text" name="q0_opt2" placeholder="Option C"></div>
+                                        <div class="form-field"><input class="form-input" type="text" name="q0_opt3" placeholder="Option D"></div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label class="form-label">Correct answer (A=0, B=1, C=2, D=3)</label>
+                                        <input class="form-input form-input--small" type="number" name="q0_correct" min="0" max="3" value="0">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button class="button button--ghost" type="button" id="add-question">Add question</button>
+                            <div class="form-field">
+                                <button class="button" type="submit">Create Quiz</button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card">
+                        <h2 class="card__title">Quizzes</h2>
+                        {% if quizzes %}
+                            <ul class="quiz-list">
+                                {% for quiz in quizzes %}
+                                    <li class="quiz-list__item">
+                                        <div class="quiz-list__info">
+                                            <strong>{{ quiz.title }}</strong>
+                                            <span class="text-muted">{{ quiz.questions|length }} questions · {{ quiz.invite_code }}</span>
+                                        </div>
+                                        <a class="button button--small" href="{{ url_for('quiz_take', quiz_id=quiz.id) }}">Take</a>
+                                        <a class="button button--small button--ghost" href="{{ url_for('quiz_results', quiz_id=quiz.id) }}">Results</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="text-muted">No quizzes yet. Create one above to get started.</p>
                         {% endif %}
                     </section>
                 {% endif %}
@@ -158,5 +267,36 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        const addQuestionBtn = document.getElementById('add-question');
+        if (addQuestionBtn) {
+            const builder = document.getElementById('quiz-builder');
+            let qCount = builder.querySelectorAll('.quiz-question-block').length;
+            addQuestionBtn.addEventListener('click', () => {
+                const block = document.createElement('div');
+                block.className = 'quiz-question-block';
+                block.dataset.q = qCount;
+                block.innerHTML = `
+                    <h3 class="quiz-question-title">Question ${qCount + 1}</h3>
+                    <div class="form-field">
+                        <label class="form-label">Question text</label>
+                        <input class="form-input" type="text" name="q${qCount}_prompt" placeholder="e.g. What is the capital of France?">
+                    </div>
+                    <label class="form-label">Options</label>
+                    <div class="quiz-options">
+                        <div class="form-field"><input class="form-input" type="text" name="q${qCount}_opt0" placeholder="Option A"></div>
+                        <div class="form-field"><input class="form-input" type="text" name="q${qCount}_opt1" placeholder="Option B"></div>
+                        <div class="form-field"><input class="form-input" type="text" name="q${qCount}_opt2" placeholder="Option C"></div>
+                        <div class="form-field"><input class="form-input" type="text" name="q${qCount}_opt3" placeholder="Option D"></div>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label">Correct answer (A=0, B=1, C=2, D=3)</label>
+                        <input class="form-input form-input--small" type="number" name="q${qCount}_correct" min="0" max="3" value="0">
+                    </div>`;
+                builder.appendChild(block);
+                qCount++;
+            });
+        }
+    </script>
 </body>
 </html>
