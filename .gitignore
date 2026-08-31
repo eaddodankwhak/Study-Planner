@@ -8,6 +8,7 @@ Database/instance/*.db
 Database/instance/*.sqlite
 Database/instance/*.sqlite3
 Database/users.json
+Database/uploads/
 
 # Environment and editor files
 .env

@@ -31,7 +31,7 @@
             <ul class="sites-nav__list">
                 {% for subject in subjects %}
                     <li class="sites-nav__item">
-                        <a class="sites-nav__link" href="{{ url_for('home') }}">
+                        <a class="sites-nav__link" href="{{ url_for('subject', slug=subject.slug) }}">
                             <span class="sites-nav__code">{{ subject.code }}</span>
                         </a>
                     </li>
@@ -48,12 +48,12 @@
             <div class="course-grid">
                 {% for subject in subjects %}
                     <article class="course-card course-card--{{ subject.color }}">
-                        <a class="course-card__header" href="{{ url_for('task') }}">
+                        <a class="course-card__header" href="{{ url_for('subject', slug=subject.slug) }}">
                             <span class="course-card__code">{{ subject.code }}</span>
                             <span class="course-card__title">{{ subject.title }}</span>
                         </a>
                         <div class="course-card__body">
-                            Upcoming study sessions and tasks.
+                            {{ subject.term }} · {{ subject.instructor }}
                         </div>
                     </article>
                 {% endfor %}

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject.code }} — {{ subject.title }} | Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <aside class="sites-nav">
+            <div class="sites-nav__heading">My Subjects</div>
+            <ul class="sites-nav__list">
+                {% for s in subjects %}
+                    <li class="sites-nav__item">
+                        <a class="sites-nav__link{{ ' sites-nav__link--active' if s.slug == subject.slug }}" href="{{ url_for('subject', slug=s.slug) }}">
+                            <span class="sites-nav__code">{{ s.code }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <main class="page-main">
+            <!-- Subject title bar / breadcrumb -->
+            <div class="subject-banner course-card--{{ subject.color }}">
+                <div class="subject-banner__info">
+                    <span class="subject-banner__code">{{ subject.code }}</span>
+                    <h1 class="subject-banner__title">{{ subject.title }}</h1>
+                    <p class="subject-banner__meta">{{ subject.term }} · {{ subject.instructor }}</p>
+                </div>
+            </div>
+
+            <!-- Sakai-style tool menu -->
+            <nav class="subject-tools">
+                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'home' }}" href="{{ url_for('subject', slug=subject.slug, tool='home') }}">Home</a>
+                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'resources' }}" href="{{ url_for('subject', slug=subject.slug, tool='resources') }}">Resources</a>
+                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'assignments' }}" href="{{ url_for('subject', slug=subject.slug, tool='assignments') }}">Assignments</a>
+                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'calendar' }}" href="{{ url_for('subject', slug=subject.slug, tool='calendar') }}">Calendar</a>
+                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'grades' }}" href="{{ url_for('subject', slug=subject.slug, tool='grades') }}">Grades</a>
+            </nav>
+
+            <div class="subject-content">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <ul class="flashes">
+                            {% for category, message in messages %}
+                                <li class="{{ category }}">{{ message }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endwith %}
+
+                {% if active_tool == 'home' %}
+                    <section class="card">
+                        <h2 class="card__title">Course Overview</h2>
+                        <p>{{ subject.description }}</p>
+                        <ul class="subject-overview">
+                            <li><strong>Instructor:</strong> {{ subject.instructor }}</li>
+                            <li><strong>Term:</strong> {{ subject.term }}</li>
+                            <li><strong>Course code:</strong> {{ subject.code }}</li>
+                        </ul>
+                    </section>
+
+                    <section class="card subject-announcements">
+                        <h2 class="card__title">Announcements</h2>
+                        <div class="task">
+                            <span>Welcome to {{ subject.title }}! Review the course overview and upload any shared slides under Resources.</span>
+                        </div>
+                    </section>
+                {% endif %}
+
+                {% if active_tool == 'resources' %}
+                    <section class="card">
+                        <h2 class="card__title">Upload Course Material</h2>
+                        <p class="text-muted mb-4">Add slides, PDFs, or other documents for this subject.</p>
+                        <form class="upload-form" action="{{ url_for('subject_upload', slug=subject.slug) }}" method="post" enctype="multipart/form-data">
+                            <div class="form-field">
+                                <input type="file" name="material">
+                                <button class="button" type="submit">Upload</button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card">
+                        <h2 class="card__title">Course Materials</h2>
+                        {% if files %}
+                            <ul class="material-list">
+                                {% for f in files %}
+                                    <li class="material-list__item">
+                                        <span class="material-list__name">{{ f }}</span>
+                                        <a class="button button--small" href="{{ url_for('subject_download', slug=subject.slug, filepath=f) }}">Download</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="text-muted">No materials uploaded yet. Upload slides or documents above.</p>
+                        {% endif %}
+                    </section>
+                {% endif %}
+
+                {% if active_tool == 'assignments' %}
+                    <section class="card">
+                        <h2 class="card__title">Assignments</h2>
+                        <ul class="task-list">
+                            <li class="task"><input type="checkbox"><span>Chapter 3 problem set — due Friday</span></li>
+                            <li class="task"><input type="checkbox"><span>Reading: pp. 45–70 — due Monday</span></li>
+                            <li class="task"><input type="checkbox"><span>Group project proposal — due next month</span></li>
+                        </ul>
+                    </section>
+                {% endif %}
+
+                {% if active_tool == 'calendar' %}
+                    <section class="card">
+                        <h2 class="card__title">Class Calendar</h2>
+                        <ul class="task-list">
+                            <li class="task"><span><strong>Mon</strong> — Lecture session</span></li>
+                            <li class="task"><span><strong>Wed</strong> — Tutorial / lab</span></li>
+                            <li class="task"><span><strong>Fri</strong> — Quiz</span></li>
+                        </ul>
+                    </section>
+                {% endif %}
+
+                {% if active_tool == 'grades' %}
+                    <section class="card">
+                        <h2 class="card__title">Grades</h2>
+                        <p class="text-muted">Your grades for this subject will appear here.</p>
+                        <table class="grade-table">
+                            <thead>
+                                <tr><th>Assessment</th><th>Score</th><th>Weight</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Midterm</td><td>—</td><td>30%</td></tr>
+                                <tr><td>Assignments</td><td>—</td><td>20%</td></tr>
+                                <tr><td>Final exam</td><td>—</td><td>50%</td></tr>
+                            </tbody>
+                        </table>
+                    </section>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
