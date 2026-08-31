@@ -22,11 +22,16 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   margin-bottom: var(--space-4);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--color-primary-light);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 img {
@@ -40,4 +45,29 @@ textarea,
 button {
   font-family: inherit;
   font-size: inherit;
+}
+
+/* Flash / alert messages */
+.flashes {
+  list-style: none;
+  margin-bottom: var(--space-4);
+}
+
+.flashes li {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+
+.flashes .success {
+  background: #e2f2e3;
+  color: var(--color-success);
+  border: 1px solid #bfe0c1;
+}
+
+.flashes .error {
+  background: #fce8e8;
+  color: var(--color-error);
+  border: 1px solid #f3c2c2;
 }

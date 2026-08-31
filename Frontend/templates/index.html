@@ -11,57 +11,55 @@
 <body>
     <header class="page-header">
         <div class="container page-header__inner">
-            <h1 class="page-header__title">My Study Planner</h1>
-            <nav class="nav-bar">
-                <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('home') }}">Home</a>
-                <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
-                <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
-                <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
-                <a class="nav-bar__link" href="{{ url_for('onboarding') }}">Get Started</a>
-            </nav>
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
         </div>
     </header>
 
-    <main class="container page-main">
-        <p class="text-muted mb-4" >Welcome to my study planner.</p>
-
-        <section class="card mb-4">
-            <h2 class="card__title">Today's tasks</h2>
-            <ul class="task-list">
-                <li class="task">
-                    <input type="checkbox">
-                    Animal Nutrition
-                </li>
-                <li class="task">
-                    <input type="checkbox">
-                    Genetics
-                </li>
-                <li class="task">
-                    <input type="checkbox">
-                    Plant Pathology
-                </li>
+    <div class="app-shell">
+        <aside class="sites-nav">
+            <div class="sites-nav__heading">My Subjects</div>
+            <ul class="sites-nav__list">
+                {% for subject in subjects %}
+                    <li class="sites-nav__item">
+                        <a class="sites-nav__link" href="{{ url_for('home') }}">
+                            <span class="sites-nav__code">{{ subject.code }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
             </ul>
-        </section>
+        </aside>
 
-        <section class="card">
-            <h3 class="card__title">Add a New Task</h3>
-            <form action="#" method="post">
-                <div class="form-field">
-                    <label for="task">Task:</label>
-                    <input type="text" id="task" name="task">
-                </div>
-                <div class="form-field">
-                    <label for="deadline">Deadline:</label>
-                    <input type="date" id="deadline" name="deadline">
-                </div>
-                <div class="form-field">
-                    <label for="category">Category:</label>
-                    <input type="text" id="category" name="category">
-                </div>
-                <button class="button" type="submit">Add Task</button>
-            </form>
-        </section>
-    </main>
+        <main class="page-main">
+            <div class="dashboard-heading">
+                <h2>My Subjects</h2>
+                <p class="text-muted mb-0">Your courses arranged just like a school portal.</p>
+            </div>
+
+            <div class="course-grid">
+                {% for subject in subjects %}
+                    <article class="course-card course-card--{{ subject.color }}">
+                        <a class="course-card__header" href="{{ url_for('task') }}">
+                            <span class="course-card__code">{{ subject.code }}</span>
+                            <span class="course-card__title">{{ subject.title }}</span>
+                        </a>
+                        <div class="course-card__body">
+                            Upcoming study sessions and tasks.
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        </main>
+    </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

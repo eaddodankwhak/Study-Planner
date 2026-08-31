@@ -9,13 +9,17 @@
 <body>
     <header class="page-header">
         <div class="container page-header__inner">
-            <h1 class="page-header__title">My Study Planner</h1>
-            <nav class="nav-bar">
-                <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
-                <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
-                <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
-                <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
-            </nav>
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
         </div>
     </header>
 
