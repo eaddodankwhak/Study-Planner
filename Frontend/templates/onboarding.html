@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Started — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <h1 class="page-header__title">My Study Planner</h1>
+            <nav class="nav-bar">
+                <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <section class="card onboarding" id="onboarding-card">
+            <h2 class="card__title">Welcome! Let's build your study routine</h2>
+            <p class="text-muted mb-4">Tell us a little about yourself so we can plan a routine that fits your courses.</p>
+
+            <form id="onboarding-form" class="onboarding__form" action="#" method="post">
+                <div class="form-field">
+                    <label for="name">Your name</label>
+                    <input type="text" id="name" name="name" placeholder="e.g. Ama Badu" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="school">School / Institution</label>
+                    <input type="text" id="school" name="school" placeholder="e.g. University of Ghana" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="courses">Courses of study (comma separated)</label>
+                    <input type="text" id="courses" name="courses" placeholder="e.g. Genetics, Animal Nutrition, Plant Pathology" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="hours">Hours available per day</label>
+                    <input type="number" id="hours" name="hours" min="1" max="12" value="4" required>
+                </div>
+
+                <button class="button" type="submit">Plan my routine</button>
+            </form>
+        </section>
+
+        <section class="card routine" id="routine-card" hidden>
+            <h2 class="card__title">Your Personalized Study Routine</h2>
+            <p class="text-muted mb-2" id="routine-heading"></p>
+            <ul class="task-list" id="routine-list"></ul>
+            <button class="button mt-4" id="start-btn">Start studying</button>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('onboarding-form');
+            const card = document.getElementById('onboarding-card');
+            const routine = document.getElementById('routine-card');
+            const heading = document.getElementById('routine-heading');
+            const list = document.getElementById('routine-list');
+            const startBtn = document.getElementById('start-btn');
+
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const name = document.getElementById('name').value.trim() || 'there';
+                const school = document.getElementById('school').value.trim() || 'your school';
+                const courses = document.getElementById('courses').value
+                    .split(',')
+                    .map((c) => c.trim())
+                    .filter(Boolean);
+                const hours = parseInt(document.getElementById('hours').value, 10) || 4;
+                const perCourse = courses.length ? Math.max(1, Math.floor(hours / courses.length)) : 1;
+
+                heading.textContent = `${name} · ${school} · ~${hours} hrs/day across ${courses.length || 0} course(s)`;
+
+                list.innerHTML = '';
+                courses.forEach((course, index) => {
+                    const day = days[index % days.length];
+                    const li = document.createElement('li');
+                    li.className = 'task';
+                    li.innerHTML = `
+                        <input type="checkbox">
+                        <span><strong>${day}</strong> — ${course} (${perCourse} hr(s))</span>
+                    `;
+                    list.appendChild(li);
+                });
+
+                if (courses.length === 0) {
+                    const li = document.createElement('li');
+                    li.className = 'task';
+                    li.innerHTML = '<span>Add at least one course to see a routine.</span>';
+                    list.appendChild(li);
+                }
+
+                card.hidden = true;
+                routine.hidden = false;
+                routine.scrollIntoView({ behavior: 'smooth' });
+            });
+
+            startBtn.addEventListener('click', () => {
+                window.location.href = '/';
+            });
+        });
+    </script>
+</body>
+</html>

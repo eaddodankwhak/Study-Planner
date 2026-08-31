@@ -10,6 +10,12 @@ app = Flask(
 )
 
 
+@app.get("/onboarding")
+def onboarding():
+    """Render the onboarding page for new users."""
+    return render_template("onboarding.html")
+
+
 @app.get("/")
 def home():
     """Render the first Study Planner page."""
