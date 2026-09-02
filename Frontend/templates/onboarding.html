@@ -12,12 +12,6 @@
             <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
             <div class="page-header__user">
                 <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
-                <nav class="nav-bar">
-                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
-                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
-                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
-                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
-                </nav>
                 <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
             </div>
         </div>
@@ -25,94 +19,122 @@
 
     <main class="container page-main">
         <section class="card onboarding" id="onboarding-card">
-            <h2 class="card__title">Welcome! Let's build your study routine</h2>
-            <p class="text-muted mb-4">Tell us a little about yourself so we can plan a routine that fits your courses.</p>
+            <h2 class="card__title">Let's personalize your planner</h2>
+            <p class="text-muted mb-4">A few quick steps, and we'll tailor your routine to you.</p>
 
-            <form id="onboarding-form" class="onboarding__form" action="#" method="post">
-                <div class="form-field">
-                    <label for="name">Your name</label>
-                    <input type="text" id="name" name="name" placeholder="e.g. Ama Badu" required>
-                </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <ul class="flashes">
+                        {% for category, message in messages %}
+                            <li class="{{ category }}">{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
 
-                <div class="form-field">
-                    <label for="school">School / Institution</label>
-                    <input type="text" id="school" name="school" placeholder="e.g. University of Ghana" required>
-                </div>
+            <!-- Step indicator -->
+            <ol class="stepper" id="stepper">
+                <li class="stepper__item is-active" data-step="1">School</li>
+                <li class="stepper__item" data-step="2">Program</li>
+                <li class="stepper__item" data-step="3">Courses</li>
+                <li class="stepper__item" data-step="4">Goals</li>
+            </ol>
 
-                <div class="form-field">
-                    <label for="courses">Courses of study (comma separated)</label>
-                    <input type="text" id="courses" name="courses" placeholder="e.g. Genetics, Animal Nutrition, Plant Pathology" required>
-                </div>
+            <form id="onboarding-form" class="onboarding__form" action="{{ url_for('onboarding_post') }}" method="post">
 
-                <div class="form-field">
-                    <label for="hours">Hours available per day</label>
-                    <input type="number" id="hours" name="hours" min="1" max="12" value="4" required>
-                </div>
+                <!-- Step 1: School -->
+                <fieldset class="onboard-step" id="step-1">
+                    <legend>Step 1 · Your school</legend>
+                    <p class="text-muted mb-3">Where do you study? We use this to keep things relevant for you.</p>
+                    <div class="form-field">
+                        <label for="school">School / Institution</label>
+                        <input type="text" id="school" name="school" placeholder="e.g. University of Ghana" value="{{ user.school if user and user.school }}" required>
+                    </div>
+                    <div class="onboard-actions">
+                        <button type="button" class="button" data-next="2">Continue →</button>
+                    </div>
+                </fieldset>
 
-                <button class="button" type="submit">Plan my routine</button>
+                <!-- Step 2: Program of study -->
+                <fieldset class="onboard-step" id="step-2" hidden>
+                    <legend>Step 2 · Your program of study</legend>
+                    <p class="text-muted mb-3">What degree or program are you pursuing?</p>
+                    <div class="form-field">
+                        <label for="program">Program of study</label>
+                        <input type="text" id="program" name="program" placeholder="e.g. BSc Animal Science" value="{{ user.program if user and user.program }}" required>
+                    </div>
+                    <div class="onboard-actions">
+                        <button type="button" class="button button--ghost" data-back="1">← Back</button>
+                        <button type="button" class="button" data-next="3">Continue →</button>
+                    </div>
+                </fieldset>
+
+                <!-- Step 3: Courses -->
+                <fieldset class="onboard-step" id="step-3" hidden>
+                    <legend>Step 3 · Your courses</legend>
+                    <p class="text-muted mb-3">Which courses are you taking this term? Separate each with a comma.</p>
+                    <div class="form-field">
+                        <label for="courses">Courses of study</label>
+                        <input type="text" id="courses" name="courses" placeholder="e.g. Genetics, Animal Nutrition, Plant Pathology" value="{{ user.courses|join(', ') if user and user.courses }}" required>
+                    </div>
+                    <div class="onboard-actions">
+                        <button type="button" class="button button--ghost" data-back="2">← Back</button>
+                        <button type="button" class="button" data-next="4">Continue →</button>
+                    </div>
+                </fieldset>
+
+                <!-- Step 4: Goals -->
+                <fieldset class="onboard-step" id="step-4" hidden>
+                    <legend>Step 4 · Your goals</legend>
+                    <p class="text-muted mb-3">What do you want to achieve? This shapes your study routine.</p>
+                    <div class="form-field">
+                        <label for="goals">Your study goals</label>
+                        <textarea id="goals" name="goals" rows="4" placeholder="e.g. Pass all courses with distinction, master Genetics, and build a consistent daily study habit.">{{ user.goals if user and user.goals }}</textarea>
+                    </div>
+                    <div class="onboard-actions">
+                        <button type="button" class="button button--ghost" data-back="3">← Back</button>
+                        <button class="button button--primary" type="submit">Finish setup →</button>
+                    </div>
+                </fieldset>
+
             </form>
-        </section>
-
-        <section class="card routine" id="routine-card" hidden>
-            <h2 class="card__title">Your Personalized Study Routine</h2>
-            <p class="text-muted mb-2" id="routine-heading"></p>
-            <ul class="task-list" id="routine-list"></ul>
-            <button class="button mt-4" id="start-btn">Start studying</button>
         </section>
     </main>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const form = document.getElementById('onboarding-form');
-            const card = document.getElementById('onboarding-card');
-            const routine = document.getElementById('routine-card');
-            const heading = document.getElementById('routine-heading');
-            const list = document.getElementById('routine-list');
-            const startBtn = document.getElementById('start-btn');
+            const steps = ['step-1', 'step-2', 'step-3', 'step-4'];
+            const stepperItems = document.querySelectorAll('.stepper__item');
 
-            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-
-                const name = document.getElementById('name').value.trim() || 'there';
-                const school = document.getElementById('school').value.trim() || 'your school';
-                const courses = document.getElementById('courses').value
-                    .split(',')
-                    .map((c) => c.trim())
-                    .filter(Boolean);
-                const hours = parseInt(document.getElementById('hours').value, 10) || 4;
-                const perCourse = courses.length ? Math.max(1, Math.floor(hours / courses.length)) : 1;
-
-                heading.textContent = `${name} · ${school} · ~${hours} hrs/day across ${courses.length || 0} course(s)`;
-
-                list.innerHTML = '';
-                courses.forEach((course, index) => {
-                    const day = days[index % days.length];
-                    const li = document.createElement('li');
-                    li.className = 'task';
-                    li.innerHTML = `
-                        <input type="checkbox">
-                        <span><strong>${day}</strong> — ${course} (${perCourse} hr(s))</span>
-                    `;
-                    list.appendChild(li);
+            function showStep(stepNum) {
+                steps.forEach((id, i) => {
+                    document.getElementById(id).hidden = (i + 1) !== stepNum;
                 });
+                stepperItems.forEach((item) => {
+                    const n = Number(item.dataset.step);
+                    item.classList.toggle('is-active', n === stepNum);
+                    item.classList.toggle('is-done', n < stepNum);
+                });
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
 
-                if (courses.length === 0) {
-                    const li = document.createElement('li');
-                    li.className = 'task';
-                    li.innerHTML = '<span>Add at least one course to see a routine.</span>';
-                    list.appendChild(li);
-                }
-
-                card.hidden = true;
-                routine.hidden = false;
-                routine.scrollIntoView({ behavior: 'smooth' });
+            document.querySelectorAll('[data-next]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const current = Number(btn.closest('fieldset').id.split('-')[1]);
+                    const nextField = document.getElementById(`step-${current}`);
+                    const input = nextField.querySelector('input[required], textarea');
+                    if (input && !input.value.trim()) {
+                        input.focus();
+                        input.reportValidity();
+                        return;
+                    }
+                    showStep(Number(btn.dataset.next));
+                });
             });
 
-            startBtn.addEventListener('click', () => {
-                window.location.href = '/';
+            document.querySelectorAll('[data-back]').forEach((btn) => {
+                btn.addEventListener('click', () => showStep(Number(btn.dataset.back)));
             });
         });
     </script>

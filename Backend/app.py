@@ -197,8 +197,8 @@ def signup_post():
     save_users(users)
 
     session["user_id"] = user_id
-    flash(f"Welcome, {name}! Your study planner is ready.", "success")
-    return redirect(url_for("home"))
+    flash(f"Welcome, {name}! Let's personalize your study planner.", "success")
+    return redirect(url_for("onboarding"))
 
 
 @app.get("/login")
@@ -246,6 +246,35 @@ def current_user():
 def onboarding():
     """Render the onboarding page for new users."""
     return render_template("onboarding.html", user=current_user())
+
+
+@app.post("/onboarding")
+@login_required
+def onboarding_post():
+    """Save the new user's school, program, courses, and goals and finish onboarding."""
+    user = current_user()
+    users = load_users()
+
+    school = request.form.get("school", "").strip()
+    program = request.form.get("program", "").strip()
+    courses = [c.strip() for c in request.form.get("courses", "").split(",") if c.strip()]
+    goals = request.form.get("goals", "").strip()
+
+    if not school or not program or not courses or not goals:
+        flash("Please complete all steps.", "error")
+        return redirect(url_for("onboarding"))
+
+    users[user["id"]].update({
+        "school": school,
+        "program": program,
+        "courses": courses,
+        "goals": goals,
+        "onboarded": True,
+    })
+    save_users(users)
+
+    flash("You're all set! Your personalized planner is ready.", "success")
+    return redirect(url_for("home"))
 
 
 @app.get("/")
