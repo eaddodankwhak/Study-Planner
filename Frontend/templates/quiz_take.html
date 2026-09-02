@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take a Quiz — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="auth-page">
+        <main class="auth-card">
+            <header class="auth-card__banner">
+                <h1>Take a Quiz</h1>
+                <p>Enter a quiz invite code shared by a classmate</p>
+            </header>
+
+            <div class="auth-card__body">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <ul class="flashes">
+                            {% for category, message in messages %}
+                                <li class="{{ category }}">{{ message }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endwith %}
+
+                {% if error %}
+                    <p class="flash error">{{ error }}</p>
+                {% endif %}
+
+                <form action="{{ url_for('quiz_take_page') }}" method="get">
+                    <div class="form-field">
+                        <label for="code">Quiz invite code</label>
+                        <input type="text" id="code" name="code" placeholder="e.g. AB3X7Z" required>
+                    </div>
+                    <button class="button button--primary" type="submit">Open Quiz</button>
+                </form>
+            </div>
+
+            <footer class="auth-card__footer">
+                <a href="{{ url_for('home') }}">Back to Home</a>
+            </footer>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

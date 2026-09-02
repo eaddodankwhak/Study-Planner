@@ -9,20 +9,27 @@
 <body>
     <header class="page-header">
         <div class="container page-header__inner">
-            <h1 class="page-header__title">My Study Planner</h1>
-            <nav class="nav-bar">
-                <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
-                <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
-                <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('progress') }}">Progress</a>
-                <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
-            </nav>
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
         </div>
     </header>
 
     <main class="container page-main">
+        <div class="dashboard-heading">
+            <h2>Progress</h2>
+        </div>
         <section class="card">
-            <h2 class="card__title">Your Progress</h2>
-            <p class="text-muted mb-4">Track your study progress here.</p>
+            <h3 class="card__title">Your Study Progress</h3>
+            <p class="text-muted mb-4">Track your study progress across subjects here.</p>
         </section>
     </main>
 </body>

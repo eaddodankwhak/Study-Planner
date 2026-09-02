@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ quiz.title }} — Results | Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <aside class="sites-nav">
+            <div class="sites-nav__heading">My Subjects</div>
+            <ul class="sites-nav__list">
+                {% for s in subjects %}
+                    <li class="sites-nav__item">
+                        <a class="sites-nav__link{{ ' sites-nav__link--active' if s.slug == subject.slug }}" href="{{ url_for('subject', slug=s.slug) }}">
+                            <span class="sites-nav__code">{{ s.code }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <main class="page-main">
+            <div class="subject-banner course-card--{{ subject.color }}">
+                <div class="subject-banner__info">
+                    <span class="subject-banner__code">{{ subject.code }}</span>
+                    <h1 class="subject-banner__title">{{ quiz.title }} — Results</h1>
+                    <p class="subject-banner__meta">{{ subject.title }}</p>
+                </div>
+            </div>
+
+            <div class="subject-content">
+                <section class="card">
+                    <h2 class="card__title">Leaderboard</h2>
+                    {% if rows %}
+                        <table class="grade-table">
+                            <thead>
+                                <tr><th>#</th><th>Name</th><th>Score</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for row in rows %}
+                                    <tr class="{{ 'row--you' if row.is_you else '' }}">
+                                        <td>{{ loop.index }}</td>
+                                        <td>{{ row.name }}{{ ' (you)' if row.is_you else '' }}</td>
+                                        <td>{{ row.score }} / {{ row.total }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="text-muted">No attempts yet. Share the quiz invite code with classmates.</p>
+                    {% endif %}
+                    <div class="form-field">
+                        <a class="button button--ghost" href="{{ url_for('quiz_take', quiz_id=quiz.id) }}">Take this quiz</a>
+                        <a class="button button--ghost" href="{{ url_for('subject', slug=quiz.subject, tool='quizzes') }}">Back to Quizzes</a>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ quiz.title }} — {{ subject.code }} | Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <aside class="sites-nav">
+            <div class="sites-nav__heading">My Subjects</div>
+            <ul class="sites-nav__list">
+                {% for s in subjects %}
+                    <li class="sites-nav__item">
+                        <a class="sites-nav__link{{ ' sites-nav__link--active' if s.slug == subject.slug }}" href="{{ url_for('subject', slug=s.slug) }}">
+                            <span class="sites-nav__code">{{ s.code }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <main class="page-main">
+            <div class="subject-banner course-card--{{ subject.color }}">
+                <div class="subject-banner__info">
+                    <span class="subject-banner__code">{{ subject.code }}</span>
+                    <h1 class="subject-banner__title">{{ quiz.title }}</h1>
+                    <p class="subject-banner__meta">{{ subject.title }} · Invite code: {{ quiz.invite_code }}</p>
+                </div>
+            </div>
+
+            <div class="subject-content">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <ul class="flashes">
+                            {% for category, message in messages %}
+                                <li class="{{ category }}">{{ message }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endwith %}
+
+                <section class="card">
+                    <h2 class="card__title">Take the Quiz</h2>
+                    {% if quiz.description %}
+                        <p class="text-muted">{{ quiz.description }}</p>
+                    {% endif %}
+                    <form class="quiz-answer" action="{{ url_for('quiz_attempt', quiz_id=quiz.id) }}" method="post">
+                        {% for q in quiz.questions %}
+                            <fieldset class="quiz-question">
+                                <legend class="quiz-question-title">{{ loop.index }}. {{ q.prompt }}</legend>
+                                {% for opt in q.options %}
+                                    {% if opt %}
+                                        <label class="quiz-option">
+                                            <input type="radio" name="q{{ loop.index0 }}" value="{{ loop.index0 }}" required>
+                                            <span>{{ opt }}</span>
+                                        </label>
+                                    {% endif %}
+                                {% endfor %}
+                            </fieldset>
+                        {% endfor %}
+                        <div class="form-field">
+                            <button class="button" type="submit">Submit Answers</button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
