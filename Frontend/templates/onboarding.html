@@ -38,6 +38,7 @@
                 <li class="stepper__item" data-step="2">Program</li>
                 <li class="stepper__item" data-step="3">Courses</li>
                 <li class="stepper__item" data-step="4">Goals</li>
+                <li class="stepper__item" data-step="5">Availability</li>
             </ol>
 
             <form id="onboarding-form" class="onboarding__form" action="{{ url_for('onboarding_post') }}" method="post">
@@ -93,6 +94,20 @@
                     </div>
                     <div class="onboard-actions">
                         <button type="button" class="button button--ghost" data-back="3">← Back</button>
+                        <button type="button" class="button" data-next="5">Continue →</button>
+                    </div>
+                </fieldset>
+
+                <!-- Step 5: Availability -->
+                <fieldset class="onboard-step" id="step-5" hidden>
+                    <legend>Step 5 · Your availability</legend>
+                    <p class="text-muted mb-3">How many hours can you study per day? We use this to build a realistic, well-balanced plan.</p>
+                    <div class="form-field">
+                        <label for="available_hours">Hours available per day</label>
+                        <input type="number" id="available_hours" name="available_hours" min="1" max="12" step="0.5" value="{{ user.available_hours if user and user.available_hours else 4 }}" required>
+                    </div>
+                    <div class="onboard-actions">
+                        <button type="button" class="button button--ghost" data-back="4">← Back</button>
                         <button class="button button--primary" type="submit">Finish setup →</button>
                     </div>
                 </fieldset>
@@ -104,7 +119,7 @@
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const steps = ['step-1', 'step-2', 'step-3', 'step-4'];
+            const steps = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'];
             const stepperItems = document.querySelectorAll('.stepper__item');
 
             function showStep(stepNum) {

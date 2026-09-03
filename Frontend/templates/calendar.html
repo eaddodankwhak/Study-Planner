@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Tasks</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="dashboard-heading">
+            <h2>Academic Calendar</h2>
+            <p class="text-muted mb-0">Lectures, tutorials, labs, and exams.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <section class="card mb-4">
+            <h3 class="card__title">Add an Event</h3>
+            <form action="{{ url_for('calendar_add') }}" method="post">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="form-label" for="title">Title</label>
+                        <input class="form-input" id="title" name="title" placeholder="e.g. DCIT 204 Lecture" required>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="type">Type</label>
+                        <select class="form-input" id="type" name="type">
+                            <option value="lecture">Lecture</option>
+                            <option value="tutorial">Tutorial</option>
+                            <option value="lab">Lab</option>
+                            <option value="exam">Exam</option>
+                            <option value="meeting">Meeting</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="course_id">Course</label>
+                        <select class="form-input" id="course_id" name="course_id">
+                            <option value="">— None —</option>
+                            {% for course in courses %}
+                                <option value="{{ course.id }}">{{ course.code }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="start">Date &amp; time</label>
+                        <input class="form-input" id="start" name="start" type="datetime-local" required>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="duration_minutes">Duration (min)</label>
+                        <input class="form-input" id="duration_minutes" name="duration_minutes" type="number" min="5" value="60">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="recurrence">Repeat</label>
+                        <select class="form-input" id="recurrence" name="recurrence">
+                            <option value="none">Does not repeat</option>
+                            <option value="weekly">Every week</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="weekday">Day of week (if repeats weekly)</label>
+                        <select class="form-input" id="weekday" name="weekday">
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="button" type="submit">Add Event</button>
+                </div>
+            </form>
+        </section>
+
+        {% if events %}
+            <section class="card">
+                <h3 class="card__title">Upcoming Events</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Event</th><th>Type</th><th>Date</th><th>Duration</th><th>Repeat</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                            <tr>
+                                <td>
+                                    {{ event.title }}
+                                    {% if event.course_id %}<span class="text-muted"> · {{ event.course_id }}</span>{% endif %}
+                                </td>
+                                <td>{{ event.type }}</td>
+                                <td>{{ event.start }}</td>
+                                <td>{{ event.duration_minutes }} min</td>
+                                <td>{% if event.recurrence == 'weekly' %}Weekly ({{ event.weekday }}){% else %}—{% endif %}</td>
+                                <td>
+                                    <form action="{{ url_for('calendar_delete', event_id=event.id) }}" method="post" class="mb-0">
+                                        <button class="button button--ghost button--small" type="submit">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+        {% else %}
+            <section class="card empty-state">
+                <p>No events yet. Add your first lecture or deadline above.</p>
+            </section>
+        {% endif %}
+    </main>
+</body>
+</html>

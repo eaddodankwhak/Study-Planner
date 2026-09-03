@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ deadline.title }} — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Tasks</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="dashboard-heading">
+            <h2>{{ deadline.title }}</h2>
+            <a class="button button--ghost" href="{{ url_for('deadlines') }}">← All Deadlines</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <section class="card mb-4">
+            <h3 class="card__title">Overview</h3>
+            <ul class="subject-overview">
+                <li><strong>Course:</strong> {{ course.code }} — {{ course.title }} {% if not course %}(not linked){% endif %}</li>
+                <li><strong>Type:</strong> {{ deadline.type }}</li>
+                <li><strong>Due:</strong> {{ deadline.due_date }}</li>
+                <li><strong>Weight:</strong> {{ deadline.weight }}%</li>
+                <li><strong>Estimated effort:</strong> {{ deadline.estimated_hours }} hours</li>
+                <li><strong>Status:</strong> <span class="badge badge--{{ 'done' if deadline.status == 'done' else 'open' }}">{{ deadline.status }}</span></li>
+            </ul>
+        </section>
+
+        <section class="card mb-4">
+            <h3 class="card__title">Lead-up Plan</h3>
+            <p class="text-muted mb-2">Break this deliverable into your own day-by-day steps — research, draft, review, and so on.</p>
+
+            {% if steps %}
+                <ul class="task-list">
+                    {% for step in steps %}
+                        <li class="task task--{{ step.priority }}">
+                            <form action="{{ url_for('task_toggle', task_id=step.id) }}" method="post" class="mb-0">
+                                <input type="hidden" name="next" value="{{ url_for('deadline_detail', deadline_id=deadline.id) }}">
+                                <button class="button button--ghost button--small" type="submit" aria-label="Toggle step">
+                                    {{ '✓' if step.status == 'done' else '○' }}
+                                </button>
+                            </form>
+                            <span>
+                                {% if step.status == 'done' %}<s>{{ step.title }}</s>{% else %}{{ step.title }}{% endif %}
+                                <span class="text-muted"> · {{ step.estimated_minutes }} min{% if step.due_date %} · due {{ step.due_date }}{% endif %}</span>
+                            </span>
+                            <span class="badge badge--{{ step.priority }}">{{ step.priority }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-muted">No lead-up steps yet. Add your first step below.</p>
+            {% endif %}
+
+            <form action="{{ url_for('deadline_step_add', deadline_id=deadline.id) }}" method="post" class="mt-4">
+                <h4 class="card__title">Add a Step</h4>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="form-label" for="step_title">Step title</label>
+                        <input class="form-input" id="step_title" name="title" placeholder="e.g. Research sources, Draft outline" required>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="due_date">Step due date</label>
+                        <input class="form-input" id="due_date" name="due_date" type="date" value="{{ deadline.due_date }}">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="estimated_minutes">Effort (min)</label>
+                        <input class="form-input" id="estimated_minutes" name="estimated_minutes" type="number" min="5" step="5" value="60">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="priority">Priority</label>
+                        <select class="form-input" id="priority" name="priority">
+                            <option value="high">High</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="button" type="submit">Add Step</button>
+                </div>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

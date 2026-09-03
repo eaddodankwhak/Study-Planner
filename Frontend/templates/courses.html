@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courses — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Tasks</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="dashboard-heading">
+            <h2>My Courses &amp; Semester</h2>
+            <p class="text-muted mb-0">Manage the courses you're taking this term.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <section class="card mb-4">
+            <h3 class="card__title">Add a Course</h3>
+            <form action="{{ url_for('courses_add') }}" method="post">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="form-label" for="code">Course code</label>
+                        <input class="form-input" id="code" name="code" placeholder="e.g. DCIT 204" required>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="title">Course title</label>
+                        <input class="form-input" id="title" name="title" placeholder="e.g. Data Structures &amp; Algorithms" required>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="lecturer">Lecturer</label>
+                        <input class="form-input" id="lecturer" name="lecturer" placeholder="e.g. Dr. Mensah">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="credits">Credits</label>
+                        <input class="form-input" id="credits" name="credits" type="number" min="0" value="3">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="schedule">Class schedule</label>
+                        <input class="form-input" id="schedule" name="schedule" placeholder="e.g. Mon &amp; Wed 10:00">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="color">Card colour</label>
+                        <select class="form-input" id="color" name="color">
+                            <option value="">Auto</option>
+                            <option value="navy">Navy</option>
+                            <option value="teal">Teal</option>
+                            <option value="orange">Orange</option>
+                            <option value="green">Green</option>
+                            <option value="purple">Purple</option>
+                            <option value="red">Red</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="description">Description</label>
+                    <textarea class="form-input" id="description" name="description" rows="2"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button class="button" type="submit">Add Course</button>
+                </div>
+            </form>
+        </section>
+
+        {% if courses %}
+            <div class="course-grid">
+                {% for course in courses %}
+                    <article class="course-card course-card--{{ course.color }}">
+                        <a class="course-card__header" href="{{ url_for('course_detail', course_id=course.id) }}">
+                            <span class="course-card__code">{{ course.code }}</span>
+                            <span class="course-card__title">{{ course.title }}</span>
+                        </a>
+                        <div class="course-card__body">
+                            {{ course.credits }} credits
+                            {% if course.lecturer %} · {{ course.lecturer }}{% endif %}
+                            {% if course.schedule %}<br>{{ course.schedule }}{% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <section class="card empty-state">
+                <p>No courses yet. Add your first course above.</p>
+            </section>
+        {% endif %}
+    </main>
+</body>
+</html>

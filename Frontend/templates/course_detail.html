@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ course.code }} — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Tasks</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="dashboard-heading">
+            <h2>{{ course.code }} — {{ course.title }}</h2>
+            <a class="button button--ghost" href="{{ url_for('courses') }}">← All Courses</a>
+        </div>
+
+        <section class="subject-banner course-card--{{ course.color }}" style="background: currentColor;">
+            <p class="subject-banner__code">{{ course.code }}</p>
+            <h2 class="subject-banner__title">{{ course.title }}</h2>
+            <p class="subject-banner__meta">
+                {% if course.lecturer %}{{ course.lecturer }}{% else %}No lecturer{% endif %}
+                · {{ course.credits }} credits
+                {% if course.schedule %} · {{ course.schedule }}{% endif %}
+            </p>
+            {% if course.description %}
+                <p class="subject-banner__meta">{{ course.description }}</p>
+            {% endif %}
+        </section>
+
+        <div class="subject-content">
+            <section class="card">
+                <h3 class="card__title">Deadlines</h3>
+                {% if deadlines %}
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Item</th><th>Type</th><th>Due</th><th>Weight</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            {% for d in deadlines %}
+                                <tr>
+                                    <td><a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a></td>
+                                    <td>{{ d.type }}</td>
+                                    <td>{{ d.due_date }}</td>
+                                    <td>{{ d.weight }}%</td>
+                                    <td>{% if d.status == 'done' %}<span class="badge badge--done">done</span>{% else %}<span class="badge badge--open">{{ d.status }}</span>{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-muted mb-0">No deadlines recorded for this course yet.</p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h3 class="card__title">Tasks</h3>
+                {% if tasks %}
+                    <ul class="task-list">
+                        {% for t in tasks %}
+                            <li class="task task--{{ t.priority }}">
+                                <span>
+                                    {% if t.status == 'done' %}<s>{{ t.title }}</s>{% else %}{{ t.title }}{% endif %}
+                                    <span class="text-muted"> · {{ t.estimated_minutes }} min{% if t.due_date %} · {{ t.due_date }}{% endif %}</span>
+                                </span>
+                                <span class="badge badge--{{ t.priority }}">{{ t.priority }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">No tasks recorded for this course yet.</p>
+                {% endif %}
+            </section>
+        </div>
+    </main>
+</body>
+</html>

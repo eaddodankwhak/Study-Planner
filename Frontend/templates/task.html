@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task — Study Planner</title>
+    <title>Tasks — Study Planner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
@@ -15,9 +15,11 @@
                 <nav class="nav-bar">
                     <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
                     <a class="nav-bar__link" href="{{ url_for('ai_hub') }}">AI Learning Hub</a>
-                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('task') }}">Tasks</a>
                     <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
-                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
                 </nav>
                 <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
             </div>
@@ -27,11 +29,84 @@
     <main class="container page-main">
         <div class="dashboard-heading">
             <h2>Tasks</h2>
+            <p class="text-muted mb-0">Your study and lead-up tasks.</p>
         </div>
-        <section class="card">
-            <h3 class="card__title">Upcoming Study Tasks</h3>
-            <p class="text-muted mb-4">Manage your study tasks here.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <section class="card mb-4">
+            <h3 class="card__title">Add a Task</h3>
+            <form action="{{ url_for('task_add') }}" method="post">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="form-label" for="title">Title</label>
+                        <input class="form-input" id="title" name="title" placeholder="e.g. Review Bayes theorem" required>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="course_id">Course</label>
+                        <select class="form-input" id="course_id" name="course_id">
+                            <option value="">— None —</option>
+                            {% for course in courses %}
+                                <option value="{{ course.id }}">{{ course.code }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="due_date">Due date</label>
+                        <input class="form-input" id="due_date" name="due_date" type="date">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="estimated_minutes">Effort (min)</label>
+                        <input class="form-input" id="estimated_minutes" name="estimated_minutes" type="number" min="5" step="5" value="60">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="priority">Priority</label>
+                        <select class="form-input" id="priority" name="priority">
+                            <option value="high">High</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="button" type="submit">Add Task</button>
+                </div>
+            </form>
         </section>
+
+        {% if tasks %}
+            <section class="card">
+                <h3 class="card__title">All Tasks</h3>
+                <ul class="task-list">
+                    {% for t in tasks %}
+                        <li class="task task--{{ t.priority }}">
+                            <form action="{{ url_for('task_toggle', task_id=t.id) }}" method="post" class="mb-0">
+                                <button class="button button--ghost button--small" type="submit" aria-label="Toggle task">
+                                    {{ '✓' if t.status == 'done' else '○' }}
+                                </button>
+                            </form>
+                            <span>
+                                {% if t.status == 'done' %}<s>{{ t.title }}</s>{% else %}{{ t.title }}{% endif %}
+                                <span class="text-muted"> · {{ t.estimated_minutes }} min{% if t.due_date %} · {{ t.due_date }}{% endif %}</span>
+                            </span>
+                            <span class="badge badge--{{ t.priority }}">{{ t.priority }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% else %}
+            <section class="card empty-state">
+                <p>No tasks yet. Add your first task above.</p>
+            </section>
+        {% endif %}
     </main>
 </body>
 </html>

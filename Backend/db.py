@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS users (
     goals       TEXT,
     courses_json TEXT,
     onboarded   INTEGER DEFAULT 0,
+    available_hours REAL DEFAULT 4,
     ai_model    TEXT,
     ai_level    TEXT
 );
@@ -137,9 +138,17 @@ def init_db():
     conn = connect()
     try:
         conn.executescript(_SCHEMA)
+        _migrate_add_columns(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _migrate_add_columns(conn):
+    """Apply lightweight schema migrations to already-created databases."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "available_hours" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN available_hours REAL DEFAULT 4")
 
 
 def _conn_context():
@@ -254,12 +263,13 @@ def update_user(user_id, fields):
         conn.close()
 
 
-def set_user_onboarded(user_id, school, program, courses, goals):
+def set_user_onboarded(user_id, school, program, courses, goals, available_hours=4):
     update_user(user_id, {
         "school": school,
         "program": program,
         "courses_json": json.dumps(courses),
         "goals": goals,
+        "available_hours": available_hours,
         "onboarded": 1,
     })
 
