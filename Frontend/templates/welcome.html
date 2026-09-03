@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome — My Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .welcome {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: linear-gradient(180deg, rgba(7,33,48,0.72), rgba(7,33,48,0.55)),
+                url("{{ url_for('static', filename='images/woman-8601818_1280.jpg') }}") center / cover no-repeat;
+            color: var(--color-text-inverse);
+            font-family: var(--font-sans);
+            overflow: hidden;
+        }
+
+        .welcome__slide {
+            max-width: 44rem;
+            margin: 0 1.5rem;
+            text-align: center;
+            padding: var(--space-8);
+            background: rgba(7, 33, 48, 0.55);
+            border: 1px solid rgb(255 255 255 / 0.25);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            backdrop-filter: blur(6px);
+        }
+
+        .welcome__brand {
+            font-size: 0.85rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--color-accent);
+            margin-bottom: var(--space-2);
+        }
+
+        .welcome__title {
+            font-size: clamp(2rem, 5vw, 3rem);
+            line-height: 1.15;
+            margin: 0 0 var(--space-4);
+        }
+
+        .welcome__text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            opacity: 0.95;
+            margin: 0 auto var(--space-8);
+            max-width: 34rem;
+        }
+
+        .welcome__features {
+            list-style: none;
+            margin: 0 auto var(--space-8);
+            padding: 0;
+            max-width: 30rem;
+            text-align: left;
+        }
+
+        .welcome__features li {
+            display: flex;
+            gap: var(--space-3);
+            align-items: flex-start;
+            padding: var(--space-2) 0;
+            border-bottom: 1px solid rgb(255 255 255 / 0.15);
+        }
+
+        .welcome__features li::before {
+            content: "✓";
+            color: var(--color-accent);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .welcome .button {
+            min-width: 10rem;
+        }
+
+        .welcome__dots {
+            display: flex;
+            gap: var(--space-2);
+            justify-content: center;
+            margin-top: var(--space-6);
+        }
+
+        .welcome__dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 999px;
+            background: rgb(255 255 255 / 0.4);
+            border: none;
+            cursor: pointer;
+        }
+
+        .welcome__dot.is-active {
+            background: var(--color-accent);
+        }
+    </style>
+</head>
+<body>
+    <main class="welcome" id="welcome">
+        <!-- Slide 1: Welcome hero -->
+        <section class="welcome__slide" id="slide-1">
+            <p class="welcome__brand">My Study Planner</p>
+            <h1 class="welcome__title">Welcome to<br>My Study Planner</h1>
+            <p class="welcome__text">
+                Your personal companion for turning busy school days into a clear,
+                achievable study routine.
+            </p>
+            <button type="button" class="button button--primary" id="next-btn">Next</button>
+            <div class="welcome__dots" aria-hidden="true">
+                <span class="welcome__dot is-active" data-slide="1"></span>
+                <span class="welcome__dot" data-slide="2"></span>
+            </div>
+        </section>
+
+        <!-- Slide 2: What the app does -->
+        <section class="welcome__slide" id="slide-2" hidden>
+            <p class="welcome__brand">What you'll get</p>
+            <h1 class="welcome__title">Study smarter, every day</h1>
+            <ul class="welcome__features">
+                <li>Organize your courses and program in one place</li>
+                <li>Get a study routine built around your own school, courses and goals</li>
+                <li>Track your progress and stay on top of every subject</li>
+                <li>Collaborate with classmates and share materials and quizzes</li>
+            </ul>
+            <a class="button button--primary" href="{{ url_for('signup') }}">Start</a>
+            <div class="welcome__dots" aria-hidden="true">
+                <span class="welcome__dot" data-slide="1"></span>
+                <span class="welcome__dot is-active" data-slide="2"></span>
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const slide1 = document.getElementById('slide-1');
+            const slide2 = document.getElementById('slide-2');
+            const dots = document.querySelectorAll('.welcome__dot');
+
+            function showSlide(n) {
+                slide1.hidden = n !== 1;
+                slide2.hidden = n !== 2;
+                dots.forEach((d) => d.classList.toggle('is-active', Number(d.dataset.slide) === n));
+            }
+
+            document.getElementById('next-btn').addEventListener('click', () => showSlide(2));
+            dots.forEach((d) => d.addEventListener('click', () => showSlide(Number(d.dataset.slide))));
+        });
+    </script>
+</body>
+</html>

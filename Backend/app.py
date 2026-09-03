@@ -153,16 +153,24 @@ def save_users(users):
 
 
 def login_required(view):
-    """Route decorator that redirects unauthenticated users to the login page."""
+    """Route decorator that redirects unauthenticated users to the welcome page."""
     from functools import wraps
 
     @wraps(view)
     def wrapped(*args, **kwargs):
         if not session.get("user_id"):
-            return redirect(url_for("login"))
+            return redirect(url_for("welcome"))
         return view(*args, **kwargs)
 
     return wrapped
+
+
+@app.get("/welcome")
+def welcome():
+    """Render the welcome splash shown before sign-in."""
+    if session.get("user_id"):
+        return redirect(url_for("home"))
+    return render_template("welcome.html")
 
 
 @app.get("/signup")
