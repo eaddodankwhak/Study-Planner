@@ -1,0 +1,20 @@
+<!-- Shared primary navigation. Set `active_nav` in the template context
+     to one of: home, courses, calendar, practice, progress, ai, settings.
+     "Practice" expands to Tasks / Deadlines / Focus / Notes. -->
+<nav class="nav-bar">
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'home' else '' }}" href="{{ url_for('home') }}">Home</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'courses' else '' }}" href="{{ url_for('courses') }}">Courses</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'calendar' else '' }}" href="{{ url_for('calendar') }}">Calendar</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'practice' else '' }}" href="{{ url_for('task') }}">Practice</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'progress' else '' }}" href="{{ url_for('progress') }}">Progress</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'ai' else '' }}" href="{{ url_for('ai_hub') }}">AI Hub</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'settings' else '' }}" href="{{ url_for('settings') }}">Settings</a>
+</nav>
+<!-- Secondary tools (kept below the primary 7 tabs) -->
+<div class="nav-sub">
+    <a class="nav-sub__link" href="{{ url_for('task') }}">Tasks</a>
+    <a class="nav-sub__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+    <a class="nav-sub__link" href="{{ url_for('session_page') }}">Focus</a>
+    <a class="nav-sub__link" href="{{ url_for('notes') }}">Notes</a>
+    <a class="nav-sub__link" href="{{ url_for('about') }}">About</a>
+</div>

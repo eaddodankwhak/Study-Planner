@@ -355,6 +355,7 @@ def settings():
     return render_template(
         "settings.html",
         user=user,
+        active_nav="settings",
         course_count=len(courses),
         deadline_count=len(planner.list_deadlines(user["id"])),
         task_count=len(planner.list_tasks(user["id"])),
@@ -475,6 +476,7 @@ def home():
     return render_template(
         "index.html",
         user=user,
+        active_nav="home",
         subjects=user_subjects(user),
         courses=planner.list_courses(user["id"]),
         deadlines=deadline_list,
@@ -533,6 +535,7 @@ def subject(slug):
         "subject.html",
         active_tool=tool,
         user=user,
+        active_nav="courses",
         subject=subject_info,
         subjects=user_subjects(user),
         files=get_subject_files(subject_info),
@@ -649,7 +652,7 @@ def quiz_take_page():
         if quiz:
             return redirect(url_for("quiz_take", quiz_id=quiz["id"]))
         error = "No quiz found for that code."
-    return render_template("quiz_take.html", user=current_user(), subjects=user_subjects(current_user()), error=error)
+    return render_template("quiz_take.html", user=current_user(), active_nav="practice", subjects=user_subjects(current_user()), error=error)
 
 
 @app.get("/quiz/<quiz_id>")
@@ -665,6 +668,7 @@ def quiz_take(quiz_id):
     return render_template(
         "quiz.html",
         user=current_user(),
+        active_nav="practice",
         subjects=user_subjects(current_user()),
         quiz=quiz,
         subject=subject_info,
@@ -769,6 +773,7 @@ def quiz_results(quiz_id):
     return render_template(
         "quiz_results.html",
         user=current_user(),
+        active_nav="practice",
         subjects=user_subjects(current_user()),
         quiz=quiz,
         subject=subject_info,
@@ -788,7 +793,7 @@ def about():
 def task():
     """Render the Task page."""
     user = current_user()
-    return render_template("task.html", user=user, tasks=planner.list_tasks(user["id"]), courses=planner.list_courses(user["id"]))
+    return render_template("task.html", user=user, active_nav="practice", tasks=planner.list_tasks(user["id"]), courses=planner.list_courses(user["id"]))
 
 
 @app.post("/task")
@@ -834,7 +839,7 @@ def task_toggle(task_id):
 def courses():
     """Render the course & semester management page."""
     user = current_user()
-    return render_template("courses.html", user=user, courses=planner.list_courses(user["id"]))
+    return render_template("courses.html", user=user, active_nav="courses", courses=planner.list_courses(user["id"]))
 
 
 @app.post("/courses")
@@ -872,6 +877,7 @@ def course_detail(course_id):
     return render_template(
         "course_detail.html",
         user=user,
+        active_nav="courses",
         course=course,
         deadlines=course_deadlines,
         tasks=course_tasks,
@@ -888,7 +894,7 @@ def course_detail(course_id):
 def calendar():
     """Render the academic calendar page."""
     user = current_user()
-    return render_template("calendar.html", user=user, events=planner.list_events(user["id"]), courses=planner.list_courses(user["id"]))
+    return render_template("calendar.html", user=user, active_nav="calendar", events=planner.list_events(user["id"]), courses=planner.list_courses(user["id"]))
 
 
 @app.post("/calendar")
@@ -932,7 +938,7 @@ def calendar_delete(event_id):
 def deadlines():
     """Render the deadline & assessment manager."""
     user = current_user()
-    return render_template("deadlines.html", user=user, deadlines=planner.list_deadlines(user["id"]), courses=planner.list_courses(user["id"]), courses_by_id={c["id"]: c for c in planner.list_courses(user["id"])})
+    return render_template("deadlines.html", user=user, active_nav="practice", deadlines=planner.list_deadlines(user["id"]), courses=planner.list_courses(user["id"]), courses_by_id={c["id"]: c for c in planner.list_courses(user["id"])})
 
 
 @app.post("/deadlines")
@@ -969,6 +975,7 @@ def deadline_detail(deadline_id):
     return render_template(
         "deadline_detail.html",
         user=user,
+        active_nav="practice",
         deadline=deadline,
         course=course,
         steps=steps,
@@ -1046,7 +1053,7 @@ def progress():
     """Render the Progress overview with real computed statistics."""
     user = current_user()
     overview = stats.overview(user["id"], db, planner)
-    return render_template("progress.html", user=user, stats=overview)
+    return render_template("progress.html", user=user, active_nav="progress", stats=overview)
 
 
 @app.get("/ai")
@@ -1057,6 +1064,7 @@ def ai_hub():
     return render_template(
         "ai_hub.html",
         user=user,
+        active_nav="ai",
         subjects=user_subjects(user),
     )
 
@@ -1078,6 +1086,7 @@ def session_page():
     return render_template(
         "session.html",
         user=user,
+        active_nav="practice",
         task=task,
         course=course,
         courses=courses,
@@ -1154,7 +1163,7 @@ def notes():
     note_list = db.list_notes(user["id"])
     for n in note_list:
         n["course_label"] = by_id.get(n.get("course_id"), {}).get("title", "")
-    return render_template("notes.html", user=user, notes=note_list, courses=courses)
+    return render_template("notes.html", user=user, active_nav="practice", notes=note_list, courses=courses)
 
 
 @app.post("/notes")

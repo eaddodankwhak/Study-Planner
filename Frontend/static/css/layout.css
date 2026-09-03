@@ -80,6 +80,29 @@
   background: var(--color-primary-dark);
 }
 
+/* Secondary tools row (kept under the primary tabs) */
+.nav-sub {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+  font-size: 0.85rem;
+}
+
+.nav-sub__link {
+  color: #a9c3d6;
+  text-decoration: none;
+  font-weight: 600;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.nav-sub__link:hover {
+  color: var(--color-text-inverse);
+  background: var(--color-primary-dark);
+  text-decoration: none;
+}
+
 /* App shell: left sidebar + main content */
 .app-shell {
   display: grid;
