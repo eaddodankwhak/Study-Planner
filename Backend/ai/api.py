@@ -8,10 +8,17 @@ Events for streaming.
 
 import json
 import os
+import sys
 import time
 import uuid
 
 from flask import Blueprint, Response, current_app, jsonify, request, session
+
+# Make the Backend package importable so `db` (at the Backend root) resolves.
+if os.path.dirname(os.path.dirname(os.path.abspath(__file__))) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import db
 
 from . import files as file_processor
 from . import limits
@@ -42,19 +49,7 @@ def _user_subjects_titles():
 
 
 def _load_users():
-    import json as _json
-    users_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "Database",
-        "users.json",
-    )
-    if os.path.exists(users_file):
-        try:
-            with open(users_file, "r", encoding="utf-8") as f:
-                return _json.load(f)
-        except (ValueError, OSError):
-            return {}
-    return {}
+    return db.load_users()
 
 
 def _sample_usage():
@@ -347,24 +342,15 @@ def upload_material():
 def set_preferences():
     uid = session["user_id"]
     body = request.get_json(silent=True) or {}
-    users_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "Database",
-        "users.json",
-    )
-    import json as _json
-    if not os.path.exists(users_file):
-        return jsonify({"error": "user storage unavailable"}), 500
-    with open(users_file, "r", encoding="utf-8") as fh:
-        users = _json.load(fh)
-    user = users.get(uid)
+    user = db.get_user(uid)
     if not user:
         return jsonify({"error": "user not found"}), 404
 
-    if "model" in body and model_registry.get_model(body["model"]):
-        user["ai_model"] = body["model"]
-    if "level" in body and body["level"] in ("beginner", "intermediate", "advanced"):
-        user["ai_level"] = body["level"]
-    with open(users_file, "w", encoding="utf-8") as fh:
-        _json.dump(users, fh, indent=2)
+    model = body.get("model")
+    level = body.get("level")
+    if model is not None and not model_registry.get_model(model):
+        return jsonify({"error": "unknown model"}), 400
+    if level is not None and level not in ("beginner", "intermediate", "advanced"):
+        return jsonify({"error": "unknown level"}), 400
+    db.set_ai_preferences(uid, model=model, level=level)
     return jsonify({"ok": True})

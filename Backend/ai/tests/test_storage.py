@@ -1,19 +1,18 @@
 """Tests for conversation storage and usage limits.
 
-These tests operate on the real Database/ai.json but use a dedicated test user id
-and back up/restore the file so they never destroy real conversations.
+These operate against the SQLite database using a dedicated test user id and
+clean up that user's rows so real user data is never touched.
 """
 
-import json
 import os
-import shutil
 import sys
-import tempfile
 import unittest
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, BASE)
+if BASE not in sys.path:
+    sys.path.insert(0, BASE)
 
+import db
 from ai import storage  # noqa: E402
 from ai import limits  # noqa: E402
 
@@ -21,18 +20,10 @@ from ai import limits  # noqa: E402
 class StorageTest(unittest.TestCase):
     def setUp(self):
         self.uid = "test-storage-user"
-        self.backup = None
-        if os.path.exists(storage.AI_FILE):
-            self.backup = tempfile.mktemp(suffix=".ai.json")
-            shutil.copy2(storage.AI_FILE, self.backup)
-        storage.reset_usage_for_tests()
+        db.ai_purge_user(self.uid)
 
     def tearDown(self):
-        storage.reset_usage_for_tests()
-        if self.backup and os.path.exists(self.backup):
-            os.makedirs(os.path.dirname(storage.AI_FILE), exist_ok=True)
-            shutil.copy2(self.backup, storage.AI_FILE)
-            os.remove(self.backup)
+        db.ai_purge_user(self.uid)
 
     def test_create_and_get_conversation(self):
         conv = storage.create_conversation(self.uid, model="claude", mode="ask")
@@ -81,18 +72,10 @@ class StorageTest(unittest.TestCase):
 class LimitsTest(unittest.TestCase):
     def setUp(self):
         self.uid = "test-limits-user"
-        self.backup = None
-        if os.path.exists(storage.AI_FILE):
-            self.backup = tempfile.mktemp(suffix=".ai.json")
-            shutil.copy2(storage.AI_FILE, self.backup)
-        storage.reset_usage_for_tests()
+        db.ai_purge_user(self.uid)
 
     def tearDown(self):
-        storage.reset_usage_for_tests()
-        if self.backup and os.path.exists(self.backup):
-            os.makedirs(os.path.dirname(storage.AI_FILE), exist_ok=True)
-            shutil.copy2(self.backup, storage.AI_FILE)
-            os.remove(self.backup)
+        db.ai_purge_user(self.uid)
 
     def test_within_limit_succeeds(self):
         limits.check_limit(self.uid)  # should not raise

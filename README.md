@@ -42,17 +42,18 @@ preloaded subject set is shown as a fallback.
 Study-planner/
 ├── Backend/
 │   ├── app.py                 # Flask application entry point (routes + subject logic)
-│   ├── collab.py              # Collaboration & quiz data layer
+│   ├── db.py                  # SQLite persistence layer (schema + data access)
+│   ├── collab.py              # Collaboration & quiz data layer (SQLite)
+│   ├── migrate_to_sqlite.py   # One-time JSON -> SQLite migration script
 │   ├── requirements.txt       # Python dependencies
 │   ├── ai/                    # AI Learning Hub package (blueprint, providers, prompts…)
+│   ├── tests/                 # Tests for the SQLite layer (db / collab / users)
 │   └── app/
 │       └── services/          # Future task and validation logic
-├── Database/
-│   ├── users.json             # Registered users (created at runtime, not committed)
-│   ├── collab.json            # Memberships, materials, quizzes (created at runtime)
-│   ├── ai.json                # AI conversations & usage (created at runtime)
+├── Database/                  # Runtime data (not committed)
+│   ├── instance/study_planner.db   # SQLite database (users, collab, AI)
 │   ├── ai_uploads/            # Extracted study-material text (created at runtime)
-│   └── instance/              # Local SQLite database files (not committed)
+│   └── uploads/               # Subject course materials (created at runtime)
 ├── Frontend/
 │   ├── static/
 │   │   ├── css/               # styles.css + split CSS modules (variables, base, layout, …)
@@ -90,8 +91,29 @@ Then:
 2. Complete the **onboarding** wizard with your school, program, courses and goals.
 3. Land on your personalized dashboard, and click any subject card to explore it.
 
-> `Database/users.json`, `Database/collab.json` and uploaded materials are generated at runtime
-> and are not tracked by Git.
+> All data is stored in the SQLite database at `Database/instance/study_planner.db`
+> (created automatically on first run), with uploads on disk under `Database/uploads/`.
+> The database file, `Database/ai_uploads/`, and uploaded materials are generated at
+> runtime and are not tracked by Git.
+
+## Database
+
+Storage uses a single **SQLite** database via Python's standard library (`sqlite3`), with
+`Backend/db.py` as the persistence layer. Tables cover: `users`, `memberships`,
+`subject_codes`, `materials`, `quizzes`, `attempts`, `ai_conversations`, `ai_messages`, and
+`ai_usage`. The schema is created automatically on first run.
+
+Existing JSON data (from before this change) can be imported once with:
+
+```powershell
+cd Backend
+py -m venv .venv                      # if you don't have one yet
+& .\.venv\Scripts\Activate.ps1
+python migrate_to_sqlite.py
+```
+
+`migrate_to_sqlite.py` reads the legacy `Database/users.json`, `Database/collab.json`, and
+`Database/ai.json`, and links into SQLite. It is idempotent, so re-running is safe.
 
 ## AI Learning Hub
 
@@ -110,7 +132,7 @@ The back end is fully provider-agnostic:
   otherwise it falls back to the mock so the hub works with no credentials.
 - `Backend/ai/service.py` — orchestration (`generate_reply`, `stream_reply`).
 - `Backend/ai/api.py` — the `/api/ai/*` JSON + SSE endpoints behind the session login.
-- `Backend/ai/storage.py` / `limits.py` — JSON persistence and per-user daily caps.
+- `Backend/ai/storage.py` / `limits.py` — SQLite-backed persistence and per-user daily caps.
 
 ### Demo vs. real models
 
@@ -135,10 +157,12 @@ hub still works and degrades gracefully for plain-text files.
 
 ### Tests
 
-The AI package ships with unit tests (no external test framework required):
+The project ships with unit tests (no external test framework required). Run both the SQLite
+layer tests and the AI package tests:
 
 ```powershell
 cd Backend
+.\.venv\Scripts\python.exe -m unittest discover -s tests
 .\.venv\Scripts\python.exe -m unittest discover -s ai\tests
 ```
 

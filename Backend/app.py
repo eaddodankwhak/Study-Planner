@@ -26,11 +26,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import collab
+import db
 import ai as ai_pkg
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
-USERS_FILE = os.path.join(DATABASE_DIR, "users.json")
 UPLOADS_DIR = os.path.join(DATABASE_DIR, "uploads")
 
 # Allowed file types for course materials (slides, PDFs, docs, etc.)
@@ -197,18 +197,17 @@ def allowed_file(filename):
 
 
 def load_users():
-    """Load the users JSON file into a dict of {id: user}."""
-    if not os.path.exists(USERS_FILE):
-        return {}
-    with open(USERS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    """Return {user_id: user} for every account from the SQLite database."""
+    return db.load_users()
 
 
 def save_users(users):
-    """Persist the users dict to the JSON file."""
-    os.makedirs(DATABASE_DIR, exist_ok=True)
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, indent=2)
+    """Legacy compatibility helper.
+
+    User writes now go through the db module directly; this is kept so any
+    remaining callers that only ever read user data still resolve.
+    """
+    raise NotImplementedError("User writes are handled through the db module.")
 
 
 def login_required(view):
@@ -241,19 +240,12 @@ def signup_post():
         flash("Please fill in all fields.", "error")
         return redirect(url_for("signup"))
 
-    users = load_users()
-    if any(u["email"] == email for u in users.values()):
+    if db.get_user_by_email(email):
         flash("An account with that email already exists.", "error")
         return redirect(url_for("signup"))
 
     user_id = uuid.uuid4().hex
-    users[user_id] = {
-        "id": user_id,
-        "name": name,
-        "email": email,
-        "password": generate_password_hash(password),
-    }
-    save_users(users)
+    db.create_user(user_id, name, email, generate_password_hash(password))
 
     session["user_id"] = user_id
     flash(f"Welcome, {name}! Let's personalize your study planner.", "success")
@@ -274,8 +266,7 @@ def login_post():
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "")
 
-    users = load_users()
-    user = next((u for u in users.values() if u["email"] == email), None)
+    user = db.get_user_by_email(email)
 
     if user and check_password_hash(user["password"], password):
         session["user_id"] = user["id"]
@@ -296,8 +287,7 @@ def logout():
 
 def current_user():
     """Return the logged-in user dict, or None."""
-    users = load_users()
-    return users.get(session.get("user_id"))
+    return db.get_user(session.get("user_id"))
 
 
 @app.get("/onboarding")
@@ -312,7 +302,6 @@ def onboarding():
 def onboarding_post():
     """Save the new user's school, program, courses, and goals and finish onboarding."""
     user = current_user()
-    users = load_users()
 
     school = request.form.get("school", "").strip()
     program = request.form.get("program", "").strip()
@@ -323,14 +312,7 @@ def onboarding_post():
         flash("Please complete all steps.", "error")
         return redirect(url_for("onboarding"))
 
-    users[user["id"]].update({
-        "school": school,
-        "program": program,
-        "courses": courses,
-        "goals": goals,
-        "onboarded": True,
-    })
-    save_users(users)
+    db.set_user_onboarded(user["id"], school, program, courses, goals)
 
     flash("You're all set! Your personalized planner is ready.", "success")
     return redirect(url_for("home"))
