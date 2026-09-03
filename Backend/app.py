@@ -345,14 +345,46 @@ def landing():
 def home():
     """Render the planning dashboard plus the user's subject cards."""
     user = current_user()
+    deadline_list = planner.list_deadlines(user["id"])
+    task_list = planner.list_tasks(user["id"])
+    checkpoint_data = _home_checkpoints(user, deadline_list, task_list)
     return render_template(
         "index.html",
         user=user,
         subjects=user_subjects(user),
         courses=planner.list_courses(user["id"]),
-        deadlines=planner.list_deadlines(user["id"]),
-        tasks=planner.list_tasks(user["id"]),
+        deadlines=deadline_list,
+        tasks=task_list,
+        checkpoints=checkpoint_data,
     )
+
+
+def _home_checkpoints(user, deadline_list, task_list):
+    """Build the Home 'today' checkpoints: due-now tasks, open deadlines with
+    backward-plan feasibility, and 'I'm behind' recovery flags."""
+    today = planner._today().isoformat()
+    overdue_tasks = [t for t in task_list if t.get("status") != "done"
+                     and t.get("due_date") and t.get("due_date") < today]
+    today_tasks = [t for t in task_list if t.get("status") != "done"
+                   and t.get("due_date") == today]
+
+    open_deadlines = [d for d in deadline_list if d.get("status") != "done"]
+    deadline_reports = {}
+    behind = []
+    for d in open_deadlines:
+        rep = planner.deadline_feasible(user["id"], d["id"])
+        deadline_reports[d["id"]] = rep
+        if rep and not rep["feasible"]:
+            behind.append({**d, "_report": rep})
+
+    return {
+        "today": today,
+        "overdue_tasks": overdue_tasks,
+        "today_tasks": today_tasks,
+        "deadline_reports": deadline_reports,
+        "behind": behind,
+        "open_deadlines": len(open_deadlines),
+    }
 
 
 @app.get("/subject/<slug>")
@@ -809,12 +841,14 @@ def deadline_detail(deadline_id):
     course = planner.get_course(user["id"], deadline.get("course_id")) if deadline.get("course_id") else None
     all_tasks = {t["id"]: t for t in planner.list_tasks(user["id"])}
     steps = [all_tasks[tid] for tid in deadline.get("steps", []) if tid in all_tasks]
+    report = planner.deadline_feasible(user["id"], deadline_id)
     return render_template(
         "deadline_detail.html",
         user=user,
         deadline=deadline,
         course=course,
         steps=steps,
+        report=report,
         remaining_days=planner.remaining_hours,
     )
 
@@ -849,6 +883,37 @@ def deadline_complete(deadline_id):
     planner.complete_deadline(user["id"], deadline_id)
     flash("Deadline marked complete.", "success")
     return redirect(url_for("deadlines"))
+
+
+@app.post("/deadlines/<deadline_id>/plan")
+@login_required
+def deadline_plan(deadline_id):
+    """Backward auto-plan a deadline into daily lead-up steps (Home checkpoint)."""
+    user = current_user()
+    if not planner.get_deadline(user["id"], deadline_id):
+        flash("Deadline not found.", "error")
+        return redirect(url_for("deadlines"))
+    created = planner.auto_plan_deadline(user["id"], deadline_id)
+    flash(f"Backward plan created: {len(created)} step(s) before the due date.", "success")
+    return redirect(url_for("deadline_detail", deadline_id=deadline_id))
+
+
+@app.post("/deadlines/<deadline_id>/recover")
+@login_required
+def deadline_recover(deadline_id):
+    """'I'm behind' recovery: rebuild the lead-up plan into the time remaining."""
+    user = current_user()
+    if not planner.get_deadline(user["id"], deadline_id):
+        flash("Deadline not found.", "error")
+        return redirect(url_for("deadlines"))
+    report = planner.recovery_plan(user["id"], deadline_id)
+    if report and report.get("recovery"):
+        flash("Recovery plan rebuilt to fit your remaining time.", "success")
+    elif report:
+        flash("This deadline is still on track — no recovery needed.", "info")
+    else:
+        flash("Recovery plan built.", "success")
+    return redirect(url_for("deadline_detail", deadline_id=deadline_id))
 
 
 @app.get("/progress")

@@ -54,6 +54,31 @@
             </ul>
         </section>
 
+        <section class="card mb-4 priority-{{ 'critical' if report and not report.feasible else 'moderate' }}">
+            <h3 class="card__title">Plan Check</h3>
+            {% if report %}
+                <p class="text-muted mb-2">
+                    {{ report.days_left }} day(s) left · needs {{ report.needed_hours }}h ·
+                    capacity ≈ {{ report.capacity_left }}h ({{ report.available_per_day }}h/day).
+                </p>
+                {% if report.feasible %}
+                    <p class="text-muted mb-2">On track. Auto-split this into daily lead-up steps, or plan it yourself below.</p>
+                {% else %}
+                    <p class="mb-2"><strong>You're behind on this one.</strong> Rebuild the plan into the time remaining (2 taps) — it will compress steps so you can catch up.</p>
+                {% endif %}
+                <div class="form-actions" style="justify-content:flex-start;">
+                    <form action="{{ url_for('deadline_plan', deadline_id=deadline.id) }}" method="post" class="inline-form" style="margin-left:0;">
+                        <button class="button button--primary" type="submit">Auto-plan backward</button>
+                    </form>
+                    <form action="{{ url_for('deadline_recover', deadline_id=deadline.id) }}" method="post" class="inline-form">
+                        <button class="button button--ghost" type="submit">I'm behind — rebuild</button>
+                    </form>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">Add an estimated effort and due date to get plan suggestions.</p>
+            {% endif %}
+        </section>
+
         <section class="card mb-4">
             <h3 class="card__title">Lead-up Plan</h3>
             <p class="text-muted mb-2">Break this deliverable into your own day-by-day steps — research, draft, review, and so on.</p>

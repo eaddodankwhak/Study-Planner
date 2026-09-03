@@ -52,6 +52,59 @@
             </div>
         </section>
 
+        {% if checkpoints %}
+        <section class="card mb-4 priority-critical">
+            <div class="dashboard-heading">
+                <h3 class="card__title mb-0">Today's Plan ({{ checkpoints.today }})</h3>
+                <a class="button button--ghost button--small" href="{{ url_for('task') }}">Manage tasks</a>
+            </div>
+
+            {% if checkpoints.overdue_tasks %}
+                <h4 class="card__title">Overdue tasks</h4>
+                <ul class="task-list">
+                    {% for t in checkpoints.overdue_tasks %}
+                        <li class="task task--high">
+                            <span>{{ t.title }} <span class="text-muted">(due {{ t.due_date }})</span></span>
+                            <span class="badge badge--high">overdue</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            {% if checkpoints.today_tasks %}
+                <h4 class="card__title">Due today</h4>
+                <ul class="task-list">
+                    {% for t in checkpoints.today_tasks %}
+                        <li class="task task--{{ t.priority }}">
+                            <span>{{ t.title }} <span class="text-muted">· {{ t.estimated_minutes }} min</span></span>
+                            <a class="button button--ghost button--small" href="{{ url_for('session_page', task_id=t.id) }}">Focus</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            {% if checkpoints.behind %}
+                <h4 class="card__title">You're behind on…</h4>
+                <ul class="task-list">
+                    {% for d in checkpoints.behind %}
+                        <li class="task task--high">
+                            <a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a>
+                            <span class="text-muted">due {{ d.due_date }} · {{ d._report.days_left }} day(s) left</span>
+                            <form action="{{ url_for('deadline_recover', deadline_id=d.id) }}" method="post" class="inline-form">
+                                <button class="button button--primary button--small" type="submit">Rebuild (2 taps)</button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            {% if not checkpoints.overdue_tasks and not checkpoints.today_tasks and not checkpoints.behind %}
+                <p class="text-muted mb-0">Nothing due right now. Protect your streak with a short focus session.</p>
+                <a class="button button--primary mt-2" href="{{ url_for('session_page') }}">Start a focus session</a>
+            {% endif %}
+        </section>
+        {% endif %}
+
         <div class="subject-content">
             <section class="card">
                 <div class="dashboard-heading">

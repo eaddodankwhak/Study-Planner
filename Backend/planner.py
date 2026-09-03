@@ -255,3 +255,142 @@ def remaining_hours(days_left, available_hours):
         return 0
     cap = available_hours or 4
     return round(min(cap, max(1, cap / days_left)), 1)
+
+
+# ---------------------------------------------------------------------------
+# Backward auto-planning + recovery (Home checkpoints / "I'm behind")
+# ---------------------------------------------------------------------------
+
+def _today():
+    return datetime.now().date()
+
+
+def _days_until(due_date_str):
+    d = parse_date(due_date_str)
+    if not d:
+        return None
+    return (d - _today()).days
+
+
+def auto_plan_deadline(user_id, deadline_id, hours_per_day=None, replace=True):
+    """Break a deadline's estimated work into lead-up tasks spaced backward
+    from its due date, at most ``hours_per_day`` (defaults to the studio's
+    available-hours cap).
+
+    Returns a list of the generated task ids. Idempotent options:
+      - replace=True  remove any existing steps for the deadline first.
+    """
+    data = load_all()
+    ud = _user_data(data, user_id)
+    d = ud.get("deadlines", {}).get(deadline_id)
+    if not d:
+        return []
+
+    due = parse_date(d.get("due_date", ""))
+    if not due:
+        return []
+    total_hours = float(d.get("estimated_hours") or 0) or 1.0
+    if hours_per_day is None:
+        available = float(db_available_hours(user_id))
+        hours_per_day = max(1.0, round(available, 2)) if available else None
+    if hours_per_day is None:
+        hours_per_day = 4.0
+
+    days_left = (due - _today()).days
+    if days_left < 1:
+        days_left = 1
+    days_needed = max(1, round(total_hours / hours_per_day))
+    days_to_use = min(days_left, days_needed)
+
+    minutes_per_day = int(round(60 * hours_per_day))
+
+    if replace:
+        old_ids = set(ud.get("deadlines", {}).get(deadline_id, {}).get("steps", []))
+        ud.setdefault("tasks", [])[:] = [
+            t for t in ud.get("tasks", []) if t.get("id") not in old_ids
+        ]
+        d["steps"] = []
+
+    # Spread work over the days_to_use days before the due date.
+    remaining_minutes = int(round(total_hours * 60))
+    created = []
+    for i in range(days_to_use):
+        day = due - timedelta(days=(days_to_use - i))
+        chunk = min(remaining_minutes, minutes_per_day)
+        if chunk <= 0:
+            break
+        task = {
+            "id": uuid.uuid4().hex,
+            "deadline_id": deadline_id,
+            "course_id": d.get("course_id"),
+            "title": f"Work on {d.get('title', 'deadline')}",
+            "due_date": day.isoformat(),
+            "estimated_minutes": chunk,
+            "priority": "high",
+            "status": "todo",
+            "auto": True,
+        }
+        ud.setdefault("tasks", []).append(task)
+        d.setdefault("steps", []).append(task["id"])
+        created.append(task)
+        remaining_minutes -= chunk
+    save_all(data)
+    return created
+
+
+def db_available_hours(user_id):
+    """Read a user's daily available-hours (from the accounts DB)."""
+    try:
+        import db as _db
+        u = _db.get_user(user_id)
+        if u:
+            return float(u.get("available_hours") or 4)
+    except Exception:
+        pass
+    return 4
+
+
+def deadline_feasible(user_id, deadline_id):
+    """Return a short feasibility report for a deadline:
+    days left, sessions remaining vs. needed, and whether it fits.
+    """
+    data = load_all()
+    ud = _user_data(data, user_id)
+    d = ud.get("deadlines", {}).get(deadline_id)
+    if not d:
+        return None
+    due = parse_date(d.get("due_date", ""))
+    if not due:
+        return None
+    days_left = (due - _today()).days
+    total_hours = float(d.get("estimated_hours") or 0) or 1.0
+    available = db_available_hours(user_id)
+    capacity_left = max(0, days_left) * available
+    feasible = capacity_left >= total_hours
+    return {
+        "days_left": days_left,
+        "needed_hours": round(total_hours, 1),
+        "available_per_day": available,
+        "capacity_left": round(capacity_left, 1),
+        "feasible": feasible,
+    }
+
+
+def recovery_plan(user_id, deadline_id, hours_per_day=None):
+    """If a deadline is no longer feasible (behind), rebuild the lead-up plan
+    squeezed into the time that remains. Returns the recovery report.
+    """
+    report = deadline_feasible(user_id, deadline_id)
+    if not report:
+        return None
+    if report["feasible"]:
+        return {**report, "recovery": False, "steps": list_tasks(user_id)}
+
+    created = auto_plan_deadline(user_id, deadline_id, hours_per_day=hours_per_day,
+                                 replace=True)
+    new_report = deadline_feasible(user_id, deadline_id)
+    return {
+        **new_report,
+        "recovery": True,
+        "steps": created,
+    }
