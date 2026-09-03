@@ -106,9 +106,64 @@ SUBJECTS = [
 ]
 
 
+def subject_slug(title):
+    """Turn a course title into a stable URL slug."""
+    slug = "".join(c if c.isalnum() else "-" for c in title.lower()).strip("-")
+    return slug or "course"
+
+
+def custom_subject(title, position):
+    """Build a subject dict for a user-entered course title."""
+    return {
+        "slug": subject_slug(title),
+        "code": f"CRS {100 + position:03d}",
+        "title": title,
+        "color": ("navy", "teal", "green", "purple", "orange", "red")[position % 6],
+        "instructor": "To be assigned",
+        "term": "Fall 2026",
+        "description": f"Custom course: {title}",
+    }
+
+
+def user_subjects(user):
+    """Return the subject cards for a user's onboarded courses.
+
+    Preloaded subjects are matched by title; anything else becomes a custom
+    course entry. Falls back to the full preloaded set when the user has no
+    courses saved.
+    """
+    course_names = [c.strip() for c in (user or {}).get("courses", []) if c.strip()]
+
+    if not course_names:
+        return list(SUBJECTS)
+
+    subjects = []
+    for position, title in enumerate(course_names):
+        matching = next(
+            (s for s in SUBJECTS if s["title"].lower() == title.lower()), None
+        )
+        if matching:
+            subjects.append(matching)
+        else:
+            subjects.append(custom_subject(title, position))
+    return subjects
+
+
 def get_subject(slug):
-    """Return the subject dict for a slug, or None."""
-    return next((s for s in SUBJECTS if s["slug"] == slug), None)
+    """Return the subject dict for a slug, or None.
+
+    Resolves both the preloaded SUBJECTS list and any custom courses that
+    users entered during onboarding (rebuilt from the users database each call
+    so newly-added courses become available immediately).
+    """
+    for s in SUBJECTS:
+        if s["slug"] == slug:
+            return s
+    for user in load_users().values():
+        for position, title in enumerate(user.get("courses", [])):
+            if subject_slug(title) == slug:
+                return custom_subject(title, position)
+    return None
 
 
 def get_subject_files(subject):
@@ -280,8 +335,9 @@ def onboarding_post():
 @app.get("/")
 @login_required
 def home():
-    """Render the subject dashboard."""
-    return render_template("index.html", user=current_user(), subjects=SUBJECTS)
+    """Render the subject dashboard from the user's onboarded courses."""
+    user = current_user()
+    return render_template("index.html", user=user, subjects=user_subjects(user))
 
 
 @app.get("/subject/<slug>")
@@ -307,7 +363,7 @@ def subject(slug):
         active_tool=tool,
         user=user,
         subject=subject_info,
-        subjects=SUBJECTS,
+        subjects=user_subjects(user),
         files=get_subject_files(subject_info),
         is_member=is_member,
         invite_code=collab.get_subject_code(slug),
@@ -422,7 +478,7 @@ def quiz_take_page():
         if quiz:
             return redirect(url_for("quiz_take", quiz_id=quiz["id"]))
         error = "No quiz found for that code."
-    return render_template("quiz_take.html", user=current_user(), subjects=SUBJECTS, error=error)
+    return render_template("quiz_take.html", user=current_user(), subjects=user_subjects(current_user()), error=error)
 
 
 @app.get("/quiz/<quiz_id>")
@@ -438,7 +494,7 @@ def quiz_take(quiz_id):
     return render_template(
         "quiz.html",
         user=current_user(),
-        subjects=SUBJECTS,
+        subjects=user_subjects(current_user()),
         quiz=quiz,
         subject=subject_info,
         user_name=user_name,
@@ -542,7 +598,7 @@ def quiz_results(quiz_id):
     return render_template(
         "quiz_results.html",
         user=current_user(),
-        subjects=SUBJECTS,
+        subjects=user_subjects(current_user()),
         quiz=quiz,
         subject=subject_info,
         rows=rows,
