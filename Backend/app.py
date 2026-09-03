@@ -226,10 +226,8 @@ def login_required(view):
 
 @app.get("/welcome")
 def welcome():
-    """Render the welcome splash shown before sign-in."""
-    if session.get("user_id"):
-        return redirect(url_for("home"))
-    return render_template("welcome.html")
+    """Render the welcome splash."""
+    return render_template("welcome.html", user=current_user())
 
 
 @app.get("/signup")
@@ -335,6 +333,12 @@ def onboarding_post():
 
 
 @app.get("/")
+def landing():
+    """Landing page: always show the welcome splash."""
+    return render_template("welcome.html", user=current_user())
+
+
+@app.get("/dashboard")
 @login_required
 def home():
     """Render the planning dashboard plus the user's subject cards."""

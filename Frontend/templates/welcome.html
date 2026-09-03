@@ -128,7 +128,7 @@
                 <li>Track your progress and stay on top of every subject</li>
                 <li>Collaborate with classmates and share materials and quizzes</li>
             </ul>
-            <a class="button button--primary" href="{{ url_for('signup') }}">Start</a>
+            <a class="button button--primary" href="{{ url_for('home') if user else url_for('signup') }}">{{ 'Go to dashboard' if user else 'Start' }}</a>
             <div class="welcome__dots" aria-hidden="true">
                 <span class="welcome__dot" data-slide="1"></span>
                 <span class="welcome__dot is-active" data-slide="2"></span>
