@@ -6,6 +6,298 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About Study Planner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        /* Modern About page styles, scoped to this page (Sakai navy theme). */
+        .about {
+            padding: 0;
+        }
+
+        .about-hero {
+            position: relative;
+            background: linear-gradient(135deg, var(--color-primary-darker) 0%, var(--color-primary) 55%, var(--color-primary-light) 100%);
+            color: var(--color-text-inverse);
+            padding: 3.5rem 1.5rem 4rem;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .about-hero::before,
+        .about-hero::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            background: rgb(255 255 255 / 0.06);
+        }
+
+        .about-hero::before {
+            width: 22rem;
+            height: 22rem;
+            top: -8rem;
+            left: -6rem;
+        }
+
+        .about-hero::after {
+            width: 16rem;
+            height: 16rem;
+            bottom: -6rem;
+            right: -4rem;
+        }
+
+        .about-hero__inner {
+            position: relative;
+            z-index: 1;
+            max-width: 46rem;
+            margin-inline: auto;
+        }
+
+        .about-hero__eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #ffd9a8;
+            margin-bottom: var(--space-4);
+        }
+
+        .about-hero__eyebrow::before,
+        .about-hero__eyebrow::after {
+            content: "";
+            width: 1.5rem;
+            height: 2px;
+            background: var(--color-accent);
+            border-radius: 2px;
+        }
+
+        .about-hero h1 {
+            font-size: clamp(2rem, 5vw, 3rem);
+            line-height: 1.15;
+            margin: 0 0 var(--space-4);
+        }
+
+        .about-hero__subtitle {
+            font-size: 1.1rem;
+            color: #d7e4ee;
+            margin: 0 0 var(--space-6);
+            line-height: 1.6;
+        }
+
+        .about-hero__cta {
+            display: inline-block;
+            padding: var(--space-3) var(--space-6);
+            background: var(--color-accent);
+            color: #2b1b00;
+            font-weight: 700;
+            border-radius: var(--radius);
+            text-decoration: none;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+            box-shadow: 0 6px 20px rgb(240 153 55 / 0.4);
+        }
+
+        .about-hero__cta:hover {
+            background: #f6a94f;
+            color: #2b1b00;
+            text-decoration: none;
+            transform: translateY(-2px);
+        }
+
+        .about-body {
+            max-width: 56rem;
+            margin-inline: auto;
+            padding: 0 1.5rem 3rem;
+        }
+
+        .about-section {
+            margin-top: 3rem;
+        }
+
+        .about-section__title {
+            font-size: 1.6rem;
+            margin: 0 0 var(--space-2);
+            color: var(--color-primary-dark);
+        }
+
+        .about-section__lead {
+            color: var(--color-muted);
+            font-size: 1.05rem;
+            line-height: 1.6;
+            margin: 0 0 var(--space-6);
+        }
+
+        /* Feature grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+            gap: var(--space-4);
+        }
+
+        .feature-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            padding: var(--space-6);
+            transition: box-shadow 0.15s ease, transform 0.15s ease;
+        }
+
+        .feature-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-3px);
+        }
+
+        .feature-card__icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.75rem;
+            font-size: 1.4rem;
+            margin-bottom: var(--space-4);
+            background: var(--color-primary-light);
+            color: var(--color-text-inverse);
+        }
+
+        .feature-card__icon--accent { background: var(--color-accent); color: #2b1b00; }
+        .feature-card__icon--teal { background: #0f5f6f; }
+        .feature-card__icon--green { background: #2e6d32; }
+
+        .feature-card h3 {
+            margin: 0 0 var(--space-2);
+            font-size: 1.1rem;
+            color: var(--color-primary-dark);
+        }
+
+        .feature-card p {
+            margin: 0;
+            color: var(--color-muted);
+            line-height: 1.55;
+            font-size: 0.95rem;
+        }
+
+        /* Split layout for mission / philosophy */
+        .about-split {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+            gap: var(--space-4);
+            margin-top: var(--space-4);
+        }
+
+        .about-panel {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            padding: var(--space-6);
+        }
+
+        .about-panel--tinted {
+            background: linear-gradient(150deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+            border: none;
+            color: var(--color-text-inverse);
+        }
+
+        .about-panel h3 {
+            margin: 0 0 var(--space-3);
+            font-size: 1.15rem;
+        }
+
+        .about-panel p {
+            margin: 0 0 var(--space-3);
+            line-height: 1.6;
+            color: var(--color-muted);
+        }
+
+        .about-panel--tinted p { color: #d7e4ee; }
+        .about-panel--tinted strong { color: #ffd9a8; }
+
+        /* Philosophy pillars */
+        .pillar-list {
+            list-style: none;
+            margin: var(--space-4) 0 0;
+            padding: 0;
+            display: grid;
+            gap: var(--space-3);
+        }
+
+        .pillar {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-4);
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            padding: var(--space-4) var(--space-6);
+        }
+
+        .pillar__number {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            background: var(--color-accent);
+            color: #2b1b00;
+            font-weight: 800;
+            font-size: 1.2rem;
+        }
+
+        .pillar h4 {
+            margin: 0 0 var(--space-1);
+            color: var(--color-primary-dark);
+        }
+
+        .pillar p {
+            margin: 0;
+            color: var(--color-muted);
+            line-height: 1.55;
+        }
+
+        /* Closing CTA band */
+        .about-cta {
+            margin-top: 3rem;
+            text-align: center;
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            padding: var(--space-8);
+        }
+
+        .about-cta h2 {
+            margin: 0 0 var(--space-2);
+            color: var(--color-primary-dark);
+            font-size: 1.5rem;
+        }
+
+        .about-cta p {
+            margin: 0 0 var(--space-6);
+            color: var(--color-muted);
+            font-size: 1.05rem;
+        }
+
+        .about-cta__btn {
+            display: inline-block;
+            padding: var(--space-3) var(--space-6);
+            background: var(--color-primary);
+            color: var(--color-text-inverse);
+            font-weight: 700;
+            border-radius: var(--radius);
+            text-decoration: none;
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+
+        .about-cta__btn:hover {
+            background: var(--color-primary-dark);
+            color: var(--color-text-inverse);
+            text-decoration: none;
+            transform: translateY(-2px);
+        }
+    </style>
 </head>
 
 <body>
@@ -17,7 +309,10 @@
                 <nav class="nav-bar">
                     <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
                     <a class="nav-bar__link" href="{{ url_for('ai_hub') }}">AI Learning Hub</a>
-                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Tasks</a>
                     <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
                     <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('about') }}">About</a>
                 </nav>
@@ -26,122 +321,132 @@
         </div>
     </header>
 
-    <main class="container page-main">
-        <h1>About Study Planner</h1>
-        <img src="{{ url_for('static', filename='images/woman-8601818_1280.jpg') }}" alt="Study Planner" width="600"
-            height="400"><br>
+    <main class="container page-main about">
+        <!-- Hero -->
+        <section class="about-hero">
+            <div class="about-hero__inner">
+                <span class="about-hero__eyebrow">Plan · Focus · Progress</span>
+                <h1>Plan Smarter. Study Better. Achieve More.</h1>
+                <p class="about-hero__subtitle">
+                    Study Planner brings your courses, deadlines, and tasks together in one organized place — so you
+                    always know what to focus on next.
+                </p>
+                <a class="about-hero__cta" href="{{ url_for('home') }}">Start Planning</a>
+            </div>
+        </section>
 
-        <h2>Plan Smarter. Study Better. Achieve More.</h2>
+        <div class="about-body">
+            <!-- What we offer -->
+            <section class="about-section">
+                <h2 class="about-section__title">What We Offer</h2>
+                <p class="about-section__lead">
+                    Everything you need to turn scattered responsibilities into a clear, achievable study plan.
+                </p>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <span class="feature-card__icon">📐</span>
+                        <h3>Smart Study Planning</h3>
+                        <p>Create structured study schedules that fit your academic goals, available time, and priorities.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-card__icon feature-card__icon--accent">🎯</span>
+                        <h3>Goal Management</h3>
+                        <p>Set academic goals and break them into smaller, achievable tasks so you always know what you're working toward.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-card__icon feature-card__icon--teal">🗂️</span>
+                        <h3>Course Organization</h3>
+                        <p>Keep courses, subjects, assignments, and study activities organized in one central place.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-card__icon feature-card__icon--green">⏱️</span>
+                        <h3>Time Management</h3>
+                        <p>Make better use of your available study time by planning sessions and prioritizing important tasks.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-card__icon">📈</span>
+                        <h3>Progress Tracking</h3>
+                        <p>Monitor your progress and see how consistently you're working toward your academic goals.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-card__icon feature-card__icon--accent">🔔</span>
+                        <h3>Deadlines &amp; Reminders</h3>
+                        <p>Stay informed about upcoming study sessions, deadlines, examinations, and important activities.</p>
+                    </div>
+                </div>
+            </section>
 
-        <p>Welcome to <strong>Study Planner</strong>, a modern study planning platform designed to help students take
-            control of their academic journey.</p>
+            <!-- Mission -->
+            <section class="about-section">
+                <h2 class="about-section__title">Our Mission</h2>
+                <p class="about-section__lead">
+                    Making academic planning simple, structured, and achievable for every student.
+                </p>
+                <div class="about-split">
+                    <div class="about-panel">
+                        <h3>Why we built it</h3>
+                        <p>
+                            Students juggle multiple courses, assignments, projects, and personal commitments.
+                            Without a plan, it's hard to know where to start or how to stay on track. Study Planner
+                            was built to close that gap — turning what's in your head into a clear plan you can follow.
+                        </p>
+                        <p>
+                            Instead of asking <strong>"What should I study today?"</strong>, you'll have a concrete
+                            answer based on your goals, priorities, schedule, and progress.
+                        </p>
+                    </div>
+                    <div class="about-panel about-panel--tinted">
+                        <h3>What we believe</h3>
+                        <p>
+                            Effective studying isn't about more hours with the books — it's about a
+                            <strong>clear plan</strong>, <strong>good time management</strong>, and
+                            <strong>consistency</strong>.
+                        </p>
+                        <p>
+                            Small, consistent actions lead to significant academic results.
+                        </p>
+                    </div>
+                </div>
+            </section>
 
-        <p>We believe that studying effectively is not simply about spending more hours with your books. It is about
-            <strong>having a clear plan, managing your time wisely, staying consistent, and knowing what to focus on
-                next</strong>.</p>
+            <!-- Philosophy -->
+            <section class="about-section">
+                <h2 class="about-section__title">Our Philosophy</h2>
+                <p class="about-section__lead">
+                    Effective studying is built on three simple principles.
+                </p>
+                <ul class="pillar-list">
+                    <li class="pillar">
+                        <span class="pillar__number">1</span>
+                        <div>
+                            <h4>Plan</h4>
+                            <p>Know what needs to be done and when it needs to be done.</p>
+                        </div>
+                    </li>
+                    <li class="pillar">
+                        <span class="pillar__number">2</span>
+                        <div>
+                            <h4>Focus</h4>
+                            <p>Give your attention to the right task at the right time.</p>
+                        </div>
+                    </li>
+                    <li class="pillar">
+                        <span class="pillar__number">3</span>
+                        <div>
+                            <h4>Progress</h4>
+                            <p>Track your efforts, learn from your habits, and keep improving.</p>
+                        </div>
+                    </li>
+                </ul>
+            </section>
 
-        <p>Study Planner brings these elements together in one simple and organized platform, helping students transform
-            their academic goals into realistic, manageable study plans.</p>
-
-        <h2>Our Mission</h2>
-
-        <p>Our mission is to make academic planning <strong>simple, structured, and achievable for every
-                student</strong>.</p>
-
-        <p>Students often have multiple courses, assignments, examinations, projects, and personal commitments competing
-            for their attention. Without proper planning, it can become difficult to know where to start or how to stay
-            on track.</p>
-
-        <p>Study Planner was created to solve this problem by providing students with the tools they need to organize
-            their workload, schedule their study sessions, monitor their progress, and build productive study habits.
-        </p>
-
-        <h2>What We Offer</h2>
-
-        <h3>Smart Study Planning</h3>
-
-        <p>Create structured study schedules that fit your academic goals, available time, and priorities.</p>
-
-        <h3>Goal Management</h3>
-
-        <p>Set academic goals and break them into smaller, achievable tasks so you always know what you are working
-            toward.</p>
-
-        <h3>Course Organization</h3>
-
-        <p>Keep your courses, subjects, topics, assignments, and study activities organized in one central place.</p>
-
-        <h3>Time Management</h3>
-
-        <p>Make better use of your available study time by planning sessions and prioritizing important academic tasks.
-        </p>
-
-        <h3>Progress Tracking</h3>
-
-        <p>Monitor your progress and see how consistently you are working toward your academic goals.</p>
-
-        <h3>Reminders</h3>
-
-        <p>Stay informed about upcoming study sessions, deadlines, examinations, and other important academic
-            activities.</p>
-
-        <h2>Why We Built Study Planner</h2>
-
-        <p>Academic life can become overwhelming when everything is kept in your head.</p>
-
-        <p>You may know that you have an examination coming up, an assignment due next week, and several topics you
-            still need to study—but knowing these things is different from having a <strong>clear plan for handling
-                them</strong>.</p>
-
-        <p>Study Planner helps bridge that gap.</p>
-
-        <p>Instead of asking:</p>
-
-        <blockquote>
-            <p><strong>"What should I study today?"</strong></p>
-        </blockquote>
-
-        <p>you can have a clear answer based on your goals, priorities, schedule, and progress.</p>
-
-        <h2>Built for Students</h2>
-
-        <p>Study Planner is designed with students at the center of the experience.</p>
-
-        <p>Whether you are preparing for examinations, managing university courses, working on assignments, or simply
-            trying to develop better study habits, the platform is designed to help you stay organized without making
-            planning complicated.</p>
-
-        <p>Our goal is not to give you more things to manage.</p>
-
-        <p><strong>Our goal is to make managing your academic life easier.</strong></p>
-
-        <h2>Our Philosophy</h2>
-
-        <p>We believe that effective studying is built on three principles:</p>
-
-        <p><strong>Plan → Focus → Progress</strong></p>
-
-        <p><strong>Plan:</strong> Know what needs to be done and when it needs to be done.</p>
-
-        <p><strong>Focus:</strong> Give your attention to the right task at the right time.</p>
-
-        <p><strong>Progress:</strong> Track your efforts, learn from your habits, and keep improving.</p>
-
-        <p>Small, consistent actions can lead to significant academic results.</p>
-
-        <h2>Looking Ahead</h2>
-
-        <p>We are continuously working to make Study Planner a more intelligent, accessible, and useful study
-            companion.</p>
-
-        <p>As the platform evolves, our focus will remain the same:</p>
-
-        <p><strong>Helping students spend less time worrying about what to study and more time actually studying.</strong>
-        </p>
-
-        <h3>Study with purpose. Plan with confidence. Grow with consistency.</h3>
-
-        <p><strong>Welcome to Study Planner.</strong></p>
+            <!-- Closing CTA -->
+            <section class="about-cta">
+                <h2>Study with purpose. Plan with confidence.</h2>
+                <p>Let's make managing your academic life easier — welcome to Study Planner.</p>
+                <a class="about-cta__btn" href="{{ url_for('home') }}">Get Started</a>
+            </section>
+        </div>
     </main>
 </body>
 
