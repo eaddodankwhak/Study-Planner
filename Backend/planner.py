@@ -188,6 +188,15 @@ def list_tasks(user_id):
     return sorted(ud.get("tasks", []), key=lambda t: t.get("due_date", ""))
 
 
+def get_task(user_id, task_id):
+    data = load_all()
+    ud = _user_data(data, user_id)
+    for t in ud.get("tasks", []):
+        if t.get("id") == task_id:
+            return t
+    return None
+
+
 def add_task(user_id, **fields):
     data = load_all()
     ud = _user_data(data, user_id)

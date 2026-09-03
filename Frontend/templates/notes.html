@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('ai_hub') }}">AI Learning Hub</a>
+                    <a class="nav-bar__link" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Tasks</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('notes') }}">Notes</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="dashboard-heading">
+            <h2>Notes</h2>
+            <span class="text-muted">Capture and review what you learn, per course.</span>
+        </div>
+
+        <section class="card">
+            <h3 class="card__title">New note</h3>
+            <form method="POST" action="{{ url_for('notes_create') }}" class="form">
+                <label class="form-label" for="note-title">Title</label>
+                <input id="note-title" type="text" name="title" class="form-input" placeholder="e.g. Photosynthesis part 2" required>
+                <label class="form-label" for="note-course">Course</label>
+                <select id="note-course" name="course_id" class="form-input">
+                    <option value="">— No course —</option>
+                    {% for c in courses %}
+                        <option value="{{ c.id }}">{{ c.title }}</option>
+                    {% endfor %}
+                </select>
+                <label class="form-label" for="note-topic">Topic</label>
+                <input id="note-topic" type="text" name="topic" class="form-input" placeholder="Optional topic">
+                <label class="form-label" for="note-body">Body</label>
+                <textarea id="note-body" name="body" class="form-input" rows="4" placeholder="Your notes..."></textarea>
+                <button type="submit" class="button button--primary">Save note</button>
+            </form>
+        </section>
+
+        <section class="card">
+            <h3 class="card__title">All notes</h3>
+            {% if notes %}
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Note</th><th>Course</th><th>Topic</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for n in notes %}
+                            <tr>
+                                <td>
+                                    <strong>{{ n.title }}</strong>
+                                    {% if n.body %}<p class="text-muted mb-0">{{ n.body }}</p>{% endif %}
+                                </td>
+                                <td>{{ n.course_label or '—' }}</td>
+                                <td>{{ n.topic or '—' }}</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('notes_delete', note_id=n.id) }}" class="inline-form">
+                                        <input type="hidden" name="back" value="{{ url_for('notes') }}">
+                                        <button type="submit" class="button button--ghost">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted mb-0">No notes yet. Add your first note above.</p>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

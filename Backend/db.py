@@ -12,6 +12,8 @@ helpers. Tables:
   ai_conversations - AI chat conversations (per user)
   ai_messages      - messages within an AI conversation
   ai_usage         - per-user AI usage counters (JSON payload)
+  notes            - per-user study notes (course/topic scoped)
+  sessions         - completed study/focus sessions + reflections
 
 The database file lives at Database/instance/study_planner.db and is created
 automatically on first use. Uses only Python's standard library (sqlite3).
@@ -110,11 +112,37 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     data_json TEXT
 );
 
+CREATE TABLE IF NOT EXISTS notes (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    course_id   TEXT,
+    slug        TEXT,
+    title       TEXT,
+    body        TEXT,
+    topic       TEXT,
+    updated_at  INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    course_id     TEXT,
+    task_id       TEXT,
+    slug          TEXT,
+    duration_minutes INTEGER,
+    started_at    INTEGER,
+    ended_at      INTEGER,
+    confidence    INTEGER,
+    notes         TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_materials_slug ON materials (slug);
 CREATE INDEX IF NOT EXISTS idx_quizzes_subject  ON quizzes (subject);
 CREATE INDEX IF NOT EXISTS idx_attempts_quiz    ON attempts (quiz_id);
 CREATE INDEX IF NOT EXISTS idx_ai_conv_user     ON ai_conversations (user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_msg_conv      ON ai_messages (conversation_id);
+CREATE INDEX IF NOT EXISTS idx_notes_user       ON notes (user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions (user_id);
 """
 
 _COLUMN_CACHE = {}
@@ -589,15 +617,206 @@ def ai_reset_usage_for_tests(user_id=None):
 
 
 def ai_purge_user(user_id):
-    """Delete all AI data (conversations, messages, usage) for a user."""
+    """Delete all user data (AI, notes, sessions) for a user.
+
+    Tolerant of a database that predates the notes/sessions tables so that
+    data-reset tooling degrades gracefully on older installs.
+    """
     conn = _conn_context()
     try:
         conn.execute("DELETE FROM ai_messages WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM ai_conversations WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM ai_usage WHERE user_id = ?", (user_id,))
+        for tbl in ("notes", "sessions"):
+            try:
+                conn.execute(f"DELETE FROM {tbl} WHERE user_id = ?", (user_id,))
+            except sqlite3.OperationalError:
+                continue
         conn.commit()
     finally:
         conn.close()
+
+
+# --------------------------------------------------------------- study notes
+
+def list_notes(user_id, course_id=None):
+    """Return a user's notes, optionally filtered to one course/topic owner."""
+    if course_id:
+        return _query_all(
+            "SELECT * FROM notes WHERE user_id = ? AND course_id = ?"
+            " ORDER BY updated_at DESC",
+            (user_id, course_id),
+        )
+    return _query_all(
+        "SELECT * FROM notes WHERE user_id = ? ORDER BY updated_at DESC", (user_id,)
+    )
+
+
+def get_note(note_id, user_id=None):
+    """Return a single note. If user_id is given, scope to that user's note."""
+    if user_id:
+        return _query_one(
+            "SELECT * FROM notes WHERE id = ? AND user_id = ?", (note_id, user_id)
+        )
+    return _query_one("SELECT * FROM notes WHERE id = ?", (note_id,))
+
+
+def create_note(user_id, title="", body="", course_id=None, slug=None, topic=""):
+    """Create a note and return it."""
+    note_id = uuid.uuid4().hex
+    now = int(time.time())
+    _execute(
+        "INSERT INTO notes (id, user_id, course_id, slug, title, body, topic, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (note_id, user_id, course_id, slug, title, body, topic, now),
+    )
+    return get_note(note_id)
+
+
+def update_note(note_id, user_id, title=None, body=None, topic=None):
+    """Update mutable fields of a note scoped to the owner."""
+    fields = {"updated_at": int(time.time())}
+    if title is not None:
+        fields["title"] = title
+    if body is not None:
+        fields["body"] = body
+    if topic is not None:
+        fields["topic"] = topic
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    params = list(fields.values()) + [note_id, user_id]
+    conn = _conn_context()
+    try:
+        cur = conn.execute(
+            f"UPDATE notes SET {cols} WHERE id = ? AND user_id = ?", params
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def delete_note(note_id, user_id):
+    """Delete a note scoped to its owner. Returns True if deleted."""
+    conn = _conn_context()
+    try:
+        cur = conn.execute(
+            "DELETE FROM notes WHERE id = ? AND user_id = ?", (note_id, user_id)
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+# ----------------------------------------------------------- study sessions
+
+def list_sessions(user_id, limit=50):
+    """Return a user's study sessions, most recent first."""
+    return _query_all(
+        "SELECT * FROM sessions WHERE user_id = ? ORDER BY started_at DESC LIMIT ?",
+        (user_id, limit),
+    )
+
+
+def get_session(session_id, user_id=None):
+    """Return a single study session, optionally scoped to the owner."""
+    if user_id:
+        return _query_one(
+            "SELECT * FROM sessions WHERE id = ? AND user_id = ?",
+            (session_id, user_id),
+        )
+    return _query_one("SELECT * FROM sessions WHERE id = ?", (session_id,))
+
+
+def create_session(user_id, duration_minutes=0, course_id=None, task_id=None,
+                   slug=None, started_at=None, ended_at=None):
+    """Record a completed study session."""
+    session_id = uuid.uuid4().hex
+    now = int(time.time())
+    started_at = started_at if started_at is not None else now
+    ended_at = ended_at if ended_at is not None else now + int(duration_minutes or 0) * 60
+    _execute(
+        "INSERT INTO sessions (id, user_id, course_id, task_id, slug,"
+        " duration_minutes, started_at, ended_at, confidence, notes)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
+        (session_id, user_id, course_id, task_id, slug,
+         int(duration_minutes or 0), int(started_at), int(ended_at)),
+    )
+    return get_session(session_id)
+
+
+def set_session_reflection(session_id, user_id, confidence=None, notes=None):
+    """Store the end-of-session reflection (confidence 1-5 and optional note)."""
+    sets = []
+    params = []
+    if confidence is not None:
+        sets.append("confidence = ?")
+        params.append(int(confidence))
+    if notes is not None:
+        sets.append("notes = ?")
+        params.append(notes)
+    if not sets:
+        return False
+    params += [session_id, user_id]
+    conn = _conn_context()
+    try:
+        cur = conn.execute(
+            f"UPDATE sessions SET {', '.join(sets)} WHERE id = ? AND user_id = ?", params
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def delete_session(session_id, user_id):
+    """Delete a study session scoped to its owner."""
+    conn = _conn_context()
+    try:
+        cur = conn.execute(
+            "DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id)
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def minutes_by_day(user_id, days=14):
+    """Return { 'YYYY-MM-DD': total_minutes } for the last N days of study + attempts."""
+    conn = _conn_context()
+    try:
+        cur = conn.execute(
+            "SELECT started_at, duration_minutes FROM sessions WHERE user_id = ?"
+            " AND started_at >= ?",
+            (user_id, int(time.time()) - days * 86400),
+        )
+        rows = {"sessions": [dict(r) for r in cur.fetchall()]}
+        halt = conn.execute(
+            "SELECT date, score, total FROM attempts WHERE user_id = ?", (user_id,)
+        )
+        rows["attempts"] = [dict(r) for r in halt.fetchall()]
+        return rows
+    finally:
+        conn.close()
+
+
+def compute_streak(active_days):
+    """Given a set of 'YYYY-MM-DD' active days, return the current streak length."""
+    from datetime import date, timedelta
+    if not active_days:
+        return 0
+    days = set(active_days)
+    today = date.today()
+    # count backwards from today (or yesterday) to allow an unfinished today
+    cursor = today
+    if cursor.isoformat() not in days:
+        cursor = today - timedelta(days=1)
+    streak = 0
+    while cursor.isoformat() in days:
+        streak += 1
+        cursor -= timedelta(days=1)
+    return streak
 
 
 # ------------------------------------------------------------- test helpers

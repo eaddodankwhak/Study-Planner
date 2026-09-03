@@ -88,6 +88,33 @@
                     <p class="text-muted mb-0">No tasks recorded for this course yet.</p>
                 {% endif %}
             </section>
+
+            <section class="card">
+                <h3 class="card__title">Notes</h3>
+                <form method="POST" action="{{ url_for('notes_create') }}" class="form">
+                    <input type="hidden" name="course_id" value="{{ course.id }}">
+                    <input type="hidden" name="back" value="{{ url_for('course_detail', course_id=course.id) }}">
+                    <input type="text" name="title" class="form-input" placeholder="Note title" required>
+                    <textarea name="body" class="form-input" rows="3" placeholder="What did you learn?"></textarea>
+                    <input type="text" name="topic" class="form-input" placeholder="Topic (optional)">
+                    <button type="submit" class="button button--primary">Save note</button>
+                </form>
+                {% if notes %}
+                    <ul class="task-list">
+                        {% for n in notes %}
+                            <li class="task">
+                                <span>
+                                    <strong>{{ n.title }}</strong>
+                                    {% if n.topic %}<span class="text-muted"> · {{ n.topic }}</span>{% endif %}
+                                    <p class="text-muted mb-0">{{ n.body }}</p>
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">No notes yet. Add your first note above.</p>
+                {% endif %}
+            </section>
         </div>
     </main>
 </body>

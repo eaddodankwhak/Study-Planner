@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Timer — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link" href="{{ url_for('ai_hub') }}">AI Learning Hub</a>
+                    <a class="nav-bar__link" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Tasks</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('session_page') }}">Focus</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="dashboard-heading">
+            <h2>Focus Timer</h2>
+            <span class="text-muted">Pick a course, run a focused session, then reflect.</span>
+        </div>
+
+        <div class="subject-content">
+            <section class="card">
+                <h3 class="card__title">Session</h3>
+                <form method="GET" action="{{ url_for('session_page') }}" class="form">
+                    <label class="form-label" for="course-select">Focusing on course</label>
+                    <select id="course-select" name="course_id" class="form-input">
+                        <option value="">— Unassigned —</option>
+                        {% for c in courses %}
+                            <option value="{{ c.id }}" {% if course and course.id == c.id %}selected{% endif %}>{{ c.title }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="form-label" for="task-select">Linked task (optional)</label>
+                    <input id="task-select" type="text" name="task_id" class="form-input"
+                           value="{{ task.id if task else '' }}" placeholder="Task id (optional)">
+                    <button type="submit" class="button button--ghost">Apply context</button>
+                </form>
+
+                <div class="timer" data-context="{{ 'course' if course else 'none' }}">
+                    <div class="timer__display" data-timer-display>25:00</div>
+                    <div class="timer__controls">
+                        <button type="button" class="button button--primary" data-timer-start>Start</button>
+                        <button type="button" class="button button--ghost" data-timer-pause>Pause</button>
+                        <button type="button" class="button button--ghost" data-timer-reset>Reset</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h3 class="card__title">Reflect &amp; Finish</h3>
+                <p class="text-muted">After your session, mark it complete and rate your confidence (1 = lost, 5 = solid).</p>
+                <form method="POST" action="{{ url_for('session_complete') }}" class="form">
+                    <input type="hidden" name="course_id" value="{{ course.id if course else '' }}">
+                    <input type="hidden" name="task_id" value="{{ task.id if task else '' }}">
+                    <input type="hidden" name="slug" value="{{ course.slug if course else '' }}">
+                    <input type="hidden" name="duration_minutes" data-root-duration value="25">
+                    <label class="form-label" for="duration">Minutes focused</label>
+                    <input id="duration" type="number" min="1" max="300" name="duration_minutes" class="form-input" data-duration-input value="25">
+                    <label class="form-label">Confidence (1–5)</label>
+                    <div class="confidence">
+                        {% for n in range(1, 6) %}
+                            <label class="confidence__label">
+                                <input type="radio" name="confidence" value="{{ n }}"> {{ n }}
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <label class="form-label" for="session-notes">Reflection (optional)</label>
+                    <textarea id="session-notes" name="notes" class="form-input" rows="3"
+                              placeholder="What worked? What's still unclear?"></textarea>
+                    <button type="submit" class="button button--primary">Complete session</button>
+                </form>
+            </section>
+        </div>
+
+        <section class="card">
+            <h3 class="card__title">Recent sessions</h3>
+            {% if sessions %}
+                <table class="data-table">
+                    <thead><tr><th>Duration</th><th>Started</th><th>Confidence</th><th></th></tr></thead>
+                    <tbody>
+                        {% for s in sessions %}
+                            <tr>
+                                <td>{{ s.duration_minutes }} min</td>
+                                <td>{{ s.started_at }}</td>
+                                <td>
+                                    {% if s.confidence is not none %}
+                                        <span class="badge badge--{% if s.confidence <= 2 %}high{% else %}done{% endif %}">{{ s.confidence }}/5</span>
+                                    {% else %}
+                                        <span class="text-muted">no reflection</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('session_delete', session_id=s.id) }}" class="inline-form">
+                                        <input type="hidden" name="back" value="{{ url_for('session_page') }}">
+                                        <button type="submit" class="button button--ghost">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted mb-0">No sessions yet. Run your first focus session above.</p>
+            {% endif %}
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/session.js') }}"></script>
+</body>
+</html>

@@ -226,6 +226,54 @@
   padding: var(--space-3) var(--space-4);
 }
 
+/* Focus timer (Flow A) */
+.timer {
+  text-align: center;
+  padding: var(--space-6);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-top: var(--space-4);
+}
+
+.timer__display {
+  font-size: 3.2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.timer__controls {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+/* Confidence selector (1-5) */
+.confidence {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+  flex-wrap: wrap;
+}
+
+.confidence__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.confidence__label:hover {
+  background: var(--color-bg);
+}
+
 /* Onboarding */
 .onboarding {
   max-width: 32rem;

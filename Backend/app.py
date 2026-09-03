@@ -1,11 +1,12 @@
 """Entry point for the Study Planner Flask application.
 
 Provides a Sakai-style interface with real authentication:
-- /signup   create a new account (stored in Database/users.json)
+- /signup   create a new account (stored in SQLite)
 - /login    sign in with existing credentials
 - /logout   end the session
-- /           home dashboard (subjects grid) - login required
-- /about, /task, /progress, /onboarding - login required
+- /           public welcome landing
+- /dashboard   home dashboard (subjects grid + planning panel) - login required
+- /about, /task, /progress, /onboarding, /session, /notes - login required
 """
 
 import json
@@ -28,6 +29,7 @@ from werkzeug.utils import secure_filename
 import collab
 import db
 import planner
+import stats
 import ai as ai_pkg
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -710,12 +712,14 @@ def course_detail(course_id):
     deadline_list = planner.list_deadlines(user["id"])
     course_deadlines = [d for d in deadline_list if d.get("course_id") == course_id]
     course_tasks = [t for t in planner.list_tasks(user["id"]) if t.get("course_id") == course_id]
+    course_notes = db.list_notes(user["id"], course_id=course_id)
     return render_template(
         "course_detail.html",
         user=user,
         course=course,
         deadlines=course_deadlines,
         tasks=course_tasks,
+        notes=course_notes,
     )
 
 
@@ -850,8 +854,10 @@ def deadline_complete(deadline_id):
 @app.get("/progress")
 @login_required
 def progress():
-    """Render the Progress page."""
-    return render_template("progress.html", user=current_user())
+    """Render the Progress overview with real computed statistics."""
+    user = current_user()
+    overview = stats.overview(user["id"], db, planner)
+    return render_template("progress.html", user=user, stats=overview)
 
 
 @app.get("/ai")
@@ -864,6 +870,148 @@ def ai_hub():
         user=user,
         subjects=user_subjects(user),
     )
+
+
+# ---------------------------------------------------------------------------
+# Focus Timer + Study Sessions (Flow A: Home -> Task -> Timer -> Reflection)
+# ---------------------------------------------------------------------------
+
+@app.get("/session")
+@login_required
+def session_page():
+    """Render the Focus Timer. Accepts ?task_id= or ?course_id= as context."""
+    user = current_user()
+    task_id = request.args.get("task_id")
+    course_id = request.args.get("course_id")
+    task = planner.get_task(user["id"], task_id) if task_id else None
+    course = planner.get_course(user["id"], course_id) if course_id else None
+    courses = planner.list_courses(user["id"])
+    return render_template(
+        "session.html",
+        user=user,
+        task=task,
+        course=course,
+        courses=courses,
+        sessions=db.list_sessions(user["id"], limit=10),
+    )
+
+
+@app.post("/session/complete")
+@login_required
+def session_complete():
+    """Record a completed study session and its reflection.
+
+    If confidence is low (<= 2) the user is routed into Practice (quiz) so the
+    core loop keeps momentum; otherwise they return where they started.
+    """
+    user = current_user()
+    duration_minutes = request.form.get("duration_minutes", "0")
+    try:
+        duration_minutes = int(float(duration_minutes))
+    except (TypeError, ValueError):
+        duration_minutes = 0
+
+    course_id = request.form.get("course_id") or None
+    task_id = request.form.get("task_id") or None
+    slug = request.form.get("slug") or None
+    confidence = request.form.get("confidence")
+    notes = request.form.get("notes") or None
+
+    sess = db.create_session(
+        user["id"],
+        duration_minutes=duration_minutes,
+        course_id=course_id,
+        task_id=task_id,
+        slug=slug,
+    )
+    try:
+        conf = int(confidence)
+    except (TypeError, ValueError):
+        conf = None
+    if conf is not None:
+        db.set_session_reflection(sess["id"], user["id"], confidence=conf, notes=notes)
+
+    flash("Session recorded. Nice work!", "success")
+
+    # Route low-confidence, testable sessions into a quick quiz (Flow A).
+    if conf is not None and conf <= 2:
+        return redirect(url_for("quiz_take_page"))
+
+    back = request.form.get("back") or request.referrer or url_for("dashboard")
+    return redirect(back)
+
+
+@app.post("/session/<session_id>/delete")
+@login_required
+def session_delete(session_id):
+    user = current_user()
+    db.delete_session(session_id, user["id"])
+    flash("Session removed.", "success")
+    back = request.form.get("back") or request.referrer or url_for("progress")
+    return redirect(back)
+
+
+# ---------------------------------------------------------------------------
+# Notes
+# ---------------------------------------------------------------------------
+
+@app.get("/notes")
+@login_required
+def notes():
+    """Render the Notes page (all of the user's study notes)."""
+    user = current_user()
+    courses = planner.list_courses(user["id"])
+    by_id = {c["id"]: c for c in courses}
+    note_list = db.list_notes(user["id"])
+    for n in note_list:
+        n["course_label"] = by_id.get(n.get("course_id"), {}).get("title", "")
+    return render_template("notes.html", user=user, notes=note_list, courses=courses)
+
+
+@app.post("/notes")
+@login_required
+def notes_create():
+    """Create a new note."""
+    user = current_user()
+    title = request.form.get("title", "").strip()
+    body = request.form.get("body", "").strip()
+    course_id = request.form.get("course_id") or None
+    topic = request.form.get("topic", "").strip()
+    if not title:
+        flash("Please give the note a title.", "error")
+    else:
+        db.create_note(user["id"], title=title, body=body, course_id=course_id, topic=topic)
+        flash("Note saved.", "success")
+    back = request.form.get("back") or url_for("notes")
+    return redirect(back)
+
+
+@app.post("/notes/<note_id>/update")
+@login_required
+def notes_update(note_id):
+    """Update a note's title/body/topic."""
+    user = current_user()
+    db.update_note(
+        note_id,
+        user["id"],
+        title=request.form.get("title"),
+        body=request.form.get("body"),
+        topic=request.form.get("topic") or "",
+    )
+    flash("Note updated.", "success")
+    back = request.form.get("back") or url_for("notes")
+    return redirect(back)
+
+
+@app.post("/notes/<note_id>/delete")
+@login_required
+def notes_delete(note_id):
+    """Delete a note."""
+    user = current_user()
+    db.delete_note(note_id, user["id"])
+    flash("Note deleted.", "success")
+    back = request.form.get("back") or url_for("notes")
+    return redirect(back)
 
 
 if __name__ == "__main__":

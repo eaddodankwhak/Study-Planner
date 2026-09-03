@@ -15,7 +15,11 @@
                 <nav class="nav-bar">
                     <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
                     <a class="nav-bar__link" href="{{ url_for('ai_hub') }}">AI Learning Hub</a>
-                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('courses') }}">Courses</a>
+                    <a class="nav-bar__link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <a class="nav-bar__link" href="{{ url_for('deadlines') }}">Deadlines</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Tasks</a>
+                    <a class="nav-bar__link" href="{{ url_for('notes') }}">Notes</a>
                     <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('progress') }}">Progress</a>
                     <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
                 </nav>
@@ -27,10 +31,43 @@
     <main class="container page-main">
         <div class="dashboard-heading">
             <h2>Progress</h2>
+            <span class="text-muted">Your study effort, current streak, and completion overview.</span>
         </div>
+
+        <div class="stat-grid">
+            <div class="stat">
+                <p class="stat__label">Current streak</p>
+                <p class="stat__value">{{ stats.streak }}</p>
+                <p class="stat__sub">days · active {{ stats.active_days }}</p>
+            </div>
+            <div class="stat">
+                <p class="stat__label">Study time</p>
+                <p class="stat__value">{{ stats.total_minutes }}<small> min</small></p>
+                <p class="stat__sub">{{ stats.total_sessions }} session(s)</p>
+            </div>
+            <div class="stat">
+                <p class="stat__label">Tasks</p>
+                <p class="stat__value">{{ stats.tasks_done }}/{{ stats.tasks_total }}</p>
+                <p class="stat__sub">{{ stats.tasks_pct }}% complete</p>
+            </div>
+            <div class="stat">
+                <p class="stat__label">Quizzes taken</p>
+                <p class="stat__value">{{ stats.total_attempts }}</p>
+                <p class="stat__sub">deadlines {{ stats.deadlines_done }}/{{ stats.deadlines_total }}</p>
+            </div>
+        </div>
+
+        {% if stats.low_confidence_sessions %}
+            <section class="card priority-critical">
+                <h3 class="card__title">Needs review</h3>
+                <p class="text-muted">You rated {{ stats.low_confidence_sessions|length }} recent session(s) as low-confidence. Revisit these before they pile up.</p>
+                <a class="button button--primary" href="{{ url_for('quiz_take_page') }}">Take a practice quiz</a>
+            </section>
+        {% endif %}
+
         <section class="card">
-            <h3 class="card__title">Your Study Progress</h3>
-            <p class="text-muted mb-4">Track your study progress across subjects here.</p>
+            <h3 class="card__title">Weekly study minutes</h3>
+            <p class="text-muted mb-0">Keep a daily habit to protect your streak and stay ahead of deadlines.</p>
         </section>
     </main>
 </body>
