@@ -506,14 +506,25 @@ textarea.form-input {
   display: inline-block;
   margin-top: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  background: var(--color-bg);
+  background: var(--glass-bg);
   border: 2px dashed var(--color-primary-light);
   border-radius: var(--radius-sm);
+  backdrop-filter: var(--blur-lg);
+  box-shadow: var(--glass-shadow);
   font-family: "Courier New", monospace;
   font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--color-primary-dark);
+}
+
+/* Glassmorphism wrapper for invite panels */
+.invite-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: var(--blur-lg);
+  box-shadow: var(--glass-shadow);
 }
 
 .member-list {

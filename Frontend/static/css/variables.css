@@ -22,6 +22,17 @@
   --color-success: #2e7d32;
   --color-error: #c62828;
 
+  /* priority colour tokens (critical / moderate / mastered) */
+  --priority-critical: #c62828;
+  --priority-moderate: #f09937;
+  --priority-mastered: #2e7d32;
+
+  /* glassmorphism tokens (invite / overlays) */
+  --glass-bg: rgb(255 255 255 / 0.72);
+  --glass-border: rgb(255 255 255 / 0.5);
+  --glass-shadow: 0 8px 32px rgb(15 23 42 / 0.2);
+  --blur-lg: blur(14px);
+
   /* spacing scale */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
