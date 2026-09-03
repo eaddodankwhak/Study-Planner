@@ -1,1 +1,7 @@
 Flask>=3.0,<4.0
+
+# Optional: richer study-material text extraction. The AI Hub degrades gracefully
+# when these are not installed (plain-text files still work everywhere).
+PyPDF2>=3.0,<4.0
+python-docx>=1.1,<2.0
+Pillow>=10.0,<12.0

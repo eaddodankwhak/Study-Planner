@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Learning Hub — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ai.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Home</a>
+                    <a class="nav-bar__link nav-bar__link--active" href="{{ url_for('ai_hub') }}">AI Learning Hub</a>
+                    <a class="nav-bar__link" href="{{ url_for('task') }}">Task</a>
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Progress</a>
+                    <a class="nav-bar__link" href="{{ url_for('about') }}">About</a>
+                </nav>
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile-only toggle for the sidebar drawer -->
+    <div class="ai-hub-mobile-nav">
+        <strong>AI Learning Hub</strong>
+        <button type="button" class="button button--small" id="ai-menu-toggle" aria-label="Toggle conversations menu">☰</button>
+    </div>
+
+    <div class="ai-hub">
+        <!-- Left sidebar: conversations + model selection -->
+        <aside class="ai-sidebar" id="ai-sidebar" aria-label="AI conversations">
+            <div>
+                <button type="button" class="button ai-newchat" id="ai-new-conv">＋ New conversation</button>
+            </div>
+
+            <div>
+                <div class="ai-sidebar__heading">Recent conversations</div>
+                <ul class="ai-conv-list" id="ai-conv-list" aria-live="polite"></ul>
+            </div>
+
+            <div>
+                <div class="ai-sidebar__heading">Choose your AI</div>
+                <div class="ai-model-list" id="ai-model-list" role="radiogroup" aria-label="Select an AI model"></div>
+            </div>
+
+            <div class="ai-sidebar__footer">
+                <div id="ai-usage"></div>
+                <button type="button" class="ai-iconbtn" id="ai-clear-conv" title="Clear current conversation">Clear conversation</button>
+            </div>
+        </aside>
+
+        <!-- Right: chat -->
+        <main class="ai-main">
+            <div class="ai-header">
+                <h2 class="ai-header__title" id="ai-conv-title">AI Learning Hub</h2>
+                <div class="ai-tools">
+                    <span class="ai-tool">Model: <strong id="ai-current-model"></strong></span>
+                </div>
+            </div>
+
+            <div class="ai-modes" id="ai-modes" role="tablist" aria-label="Task modes"></div>
+
+            <div class="ai-chat" id="ai-chat" aria-live="polite"></div>
+
+            <div class="ai-status" id="ai-status"></div>
+
+            <div class="ai-composer">
+                <div class="ai-attachments" id="ai-attachments"></div>
+                <div class="ai-input-row">
+                    <button type="button" class="ai-attach-btn" id="ai-attach-btn" aria-label="Attach study material">＋ Attach</button>
+                    <input type="file" id="ai-file-input" class="hidden" accept=".txt,.md,.csv,.json,.log,.pdf,.docx,.png,.jpg,.jpeg,.gif">
+                    <textarea id="ai-input" class="ai-textarea" rows="1" placeholder="Ask anything about your studies…" aria-label="Message"></textarea>
+                    <button type="button" class="button ai-send" id="ai-send">Send</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Seed data available to the frontend chat controller.
+        window.AI_META = {};
+        window.AI_SUBJECTS = {{ subjects | map(attribute='title') | list | tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='js/ai_hub.js') }}"></script>
+</body>
+</html>

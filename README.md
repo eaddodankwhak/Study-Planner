@@ -16,6 +16,10 @@ subject cards they can explore, share course materials for, and build collaborat
   grades, collaboration, and quizzes, all under `/subject/<slug>`.
 - **Collaboration** — join a subject workspace with an invite code, share materials, and see members.
 - **Quizzes** — create quizzes with auto-generated invite codes, take them, and view a leaderboard.
+- **AI Learning Hub** — a chat assistant on `/ai` that explains, summarizes, solves, quizzes,
+  makes flashcards, builds study plans, simplifies material, and preps for exams, with
+  per-conversation history, streaming replies, and study-material uploads. Works in a clear
+  demo mode with no API key and switches to real models automatically when configured.
 
 ## How onboarding maps the courses to the dashboard
 
@@ -40,11 +44,14 @@ Study-planner/
 │   ├── app.py                 # Flask application entry point (routes + subject logic)
 │   ├── collab.py              # Collaboration & quiz data layer
 │   ├── requirements.txt       # Python dependencies
+│   ├── ai/                    # AI Learning Hub package (blueprint, providers, prompts…)
 │   └── app/
 │       └── services/          # Future task and validation logic
 ├── Database/
 │   ├── users.json             # Registered users (created at runtime, not committed)
 │   ├── collab.json            # Memberships, materials, quizzes (created at runtime)
+│   ├── ai.json                # AI conversations & usage (created at runtime)
+│   ├── ai_uploads/            # Extracted study-material text (created at runtime)
 │   └── instance/              # Local SQLite database files (not committed)
 ├── Frontend/
 │   ├── static/
@@ -85,6 +92,55 @@ Then:
 
 > `Database/users.json`, `Database/collab.json` and uploaded materials are generated at runtime
 > and are not tracked by Git.
+
+## AI Learning Hub
+
+The AI Hub lives at **`/ai`** (linked from the top navigation). It uses a chat interface with
+task *modes* (Explain, Summarize, Solve, Quiz Me, Flashcards, Study Plan, Simplify, Exam Prep,
+Ask Anything), a choice of models, per-conversation history, streaming replies, and the ability
+to attach study materials (`.txt`, `.md`, `.pdf`, `.docx`, images) so the AI can answer from
+your notes.
+
+The back end is fully provider-agnostic:
+
+- `Backend/ai/models.py` — the model registry (claude/gpt/gemini) and capability flags.
+- `Backend/ai/prompts.py` + `context.py` — prompt composition and student context.
+- `Backend/ai/providers/` — one adapter per provider (OpenAI, Anthropic, Google) plus a clearly
+  isolated `mock.py`. `get_provider()` returns a real adapter only when its API key is set,
+  otherwise it falls back to the mock so the hub works with no credentials.
+- `Backend/ai/service.py` — orchestration (`generate_reply`, `stream_reply`).
+- `Backend/ai/api.py` — the `/api/ai/*` JSON + SSE endpoints behind the session login.
+- `Backend/ai/storage.py` / `limits.py` — JSON persistence and per-user daily caps.
+
+### Demo vs. real models
+
+Out of the box the hub runs in **demo mode** with the built-in mock provider; replies are
+clearly marked as demos. To enable a real model, set one API key in your environment
+(see `Backend/.env.example`):
+
+```powershell
+$env:OPENAI_API_KEY  = "sk-..."
+$env:ANTHROPIC_API_KEY = "sk-ant-..."
+$env:GOOGLE_AI_API_KEY  = "AIza..."
+```
+
+Optional `*_MODEL` / `*_BASE_URL` variables override the default model/endpoint for each
+provider. Limits are configurable via `AI_MAX_REQUESTS_PER_DAY`, `AI_MAX_QUESTION_CHARS`,
+`AI_MAX_MATERIAL_CHARS`, `AI_MAX_OUTPUT_TOKENS`, and `AI_MAX_FILE_BYTES`.
+
+### Optional material-extraction libraries
+
+Add `PyPDF2`, `python-docx`, and `Pillow` for richer PDF/DOCX/image handling. Without them the
+hub still works and degrades gracefully for plain-text files.
+
+### Tests
+
+The AI package ships with unit tests (no external test framework required):
+
+```powershell
+cd Backend
+.\.venv\Scripts\python.exe -m unittest discover -s ai\tests
+```
 
 ## Learning progression
 

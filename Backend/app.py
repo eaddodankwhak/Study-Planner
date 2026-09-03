@@ -26,6 +26,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import collab
+import ai as ai_pkg
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
@@ -46,6 +47,9 @@ app = Flask(
 
 # Secret key for session cookies. In production, move this to an env variable.
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "study-planner-dev-secret")
+
+# Register the AI Learning Hub API blueprint.
+app.register_blueprint(ai_pkg.get_ai_blueprint())
 
 # Sample subjects shown on the dashboard (Sakai-style course cards).
 SUBJECTS = [
@@ -624,6 +628,18 @@ def task():
 def progress():
     """Render the Progress page."""
     return render_template("progress.html", user=current_user())
+
+
+@app.get("/ai")
+@login_required
+def ai_hub():
+    """Render the AI Learning Hub."""
+    user = current_user()
+    return render_template(
+        "ai_hub.html",
+        user=user,
+        subjects=user_subjects(user),
+    )
 
 
 if __name__ == "__main__":

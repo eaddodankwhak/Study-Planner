@@ -1,0 +1,370 @@
+"""API blueprint for the AI Learning Hub.
+
+All /api/ai/* endpoints require an authenticated session and authorize against
+the logged-in user, so users can never read or write another user's
+conversations or files. Responses are JSON; message-send supports Server-Sent
+Events for streaming.
+"""
+
+import json
+import os
+import time
+import uuid
+
+from flask import Blueprint, Response, current_app, jsonify, request, session
+
+from . import files as file_processor
+from . import limits
+from . import models as model_registry
+from . import storage
+from . import service
+from .providers import get_provider
+
+ai_api = Blueprint("ai_api", __name__, url_prefix="/api/ai")
+
+UPLOAD_ROOT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "Database",
+    "ai_uploads",
+)
+
+
+def _require_user_id():
+    uid = session.get("user_id")
+    if not uid:
+        return None
+    return uid
+
+
+def _user_subjects_titles():
+    # Light helper: none strictly needed here; context builder reads the user.
+    return None
+
+
+def _load_users():
+    import json as _json
+    users_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "Database",
+        "users.json",
+    )
+    if os.path.exists(users_file):
+        try:
+            with open(users_file, "r", encoding="utf-8") as f:
+                return _json.load(f)
+        except (ValueError, OSError):
+            return {}
+    return {}
+
+
+def _sample_usage():
+    uid = session.get("user_id")
+    if not uid:
+        return (0, limits.MAX_REQUESTS_PER_DAY)
+    return limits.remaining_requests(uid)
+
+
+def _write_sse(events):
+    """Wrap a list/iterable as a text/event-stream Flask response."""
+    def gen():
+        for event in events:
+            yield f"data: {json.dumps(event)}\n\n"
+        yield "data: [DONE]\n\n"
+    return Response(gen(), mimetype="text/event-stream")
+
+
+def _event_stream_from(callback):
+    """Return an SSE Generator that runs callback(emit) for streaming."""
+    def emit(d):
+        return f"data: {json.dumps(d)}\n\n"
+
+    def gen():
+        done_text = []
+
+        def on_chunk(text):
+            done_text.append(text)
+            yield emit({"type": "chunk", "text": text})
+
+        def on_done(payload):
+            yield emit({"type": "done", **payload})
+
+        try:
+            for chunk in callback():
+                yield emit({"type": "chunk", "text": chunk})
+                # (accumulate handled in closure below via callback's own store)
+        except Exception as exc:  # noqa: BLE001
+            yield emit({"type": "error", "message": service.handle_error(exc)})
+        yield emit({"type": "done"} if not done_text else {"type": "done", "note": "streamed"})
+        yield "data: [DONE]\n\n"
+
+    return Response(gen(), mimetype="text/event-stream")
+
+
+def _material_text(material_id, user_id):
+    """Return stored material text (and user's own upload) or None."""
+    if not material_id:
+        return None
+    safe = os.path.basename(str(material_id))
+    path = os.path.join(UPLOAD_ROOT, user_id, safe + ".txt")
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@ai_api.before_request
+def _auth():
+    if not session.get("user_id"):
+        return jsonify({"error": "unauthorized"}), 401
+
+
+# --------------------------------------------------------------- meta
+
+@ai_api.get("/meta")
+def meta():
+    uid = session["user_id"]
+    users = _load_users()
+    user = users.get(uid, {})
+    used, limit = _sample_usage()
+    return jsonify({
+        "models": model_registry.models_available(),
+        "modes": model_registry.MODES,
+        "preferences": {
+            "model": user.get("ai_model", "claude"),
+            "level": user.get("ai_level", "intermediate"),
+        },
+        "usage": {"used": used, "limit": limit},
+        "mockMode": getattr(get_provider("mock" if not any(os.getenv(k) for k in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_AI_API_KEY")) else "mock"), "is_mock", True),
+    })
+
+
+# ---------------------------------------------------------- conversations
+
+@ai_api.get("/conversations")
+def list_conversations():
+    uid = session["user_id"]
+    return jsonify({"conversations": storage.list_conversations(uid)})
+
+
+@ai_api.post("/conversations")
+def create_conversation():
+    uid = session["user_id"]
+    body = request.get_json(silent=True) or {}
+    model = body.get("model") or "claude"
+    mode = body.get("mode") or "ask"
+    if not model_registry.get_model(model):
+        model = "claude"
+    conv = storage.create_conversation(uid, model=model, mode=mode)
+    return jsonify({"conversation": conv}), 201
+
+
+@ai_api.get("/conversations/<conversation_id>")
+def get_conversation(conversation_id):
+    uid = session["user_id"]
+    conv = storage.get_conversation(uid, conversation_id)
+    if not conv:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"conversation": conv})
+
+
+@ai_api.patch("/conversations/<conversation_id>")
+def update_conversation(conversation_id):
+    uid = session["user_id"]
+    body = request.get_json(silent=True) or {}
+    if "title" in body:
+        ok = storage.rename_conversation(uid, conversation_id, str(body["title"])[:80])
+    elif "model" in body:
+        if not model_registry.get_model(body["model"]):
+            return jsonify({"error": "unknown model"}), 400
+        ok = storage.set_conversation_model(uid, conversation_id, body["model"])
+    else:
+        return jsonify({"error": "nothing to update"}), 400
+    if not ok:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True})
+
+
+@ai_api.delete("/conversations/<conversation_id>")
+def delete_conversation(conversation_id):
+    uid = session["user_id"]
+    ok = storage.delete_conversation(uid, conversation_id)
+    if not ok:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------- messages
+
+@ai_api.get("/conversations/<conversation_id>/messages")
+def list_messages(conversation_id):
+    uid = session["user_id"]
+    conv = storage.get_conversation(uid, conversation_id)
+    if not conv:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"messages": conv.get("messages", []), "conversation": conv})
+
+
+@ai_api.post("/conversations/<conversation_id>/messages")
+def send_message(conversation_id):
+    """Send a message. Supports non-streaming (JSON) and streaming (SSE).
+
+    Use ?stream=1 for Server-Sent Events; otherwise a JSON response with the
+    assistant reply is returned.
+    """
+    uid = session["user_id"]
+    conv = storage.get_conversation(uid, conversation_id)
+    if not conv:
+        return jsonify({"error": "not found"}), 404
+
+    body = request.get_json(silent=True) or {}
+    question = (body.get("message") or "").strip()
+    if not question:
+        return jsonify({"error": "Message cannot be empty."}), 400
+    if len(question) > limits.MAX_QUESTION_CHARS:
+        return jsonify({"error": "Message is too long."}), 400
+
+    mode = body.get("mode") or conv.get("mode") or "ask"
+    model_id = body.get("model") or conv.get("model") or "claude"
+    model = model_registry.get_model(model_id) or model_registry.get_model("claude")
+
+    # Optional study material reference.
+    material_text = None
+    material_id = body.get("materialId")
+    if material_id:
+        material_text = _material_text(material_id, uid)
+
+    # Enforce usage limits before doing work.
+    try:
+        limits.check_limit(uid)
+    except limits.RateLimitError as exc:
+        return jsonify({"error": str(exc)}), 429
+
+    # Persist the user message first.
+    storage.add_message(uid, conversation_id, "user", question, model=model_id, metadata={"mode": mode, "materialId": material_id})
+
+    history = conv.get("messages", [])
+
+    request_dict = service.build_provider_request(
+        mode=mode,
+        question=question,
+        material_text=file_processor.truncate_for_context(material_text),
+        user=_load_users().get(uid, {}),
+        conversation_messages=history[:-1],  # exclude the just-added user message
+        model_id=model_id,
+        subject_title=body.get("subject"),
+    )
+
+    streaming = request.args.get("stream") in ("1", "true")
+
+    if streaming:
+        def generate():
+            accumulated = []
+
+            def chunks():
+                for ch in service.stream_reply(request_dict):
+                    accumulated.append(ch)
+                    yield ch
+
+            try:
+                for ch in chunks():
+                    yield ch
+            except Exception as exc:  # noqa: BLE001
+                msg = service.handle_error(exc)
+                yield "[[AI_ERROR]]" + msg
+                return
+
+            full = "".join(accumulated)
+            storage.add_message(uid, conversation_id, "assistant", full, model=model_id, metadata={"mode": mode})
+            storage.record_usage(uid, model=model_id, mode=mode)
+            # Note: tokens unknown in streaming (mock) — usage recorded without token counts.
+
+        def sse_gen():
+            started = False
+            for ch in generate():
+                if ch.startswith("[[AI_ERROR]]"):
+                    yield f"data: {json.dumps({'type': 'error', 'message': ch[len('[[AI_ERROR]]'):]})}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                yield f"data: {json.dumps({'type': 'chunk', 'text': ch})}\n\n"
+                started = True
+            yield "data: [DONE]\n\n"
+
+        return Response(sse_gen(), mimetype="text/event-stream")
+
+    # Non-streaming path.
+    try:
+        result = service.generate_reply(request_dict)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": service.handle_error(exc)}), 502
+
+    content = result["content"]
+    usage = result.get("usage", {})
+    storage.add_message(uid, conversation_id, "assistant", content, model=model_id, metadata={"mode": mode})
+    storage.record_usage(
+        uid,
+        model=model_id,
+        mode=mode,
+        input_tokens=usage.get("inputTokens", 0),
+        output_tokens=usage.get("outputTokens", 0),
+    )
+    return jsonify({"reply": content, "conversation": storage.get_conversation(uid, conversation_id)})
+
+
+# ---------------------------------------------------------------- uploads
+
+@ai_api.post("/upload")
+def upload_material():
+    uid = session["user_id"]
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"error": "No file selected."}), 400
+
+    content = f.read()
+    if len(content) > limits.MAX_FILE_BYTES:
+        return jsonify({"error": "File too large."}), 400
+
+    result = file_processor.extract_text(f.filename, content, f.filename)
+
+    # Persist extracted text for later attachment to a message.
+    material_id = uuid.uuid4().hex
+    folder = os.path.join(UPLOAD_ROOT, uid)
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, material_id + ".txt"), "w", encoding="utf-8") as out:
+        out.write(result["text"])
+
+    return jsonify({
+        "materialId": material_id,
+        "filename": os.path.basename(f.filename),
+        "kind": result["kind"],
+        "textLength": len(result["text"]),
+        "note": result["note"],
+    })
+
+
+# ------------------------------------------------------------ preferences
+
+@ai_api.put("/preferences")
+def set_preferences():
+    uid = session["user_id"]
+    body = request.get_json(silent=True) or {}
+    users_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "Database",
+        "users.json",
+    )
+    import json as _json
+    if not os.path.exists(users_file):
+        return jsonify({"error": "user storage unavailable"}), 500
+    with open(users_file, "r", encoding="utf-8") as fh:
+        users = _json.load(fh)
+    user = users.get(uid)
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+
+    if "model" in body and model_registry.get_model(body["model"]):
+        user["ai_model"] = body["model"]
+    if "level" in body and body["level"] in ("beginner", "intermediate", "advanced"):
+        user["ai_level"] = body["level"]
+    with open(users_file, "w", encoding="utf-8") as fh:
+        _json.dump(users, fh, indent=2)
+    return jsonify({"ok": True})

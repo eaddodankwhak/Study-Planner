@@ -10,6 +10,8 @@ Database/instance/*.sqlite3
 Database/users.json
 Database/collab.json
 Database/uploads/
+Database/ai.json
+Database/ai_uploads/
 
 # Environment and editor files
 .env
