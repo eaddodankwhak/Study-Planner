@@ -271,6 +271,7 @@ def send_message(conversation_id):
             full = "".join(accumulated)
             storage.add_message(uid, conversation_id, "assistant", full, model=model_id, metadata={"mode": mode})
             storage.record_usage(uid, model=model_id, mode=mode)
+            db.log_audit(uid, "ai_reply", f"mode={mode} model={model_id}")
             # Note: tokens unknown in streaming (mock) — usage recorded without token counts.
 
         def sse_gen():
@@ -302,6 +303,7 @@ def send_message(conversation_id):
         input_tokens=usage.get("inputTokens", 0),
         output_tokens=usage.get("outputTokens", 0),
     )
+    db.log_audit(uid, "ai_reply", f"mode={mode} model={model_id}")
     return jsonify({"reply": content, "conversation": storage.get_conversation(uid, conversation_id)})
 
 

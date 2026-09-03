@@ -123,6 +123,14 @@ CREATE TABLE IF NOT EXISTS notes (
     updated_at  INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS ai_audit (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id   TEXT,
+    action    TEXT NOT NULL,
+    detail    TEXT,
+    created_at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
     id            TEXT PRIMARY KEY,
     user_id       TEXT NOT NULL,
@@ -143,6 +151,7 @@ CREATE INDEX IF NOT EXISTS idx_ai_conv_user     ON ai_conversations (user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_msg_conv      ON ai_messages (conversation_id);
 CREATE INDEX IF NOT EXISTS idx_notes_user       ON notes (user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_user       ON ai_audit (user_id);
 """
 
 _COLUMN_CACHE = {}
@@ -617,7 +626,7 @@ def ai_reset_usage_for_tests(user_id=None):
 
 
 def ai_purge_user(user_id):
-    """Delete all user data (AI, notes, sessions) for a user.
+    """Delete all user data (AI, notes, sessions, audit) for a user.
 
     Tolerant of a database that predates the notes/sessions tables so that
     data-reset tooling degrades gracefully on older installs.
@@ -627,7 +636,60 @@ def ai_purge_user(user_id):
         conn.execute("DELETE FROM ai_messages WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM ai_conversations WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM ai_usage WHERE user_id = ?", (user_id,))
-        for tbl in ("notes", "sessions"):
+        for tbl in ("notes", "sessions", "ai_audit"):
+            try:
+                conn.execute(f"DELETE FROM {tbl} WHERE user_id = ?", (user_id,))
+            except sqlite3.OperationalError:
+                continue
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ------------------------------------------------------------ audit trail
+
+def log_audit(user_id, action, detail=""):
+    """Append an AI audit entry (who/what/when) for accountability."""
+    conn = _conn_context()
+    try:
+        conn.execute(
+            "INSERT INTO ai_audit (user_id, action, detail, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, action, detail, int(time.time())),
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Tolerate tables that predate the audit trail.
+        pass
+    finally:
+        conn.close()
+
+
+def list_audit(user_id=None, limit=200):
+    """Return audit entries, newest first, optionally filtered to a user."""
+    if user_id:
+        return _query_all(
+            "SELECT * FROM ai_audit WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        )
+    return _query_all(
+        "SELECT * FROM ai_audit ORDER BY created_at DESC LIMIT ?", (limit,)
+    )
+
+
+def delete_user(user_id):
+    """Permanently delete an account and all of its rows (per-user isolation)."""
+    conn = _conn_context()
+    try:
+        for sql in (
+            "DELETE FROM ai_messages WHERE user_id = ?",
+            "DELETE FROM ai_conversations WHERE user_id = ?",
+            "DELETE FROM ai_usage WHERE user_id = ?",
+            "DELETE FROM memberships WHERE user_id = ?",
+            "DELETE FROM attempts WHERE user_id = ?",
+            "DELETE FROM users WHERE id = ?",
+        ):
+            conn.execute(sql, (user_id,))
+        for tbl in ("notes", "sessions", "ai_audit"):
             try:
                 conn.execute(f"DELETE FROM {tbl} WHERE user_id = ?", (user_id,))
             except sqlite3.OperationalError:

@@ -11,6 +11,7 @@ Provides a Sakai-style interface with real authentication:
 
 import json
 import os
+import time
 import uuid
 
 from flask import (
@@ -31,6 +32,46 @@ import db
 import planner
 import stats
 import ai as ai_pkg
+
+# ---------------------------------------------------------------------------
+# Login brute-force protection (in-memory, single-process)
+# ---------------------------------------------------------------------------
+LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
+LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "300"))
+LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
+_login_track = {}  # key -> {"fails": [(ts,...)], "locked_until": ts}
+
+
+def _login_key(email, ip):
+    return f"{email}|{ip}"
+
+
+def _login_blocked(email, ip):
+    rec = _login_track.get(_login_key(email, ip))
+    if not rec:
+        return False, 0
+    now = time.time()
+    lock_until = rec.get("locked_until", 0)
+    if lock_until > now:
+        return True, int(lock_until - now)
+    return False, 0
+
+
+def _record_login_failure(email, ip):
+    key = _login_key(email, ip)
+    now = time.time()
+    rec = _login_track.get(key, {"fails": [], "locked_until": 0})
+    rec["fails"] = [ts for ts in rec["fails"] if now - ts < LOGIN_WINDOW_SECONDS]
+    rec["fails"].append(now)
+    if len(rec["fails"]) >= LOGIN_MAX_ATTEMPTS:
+        rec["locked_until"] = now + LOGIN_LOCKOUT_SECONDS
+        rec["fails"] = []
+    _login_track[key] = rec
+    return rec
+
+
+def _clear_login_failures(email, ip):
+    _login_track.pop(_login_key(email, ip), None)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
@@ -271,17 +312,25 @@ def login():
 
 @app.post("/login")
 def login_post():
-    """Authenticate a user and start a session."""
+    """Authenticate a user and start a session (rate-limited)."""
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "")
+    ip = request.remote_addr or "unknown"
+
+    blocked, wait = _login_blocked(email, ip)
+    if blocked:
+        flash(f"Too many attempts. Try again in {wait} seconds.", "error")
+        return redirect(url_for("login"))
 
     user = db.get_user_by_email(email)
 
     if user and check_password_hash(user["password"], password):
+        _clear_login_failures(email, ip)
         session["user_id"] = user["id"]
         flash(f"Welcome back, {user['name']}!", "success")
         return redirect(url_for("home"))
 
+    _record_login_failure(email, ip)
     flash("Invalid email or password.", "error")
     return redirect(url_for("login"))
 
@@ -292,6 +341,81 @@ def logout():
     session.clear()
     flash("You have been logged out.", "success")
     return redirect(url_for("login"))
+
+
+@app.get("/settings")
+@login_required
+def settings():
+    """Account & privacy page: data export, deletion, and the AI audit trail."""
+    user = current_user()
+    courses = planner.list_courses(user["id"])
+    note_count = len(db.list_notes(user["id"]))
+    session_count = len(db.list_sessions(user["id"]))
+    audit = db.list_audit(user["id"], limit=20)
+    return render_template(
+        "settings.html",
+        user=user,
+        course_count=len(courses),
+        deadline_count=len(planner.list_deadlines(user["id"])),
+        task_count=len(planner.list_tasks(user["id"])),
+        note_count=note_count,
+        session_count=session_count,
+        audit=audit,
+    )
+
+
+@app.get("/export")
+@login_required
+def export_data():
+    """Download the user's data as a JSON bundle (GDPR-style data export)."""
+    from flask import Response, jsonify as _jsonify
+
+    user = current_user()
+    bundle = {
+        "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "profile": user,
+        "planner": planner.load_all().get(user["id"], {}),
+        "notes": db.list_notes(user["id"]),
+        "sessions": db.list_sessions(user["id"]),
+        "ai_conversations": db.ai_list_conversations(user["id"]) if hasattr(db, "ai_list_conversations") else [],
+        "ai_usage": db.ai_get_usage(user["id"]) if hasattr(db, "ai_get_usage") else None,
+        "attempts": [
+            dict(r) for r in db.connect().execute(
+                "SELECT * FROM attempts WHERE user_id = ?", (user["id"],)
+            ).fetchall()
+        ] if _column_exists("attempts") else [],
+    }
+    payload = json.dumps(bundle, indent=2, default=str)
+    filename = "study-planner-export.json"
+    return Response(
+        payload,
+        mimetype="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.post("/settings/delete")
+@login_required
+def delete_account():
+    """Permanently delete the account and all associated data."""
+    user = current_user()
+    db.log_audit(user["id"], "account_delete")
+    db.delete_user(user["id"])
+    session.clear()
+    flash("Your account and data have been permanently deleted.", "success")
+    return redirect(url_for("welcome"))
+
+
+def _column_exists(table):
+    try:
+        conn = db.connect()
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?", (table,)
+        ).fetchall()
+        conn.close()
+        return len(rows) > 0
+    except Exception:
+        return False
 
 
 def current_user():
