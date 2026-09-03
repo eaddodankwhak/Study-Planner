@@ -101,15 +101,15 @@
 }
 
 .badge--high { background: #fdecea; color: var(--priority-critical); }
-.badge--medium { background: #fff4e0; color: #8a5a00; }
+.badge--medium { background: #fff4e0; color: var(--priority-moderate); }
 .badge--low { background: #e7f4e9; color: var(--priority-mastered); }
 .badge--done { background: #e7f4e9; color: var(--priority-mastered); }
 .badge--open { background: #eaf1ff; color: #0f3a52; }
 
 /* Priority left-border list item */
-.task--high { border-left: 4px solid #c62828; }
-.task--medium { border-left: 4px solid #f09937; }
-.task--low { border-left: 4px solid #2e7d32; }
+.task--high { border-left: 4px solid var(--priority-critical); }
+.task--medium { border-left: 4px solid var(--priority-moderate); }
+.task--low { border-left: 4px solid var(--priority-mastered); }
 
 /* Data tables (reusable) */
 .data-table {

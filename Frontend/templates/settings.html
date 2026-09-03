@@ -13,7 +13,7 @@
             <div class="page-header__user">
                 <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
                 {% include '_nav.html' %}
-                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+
             </div>
         </div>
     </header>
@@ -33,6 +33,44 @@
         </div>
 
         <div class="subject-content">
+            <section class="card">
+                <h3 class="card__title">Notifications</h3>
+                <p class="text-muted">Choose what Study Planner sends you.</p>
+                <form method="POST" action="{{ url_for('settings_notifications') }}" class="form">
+                    <label class="toggle">
+                        <input type="checkbox" name="notify_digest" {{ 'checked' if notify_digest else '' }}>
+                        <span class="toggle__track"><span class="toggle__thumb"></span></span>
+                        <span class="toggle__label">Weekly digest — a summary of your deadlines, tasks, and study load for the next 7 days.</span>
+                    </label>
+                    <div class="form-actions" style="justify-content:flex-start;">
+                        <button class="button button--primary" type="submit" style="width:auto;">Save preferences</button>
+                    </div>
+                </form>
+
+                {% if notify_digest %}
+                <div class="digest-preview">
+                    <div class="stat-grid">
+                        <div class="stat"><p class="stat__value">{{ week.upcoming_deadlines|length }}</p><p class="stat__label">Deadlines</p></div>
+                        <div class="stat"><p class="stat__value">{{ week.upcoming_tasks|length }}</p><p class="stat__label">Tasks</p></div>
+                        <div class="stat"><p class="stat__value">{{ (week.total_minutes // 60) }}h {{ week.total_minutes % 60 }}m</p><p class="stat__label">Effort</p></div>
+                    </div>
+                    <p class="text-muted mb-2">This week runs through {{ week.week_end }}. Here's how the digest reads:</p>
+                    {% if week.upcoming_deadlines or week.upcoming_tasks %}
+                    <ul class="digest-preview__list">
+                        {% for d in week.upcoming_deadlines %}
+                            <li>Deadline · <strong>{{ d.title }}</strong> <span class="badge badge--open">due {{ d.due_date }}</span></li>
+                        {% endfor %}
+                        {% for t in week.upcoming_tasks %}
+                            <li>Task · {{ t.title }} <span class="badge badge--{{ t.priority }}">{{ t.due_date }}</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted mb-0">No deadlines or tasks due in the next 7 days.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </section>
+
             <section class="card">
                 <h3 class="card__title">Your data</h3>
                 <p class="text-muted">Download everything we store about you as a readable JSON file, or permanently remove your account.</p>

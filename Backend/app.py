@@ -33,6 +33,9 @@ import planner
 import stats
 import ai as ai_pkg
 
+# Ensure tables and any lightweight migrations (e.g. notify_digest) exist.
+db.init_db()
+
 # ---------------------------------------------------------------------------
 # Login brute-force protection (in-memory, single-process)
 # ---------------------------------------------------------------------------
@@ -346,12 +349,13 @@ def logout():
 @app.get("/settings")
 @login_required
 def settings():
-    """Account & privacy page: data export, deletion, and the AI audit trail."""
+    """Account & privacy page: data export, deletion, AI audit trail, and notification prefs."""
     user = current_user()
     courses = planner.list_courses(user["id"])
     note_count = len(db.list_notes(user["id"]))
     session_count = len(db.list_sessions(user["id"]))
     audit = db.list_audit(user["id"], limit=20)
+    week = _week_context(user["id"])
     return render_template(
         "settings.html",
         user=user,
@@ -362,7 +366,52 @@ def settings():
         note_count=note_count,
         session_count=session_count,
         audit=audit,
+        notify_digest=bool(user.get("notify_digest", False)),
+        week=week,
     )
+
+
+@app.post("/settings/notifications")
+@login_required
+def settings_notifications():
+    """Toggle the weekly digest notification preference."""
+    user = current_user()
+    wanted = request.form.get("notify_digest") == "on"
+    db.set_digest_preference(user["id"], wanted)
+    db.log_audit(user["id"], "notification_pref", "weekly_digest=on" if wanted else "weekly_digest=off")
+    flash("Notification preferences updated.", "success")
+    return redirect(url_for("settings"))
+
+
+def _week_context(user_id):
+    """Compute the next-7-days digest summary for a user (deadlines, tasks, effort)."""
+    from datetime import datetime as _dt, timedelta as _td
+    today = _dt.now().date()
+    week = today + _td(days=7)
+
+    deadlines = planner.list_deadlines(user_id)
+    upcoming_deadlines = [
+        d for d in deadlines
+        if d.get("status") != "done" and planner.parse_date(d.get("due_date"))
+        and today <= planner.parse_date(d.get("due_date")) <= week
+    ]
+    tasks = planner.list_tasks(user_id)
+    upcoming_tasks = [
+        t for t in tasks
+        if t.get("status") != "done" and t.get("due_date") and today <= planner.parse_date(t.get("due_date")) <= week
+    ]
+    courses = planner.list_courses(user_id)
+    by_id = {c["id"]: c for c in courses}
+    upcoming_deadlines.sort(key=lambda d: d.get("due_date", ""))
+    upcoming_tasks.sort(key=lambda t: t.get("due_date", ""))
+    total_minutes = sum(int(t.get("estimated_minutes") or 0) for t in upcoming_tasks)
+    return {
+        "week_end": week.isoformat(),
+        "upcoming_deadlines": upcoming_deadlines,
+        "upcoming_tasks": upcoming_tasks,
+        "by_id": by_id,
+        "total_minutes": total_minutes,
+    }
 
 
 @app.get("/export")
@@ -417,45 +466,6 @@ def _column_exists(table):
         return len(rows) > 0
     except Exception:
         return False
-
-
-@app.get("/digest")
-@login_required
-def digest():
-    """Weekly digest: everything upcoming in the next 7 days."""
-    user = current_user()
-    from datetime import datetime as _dt, timedelta as _td
-    today = _dt.now().date()
-    week = today + _td(days=7)
-
-    deadlines = planner.list_deadlines(user["id"])
-    upcoming_deadlines = [
-        d for d in deadlines
-        if d.get("status") != "done" and planner.parse_date(d.get("due_date"))
-        and today <= planner.parse_date(d.get("due_date")) <= week
-    ]
-    tasks = planner.list_tasks(user["id"])
-    upcoming_tasks = [
-        t for t in tasks
-        if t.get("status") != "done" and t.get("due_date") and today <= planner.parse_date(t.get("due_date")) <= week
-    ]
-    courses = planner.list_courses(user["id"])
-    by_id = {c["id"]: c for c in courses}
-    upcoming_deadlines.sort(key=lambda d: d.get("due_date", ""))
-    upcoming_tasks.sort(key=lambda t: t.get("due_date", ""))
-
-    # estimate total effort for the week
-    total_minutes = sum(int(t.get("estimated_minutes") or 0) for t in upcoming_tasks)
-    return render_template(
-        "digest.html",
-        user=user,
-        active_nav="home",
-        upcoming_deadlines=upcoming_deadlines,
-        upcoming_tasks=upcoming_tasks,
-        by_id=by_id,
-        total_minutes=total_minutes,
-        week_end=week.isoformat(),
-    )
 
 
 @app.get("/calendar/export")

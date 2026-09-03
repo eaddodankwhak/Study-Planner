@@ -226,6 +226,19 @@
   padding: var(--space-3) var(--space-4);
 }
 
+.task > span:nth-child(3) {
+  flex: 1;
+  min-width: 0;
+}
+
+.task__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 /* Focus timer (Flow A) */
 .timer {
   text-align: center;
@@ -274,62 +287,107 @@
   background: var(--color-bg);
 }
 
-/* Command palette (Ctrl/Cmd+K) */
+/* Command palette (Ctrl/Cmd+K): centered modal over a dimmed backdrop */
 .palette {
   position: fixed;
   inset: 0;
   z-index: 1000;
+  display: none;
+}
+
+.palette.is-open {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 12vh;
+  padding: 20vh var(--space-4) 0;
 }
 
 .palette__backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: rgb(10 18 26 / 0.5);
+  background: rgb(6 12 18 / 0.55);
+  backdrop-filter: blur(2px);
 }
 
-.palette__panel {
+.palette__dialog {
   position: relative;
-  width: min(28rem, 90vw);
-  background: var(--color-surface);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 600px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: calc(var(--radius) * 1.5);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--blur-lg);
   overflow: hidden;
 }
 
 .palette__input {
   width: 100%;
   border: none;
-  border-bottom: 1px solid var(--color-border);
+  background: transparent;
   padding: var(--space-4);
-  font-size: 1rem;
+  padding-left: var(--space-6);
+  font-size: 1.1rem;
+  color: var(--color-text);
   outline: none;
+}
+
+.palette__hint {
+  padding: var(--space-1) var(--space-6);
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  border-bottom: 1px solid rgb(15 23 42 / 0.08);
 }
 
 .palette__list {
   list-style: none;
-  max-height: 50vh;
-  overflow: auto;
+  overflow-y: auto;
   padding: var(--space-2);
+  margin: 0;
   display: grid;
   gap: var(--space-1);
 }
 
-.palette__list a {
-  display: block;
+.palette__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--color-text);
   text-decoration: none;
+  cursor: pointer;
+}
+
+.palette__item:hover,
+.palette__item.is-selected {
+  background: var(--color-primary-light);
+  color: var(--color-text-inverse);
+}
+
+.palette__label {
   font-weight: 600;
 }
 
-.palette__list a:hover {
-  background: var(--color-bg);
-  color: var(--color-primary-light);
+.palette__crumb {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  opacity: 0.9;
+}
+
+.palette__item.is-selected .palette__crumb,
+.palette__item:hover .palette__crumb {
+  color: #d7e4ee;
+}
+
+.palette__empty {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-muted);
 }
 
 /* Onboarding */
@@ -341,6 +399,70 @@
 .onboarding__form {
   display: grid;
   gap: var(--space-4);
+}
+
+/* Toggle switch (settings) */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  margin-bottom: var(--space-3);
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle__track {
+  width: 2.75rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--color-border);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.toggle__thumb {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease;
+}
+
+.toggle input:checked + .toggle__track {
+  background: var(--color-primary-light);
+}
+
+.toggle input:checked + .toggle__track .toggle__thumb {
+  transform: translateX(1.25rem);
+}
+
+.toggle__label {
+  font-weight: 600;
+}
+
+/* Weekly digest preview (inside Settings) */
+.digest-preview {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px dashed var(--color-border);
+}
+
+.digest-preview__list {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+  padding-left: 0;
+  margin-bottom: 0;
 }
 
 .routine {
@@ -692,5 +814,47 @@ textarea.form-input {
   background: var(--color-primary-light);
   color: var(--color-text-inverse);
   font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Design direction: glassmorphism / soft depth for the Home dashboard.
+   Data-dense screens (Courses list, Progress) intentionally stay flat so the
+   frosted, glowing look is reserved for Home and overlays like the palette.
+--------------------------------------------------------------------------- */
+body.home {
+  background:
+    radial-gradient(60rem 32rem at 15% -10%, rgb(27 106 138 / 0.22), transparent 60%),
+    radial-gradient(50rem 30rem at 110% 20%, rgb(240 153 55 / 0.18), transparent 60%),
+    var(--color-bg);
+}
+
+body.home .page-main {
+  padding-top: var(--space-6);
+}
+
+body.home .card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-lg);
+  box-shadow: var(--glass-shadow);
+}
+
+body.home .stat {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+body.home .task,
+body.home .course-card {
+  background: rgb(255 255 255 / 0.55);
+  backdrop-filter: blur(8px);
+}
+
+/* Data-dense screens stay flat and high-contrast. */
+.courses .page-main,
+body:not(.home) .page-main .data-table {
+  background: transparent;
 }
 

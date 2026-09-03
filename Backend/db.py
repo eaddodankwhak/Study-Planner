@@ -186,6 +186,8 @@ def _migrate_add_columns(conn):
     cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
     if "available_hours" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN available_hours REAL DEFAULT 4")
+    if "notify_digest" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN notify_digest INTEGER DEFAULT 0")
 
 
 def _conn_context():
@@ -318,6 +320,10 @@ def set_ai_preferences(user_id, model=None, level=None):
     if level is not None:
         fields["ai_level"] = level
     update_user(user_id, fields)
+
+
+def set_digest_preference(user_id, enabled):
+    update_user(user_id, {"notify_digest": 1 if enabled else 0})
 
 
 # ------------------------------------------------------------------ collab
