@@ -1,26 +1,13 @@
 # CSS Architecture Guide — Study Planner
 
-This document outlines a clean, maintainable structure for the Study Planner's
-front-end styling. It is a **recommendation**, not a rewrite-of-everything order —
-you can adopt as much or as little as you like.
+This document outlines the maintenance conventions for the Study Planner's front-end
+styling. It explains the current file split, the design-token layer, naming rules, and
+how to add new styles without breaking the shared look.
 
-## 1. The Problem Today
+## 1. Current structure
 
-- Every page currently has its styles in a single `styles.css` file.
-- The file is effectively empty (just a placeholder), so pages have no shared look.
-- `index.html` links the stylesheet, but `task.html`, `progress.html` and
-  `about.html` do **not** link it at all, so they render unstyled and inconsistent.
-
-Goals of a good structure:
-
-- One place to change colours, spacing and type.
-- Reusable classes (buttons, cards, forms) instead of repeating CSS.
-- Predictable naming, so it is easy to extend as the app grows.
-
-## 2. Recommended File Layout
-
-Flask serves the `Frontend/static` folder at `/static/`. Keep CSS in
-`Frontend/static/css/` and split it by responsibility:
+CSS lives in `Frontend/static/css/` and is split by responsibility. `styles.css` is the
+global entry point and is linked from **every** template's `<head>`:
 
 ```
 Frontend/static/css/
@@ -28,27 +15,40 @@ Frontend/static/css/
 ├── variables.css       # design tokens: colours, spacing, font, radius
 ├── base.css            # resets + base element styling (body, h1–h6, a, forms)
 ├── layout.css          # header, nav, main containers
-├── components.css      # buttons, cards, task list, badges
-└── utilities.css       # small helper classes (.text-center, .mt-2, …)
+├── components.css      # buttons, cards, task list, badges, forms, quizzes
+├── utilities.css       # small helper classes (.text-center, .mt-2, …)
+└── ai.css              # AI Learning Hub chat, streaming, markdown, uploads
 ```
 
-> If you prefer fewer files, `styles.css` + `variables.css` + `base.css` is a
-> solid minimal starting point.
+Every template includes the same `<link>` in its `<head>` so the layout is consistent
+across pages:
 
-## 3. Maintain a Design-Token Layer (variables.css)
+```html
+<link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+```
 
-Put the "decisions" in one place so the whole app shares a consistent palette.
+Page-specific styles (such as the About or Welcome pages) are kept as small `<style>`
+blocks inside the template itself, scoped under a page-level class (e.g. `.about`,
+`.welcome`), so they don't bleed into other pages.
+
+## 2. Design tokens (variables.css)
+
+All colours, spacing, radius and effects are defined once in `variables.css` and
+referenced via CSS custom properties so the whole app shares a consistent palette.
 
 ```css
 :root {
-  /* colours */
-  --color-primary: #2563eb;
-  --color-primary-dark: #1d4ed8;
-  --color-bg: #f8fafc;
+  /* Sakai signature navy brand colour */
+  --color-primary: #0f3a52;
+  --color-primary-dark: #0a2c3e;
+  --color-accent: #f09937;
+
+  /* neutrals */
+  --color-bg: #eef1f4;
   --color-surface: #ffffff;
-  --color-text: #0f172a;
-  --color-muted: #64748b;
-  --color-border: #e2e8f0;
+  --color-text: #22282e;
+  --color-muted: #5f6b76;
+  --color-border: #d7dde3;
 
   /* spacing scale */
   --space-1: 0.25rem;
@@ -58,19 +58,20 @@ Put the "decisions" in one place so the whole app shares a consistent palette.
   --space-6: 1.5rem;
   --space-8: 2rem;
 
-  /* typography */
-  --font-sans: "Segoe UI", system-ui, Arial, sans-serif;
+  /* typography / effects */
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --radius: 0.5rem;
-
-  /* effects */
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
-  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.1);
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.08);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.18);
 }
 ```
 
-## 4. Naming convention
+> Use the tokens instead of hard-coded hex values or raw pixel spacing so a future
+> theme/refactor only touches this one file.
 
-Use **BEM** (Block, Element, Modifier). It is simple, readable and very common.
+## 3. Naming convention (BEM)
+
+Components use **BEM**: Block, Element, Modifier.
 
 ```css
 /* Block: a standalone component */
@@ -85,62 +86,39 @@ Use **BEM** (Block, Element, Modifier). It is simple, readable and very common.
 .button--danger { … }
 ```
 
-Class naming rules to keep it predictable:
+Naming rules to keep things predictable:
 
 - Use lowercase + hyphens for blocks and utilities: `.task-list`, `.nav-bar`.
 - Never style by `#id` for layout (ids are for JS hooks / anchors, not styling).
 - Avoid deep nesting and avoid styling bare tags for components — use classes.
 
-## 5. Example Component Styles (components.css)
+## 4. Reusable components
 
-```css
-.nav-bar {
-  display: flex;
-  gap: var(--space-4);
-  padding: var(--space-4);
-}
+Shared building blocks live in `components.css` and are reused across pages:
 
-.nav-bar__link {
-  color: var(--color-primary);
-  text-decoration: none;
-  font-weight: 600;
-}
+- `.button`, `.button--primary`, `.button--accent`, `.button--ghost`, `.button--small`
+- `.card`, `.card__title`
+- `.form-field`, `.form-label`, `.form-input`
+- `.course-grid` / `.course-card` (with colour modifiers `--navy/--teal/--orange/…`)
+- `.task`, `.task-list`, `.badge` variants
+- `.subject-tools`, `.material-list`, `.member-list`, `.quiz-*`
 
-.nav-bar__link--active {
-  color: var(--color-primary-dark);
-  text-decoration: underline;
-}
+Layout blocks (header, nav, `app-shell`/sidebar, `.container`, `.page-main`) live in
+`layout.css`.
 
-.button {
-  padding: var(--space-2) var(--space-4);
-  border: none;
-  border-radius: var(--radius);
-  background: var(--color-primary);
-  color: #fff;
-  cursor: pointer;
-}
+## 5. Adding a new component
 
-.button--danger {
-  background: #dc2626;
-}
-```
+1. Pick a short, descriptive BEM block name.
+2. Put the block styles in `components.css` (or `layout.css` for layout).
+3. Reference design tokens from `variables.css` — no magic values.
+4. Add the class to the template and link `styles.css` if the page doesn't already.
+5. For one-off page styles, use a scoped `<style>` block under a page-level class.
 
-## 6. Link the stylesheet on EVERY page
+## 6. Responsive approach
 
-Every template must include the same `<link>` in its `<head>`, or the layout
-will not be consistent:
-
-```html
-<link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-```
-
-`about.html`, `task.html` and `progress.html` currently omit this line — add it.
-
-## 7. Responsive approach
-
-- Use a **mobile-first** strategy: write the base styles, then layer `@media`
-  queries to enrich larger screens.
-- Use the spacing variables above instead of hard-coded pixel values.
+- Use a **mobile-first** strategy: write base styles, then layer `@media` queries to
+  enrich larger screens.
+- Use the spacing tokens rather than hard-coded pixel values.
 - Avoid fixed pixel widths on containers; use `max-width` + `width: 100%`.
 
 ```css
@@ -150,24 +128,16 @@ will not be consistent:
   margin-inline: auto;
   padding-inline: var(--space-4);
 }
-
-@media (min-width: 40rem) {
-  .container {
-    padding-inline: var(--space-6);
-  }
-}
 ```
 
-## 8. What to do next (checklist)
+## 7. Checklist when changing styles
 
-- [ ] Create `variables.css`, `base.css`, `layout.css`, `components.css`,
-      `utilities.css` under `Frontend/static/css/`.
-- [ ] Turn `styles.css` into the entry point that imports them.
-- [ ] Add the `<link>` to every template (`index`, `task`, `progress`, `about`).
-- [ ] Replace inline `style="..."` attributes on elements with classes.
-- [ ] Move any future component styles into `components.css` by BEM blocks.
-- [ ] Before committing, run a quick visual check in the browser on desktop +
-      a narrow (mobile) viewport.
+- [ ] Reuse existing tokens and component classes before writing new CSS.
+- [ ] Keep BEM naming consistent with the rest of the app.
+- [ ] Confirm `styles.css` is linked on any page you add styles to.
+- [ ] Scope one-off page styles under a page class.
+- [ ] Before committing, do a quick visual check on desktop + a narrow (mobile) viewport.
 
-This structure keeps the styling simple now, and scales comfortably as you add
-tasks, progress charts and authentication later.
+This structure keeps the styling consistent across the growing set of pages (dashboard,
+courses, calendar, deadlines, tasks, progress, AI hub, about) and scales comfortably as
+you add more.

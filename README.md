@@ -1,17 +1,25 @@
 # Study Planner
 
-A Flask study planner with a Sakai-style interface. New users sign up, complete a short
-onboarding wizard (school, program, courses, goals), and get a personalized dashboard of
-subject cards they can explore, share course materials for, and build collaborative quizzes around.
+A Flask study planner with a Sakai-style interface. Visitors land on a **welcome** splash, sign up,
+complete a short onboarding wizard (school, program, courses, goals, daily availability), and get a
+personalized dashboard of subject cards, courses, deadlines and tasks to help them stay on top of
+their academic life.
 
 ## Features
 
-- **Authentication** — sign up, log in, and log out with stored (hashed) passwords in `Database/users.json`.
-- **Onboarding wizard** — a 4-step flow (`school`, `program`, `courses`, `goals`) on `/onboarding`.
-- **Personalized dashboard** — the home page shows *your* onboarded courses, not a fixed list.
-  - Course titles that match a preloaded subject (e.g. "Genetics") reuse that polished card.
+- **Welcome splash** — opening the app always shows the `welcome` landing (a two-slide intro), with
+  a dynamic CTA: *Start* for new users, *Go to dashboard* for returning ones.
+- **Authentication** — sign up, log in, and log out with stored (hashed) passwords.
+- **Onboarding wizard** — a short flow (`school`, `program`, `courses`, `goals`, `available_hours`)
+  on `/onboarding`; `available_hours` is used for planning estimates.
+- **Planning dashboard** — the logged-in dashboard (`/dashboard`) shows *your* onboarded subjects as
+  polished course cards, plus a planning panel with upcoming deadlines, open tasks, and your courses.
+  - Course titles that match a preloaded subject (e.g. "Genetics") reuse that styled card.
   - Any other title (e.g. "Intro to Biochemistry") is turned into a working custom course page
     with its own URL, uploads, collaboration and quizzes.
+- **Planning pillar** — per-user courses, academic calendar events, graded deadlines (with manual
+  lead-up steps) and tasks, managed from `/courses`, `/calendar`, `/deadlines` and `/task`.
+- **Progress** — a `/progress` overview of your activity.
 - **Per-subject pages** — home, resources (upload/download materials), assignments, calendar,
   grades, collaboration, and quizzes, all under `/subject/<slug>`.
 - **Collaboration** — join a subject workspace with an invite code, share materials, and see members.
@@ -20,12 +28,12 @@ subject cards they can explore, share course materials for, and build collaborat
   makes flashcards, builds study plans, simplifies material, and preps for exams, with
   per-conversation history, streaming replies, and study-material uploads. Works in a clear
   demo mode with no API key and switches to real models automatically when configured.
+- **About page** — a modern landing-style `/about` page describing the mission, philosophy and features.
 
 ## How onboarding maps the courses to the dashboard
 
-During onboarding the entered course titles are stored on the user record
-(`Database/users.json`, under the user's `courses` list). The `home()` route in
-`Backend/app.py` builds the dashboard from those titles:
+During onboarding the entered course titles are stored on the user record (SQLite `users` table).
+The dashboard route in `Backend/app.py` builds the subject-card grid from those titles:
 
 - `Backend/app.py` `user_subjects(user)` matches each title against the preloaded `SUBJECTS` list.
 - Titles that do not match any preloaded subject are converted with
@@ -36,6 +44,9 @@ During onboarding the entered course titles are stored on the user record
 Without any onboarded courses (e.g. a freshly registered user who skips the wizard), the full
 preloaded subject set is shown as a fallback.
 
+> **Routing note:** `/` is the public welcome landing and is always shown when the app opens.
+> The logged-in dashboard lives at `/dashboard` (links use `url_for('home')`, which resolves there).
+
 ## Project structure
 
 ```text
@@ -44,10 +55,18 @@ Study-planner/
 │   ├── app.py                 # Flask application entry point (routes + subject logic)
 │   ├── db.py                  # SQLite persistence layer (schema + data access)
 │   ├── collab.py              # Collaboration & quiz data layer (SQLite)
+│   ├── planner.py             # Planning data layer (courses, calendar, deadlines, tasks)
 │   ├── migrate_to_sqlite.py   # One-time JSON -> SQLite migration script
 │   ├── requirements.txt       # Python dependencies
+│   ├── .env.example           # Copy to .env to enable real AI providers
 │   ├── ai/                    # AI Learning Hub package (blueprint, providers, prompts…)
-│   ├── tests/                 # Tests for the SQLite layer (db / collab / users)
+│   │   ├── api.py             # /api/ai/* JSON + SSE endpoints
+│   │   ├── service.py         # Orchestration (generate_reply, stream_reply)
+│   │   ├── models.py          # Model registry and capability flags
+│   │   ├── prompts.py / context.py / limits.py / files.py / storage.py
+│   │   ├── providers/         # openai, anthropic, google + mock adapters
+│   │   └── tests/             # AI package unit tests
+│   ├── tests/                 # Tests for the SQLite layer (db)
 │   └── app/
 │       └── services/          # Future task and validation logic
 ├── Database/                  # Runtime data (not committed)
@@ -58,16 +77,21 @@ Study-planner/
 │   ├── static/
 │   │   ├── css/               # styles.css + split CSS modules (variables, base, layout, …)
 │   │   ├── images/            # Static imagery
-│   │   └── js/app.js          # Browser-side interactions
+│   │   └── js/app.js, ai_hub.js  # Browser-side interactions
 │   └── templates/
-│       ├── index.html         # Dashboard (subject cards)
-│       ├── onboarding.html    # 4-step onboarding wizard
+│       ├── welcome.html       # Public landing splash
+│       ├── index.html         # Dashboard (subject cards + planning panel)
+│       ├── onboarding.html    # Onboarding wizard
+│       ├── courses.html, calendar.html, deadlines.html, task.html, progress.html
+│       ├── course_detail.html, deadline_detail.html
 │       ├── subject.html       # Per-subject Sakai-style page
-│       └── login.html, signup.html, quiz*.html, about/task/progress.html
+│       ├── about.html         # Modern about / mission page
+│       ├── ai_hub.html        # AI Learning Hub chat UI
+│       └── login.html, signup.html, quiz*.html
 ├── docs/
 │   ├── learning-roadmap.md    # Suggested staged learning plan
 │   └── css-architecture.md    # Front-end styling structure recommendation
-├── run.bat                    # Windows launcher (banket run from the project root)
+├── run.bat                    # Windows launcher (run from the project root)
 ├── .gitignore
 └── README.md
 ```
@@ -87,21 +111,28 @@ Or just double-click `run.bat` from the project root — it starts the server an
 
 Then:
 
-1. Click **Sign up** and create an account.
-2. Complete the **onboarding** wizard with your school, program, courses and goals.
-3. Land on your personalized dashboard, and click any subject card to explore it.
+1. The app opens on the **welcome** splash.
+2. Click **Start** and create an account.
+3. Complete the **onboarding** wizard with your school, program, courses, goals and daily availability.
+4. Land on your **dashboard** (`/dashboard`) and click any subject card to explore it, or use the
+   **Courses / Calendar / Deadlines / Tasks / Progress** links to plan your work.
 
-> All data is stored in the SQLite database at `Database/instance/study_planner.db`
-> (created automatically on first run), with uploads on disk under `Database/uploads/`.
-> The database file, `Database/ai_uploads/`, and uploaded materials are generated at
-> runtime and are not tracked by Git.
+> User, collaboration and AI data live in the SQLite database at
+> `Database/instance/study_planner.db` (created automatically on first run), with uploads on disk
+> under `Database/uploads/`. The planning features (courses, calendar, deadlines, tasks) use their
+> own `Database/planner.json` file. All database files, `Database/ai_uploads/`, and uploaded
+> materials are generated at runtime and are not tracked by Git.
 
 ## Database
 
-Storage uses a single **SQLite** database via Python's standard library (`sqlite3`), with
-`Backend/db.py` as the persistence layer. Tables cover: `users`, `memberships`,
-`subject_codes`, `materials`, `quizzes`, `attempts`, `ai_conversations`, `ai_messages`, and
-`ai_usage`. The schema is created automatically on first run.
+User, collaboration and AI storage uses a single **SQLite** database via Python's standard library
+(`sqlite3`), with `Backend/db.py` as the persistence layer. Tables cover: `users`,
+`memberships`, `subject_codes`, `materials`, `quizzes`, `attempts`, `ai_conversations`,
+`ai_messages`, and `ai_usage`. The schema is created automatically on first run, and lightweight
+column migrations (e.g. `users.available_hours`) are applied automatically too.
+
+The planning pillars (`course`, `calendar`, `deadline`, `task`) are kept in `Database/planner.json`
+by `Backend/planner.py`.
 
 Existing JSON data (from before this change) can be imported once with:
 
@@ -168,11 +199,11 @@ cd Backend
 
 ## Learning progression
 
-1. **HTML:** build the planner’s content and form in `Frontend/templates/index.html`.
-2. **CSS:** style it responsively in `Frontend/static/css/styles.css`.
-3. **Python:** practise task logic in `Backend/app/services/`.
-4. **Flask:** connect forms and task views through `Backend/app.py`.
-5. **Database:** persist users, materials and quizzes in `Database/`.
-6. **Polish:** add validation, search, filters, accounts, and deployment.
+1. **HTML:** build and structure the pages in `Frontend/templates/`.
+2. **CSS:** style them responsibly using the design tokens in `Frontend/static/css/`.
+3. **Python:** practise task/course logic in `Backend/app/services/` and `Backend/planner.py`.
+4. **Flask:** connect forms and views through `Backend/app.py`.
+5. **Database:** persist users, materials, quizzes and AI data in SQLite via `Backend/db.py`.
+6. **Polish:** add validation, search, filters, analytics, and deployment.
 
 See [the learning roadmap](docs/learning-roadmap.md) for suggested milestones and challenges.
