@@ -9,7 +9,11 @@ Database/instance/*.sqlite
 Database/instance/*.sqlite3
 Database/users.json
 Database/collab.json
+Database/planner.json
 Database/uploads/
+
+# Local runtime logs
+*.log
 
 # Environment and editor files
 .env

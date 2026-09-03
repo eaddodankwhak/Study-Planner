@@ -26,6 +26,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import collab
+import planner
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
@@ -272,11 +273,19 @@ def onboarding_post():
         flash("Please complete all steps.", "error")
         return redirect(url_for("onboarding"))
 
+    available_hours = request.form.get("available_hours", "4").strip()
+    try:
+        available_hours = float(available_hours)
+    except ValueError:
+        available_hours = 4
+    available_hours = max(1, min(12, available_hours))
+
     users[user["id"]].update({
         "school": school,
         "program": program,
         "courses": courses,
         "goals": goals,
+        "available_hours": available_hours,
         "onboarded": True,
     })
     save_users(users)
@@ -289,7 +298,15 @@ def onboarding_post():
 @login_required
 def home():
     """Render the subject dashboard."""
-    return render_template("index.html", user=current_user(), subjects=SUBJECTS)
+    user = current_user()
+    return render_template(
+        "index.html",
+        user=user,
+        subjects=SUBJECTS,
+        courses=planner.list_courses(user["id"]),
+        deadlines=planner.list_deadlines(user["id"]),
+        tasks=planner.list_tasks(user["id"]),
+    )
 
 
 @app.get("/subject/<slug>")
@@ -568,7 +585,222 @@ def about():
 @login_required
 def task():
     """Render the Task page."""
-    return render_template("task.html", user=current_user())
+    user = current_user()
+    return render_template("task.html", user=user, tasks=planner.list_tasks(user["id"]), courses=planner.list_courses(user["id"]))
+
+
+@app.post("/task")
+@login_required
+def task_add():
+    """Create a new task."""
+    user = current_user()
+    course_id = request.form.get("course_id")
+    deadline_id = request.form.get("deadline_id")
+    if deadline_id == "":
+        deadline_id = None
+    if course_id == "":
+        course_id = None
+    planner.add_task(
+        user["id"],
+        course_id=course_id,
+        deadline_id=deadline_id,
+        title=request.form.get("title", ""),
+        due_date=request.form.get("due_date", ""),
+        estimated_minutes=int(request.form.get("estimated_minutes") or 60),
+        priority=request.form.get("priority", "medium"),
+    )
+    flash("Task added.", "success")
+    return redirect(url_for("task"))
+
+
+@app.post("/task/<task_id>/toggle")
+@login_required
+def task_toggle(task_id):
+    """Flip a task between todo and done."""
+    user = current_user()
+    planner.toggle_task(user["id"], task_id)
+    back = request.form.get("next") or url_for("task")
+    return redirect(back)
+
+
+# ---------------------------------------------------------------------------
+# Courses
+# ---------------------------------------------------------------------------
+
+@app.get("/courses")
+@login_required
+def courses():
+    """Render the course & semester management page."""
+    user = current_user()
+    return render_template("courses.html", user=user, courses=planner.list_courses(user["id"]))
+
+
+@app.post("/courses")
+@login_required
+def courses_add():
+    """Create a new course."""
+    user = current_user()
+    planner.create_course(
+        user["id"],
+        code=request.form.get("code", ""),
+        title=request.form.get("title", ""),
+        lecturer=request.form.get("lecturer", ""),
+        credits=request.form.get("credits", 0),
+        description=request.form.get("description", ""),
+        schedule=request.form.get("schedule", ""),
+        color=request.form.get("color", ""),
+    )
+    flash("Course added.", "success")
+    return redirect(url_for("courses"))
+
+
+@app.get("/courses/<course_id>")
+@login_required
+def course_detail(course_id):
+    """Render a single course's detail page."""
+    user = current_user()
+    course = planner.get_course(user["id"], course_id)
+    if not course:
+        flash("Course not found.", "error")
+        return redirect(url_for("courses"))
+    deadline_list = planner.list_deadlines(user["id"])
+    course_deadlines = [d for d in deadline_list if d.get("course_id") == course_id]
+    course_tasks = [t for t in planner.list_tasks(user["id"]) if t.get("course_id") == course_id]
+    return render_template(
+        "course_detail.html",
+        user=user,
+        course=course,
+        deadlines=course_deadlines,
+        tasks=course_tasks,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Calendar
+# ---------------------------------------------------------------------------
+
+@app.get("/calendar")
+@login_required
+def calendar():
+    """Render the academic calendar page."""
+    user = current_user()
+    return render_template("calendar.html", user=user, events=planner.list_events(user["id"]), courses=planner.list_courses(user["id"]))
+
+
+@app.post("/calendar")
+@login_required
+def calendar_add():
+    """Create a new calendar event."""
+    user = current_user()
+    course_id = request.form.get("course_id")
+    if course_id == "":
+        course_id = None
+    planner.create_event(
+        user["id"],
+        type=request.form.get("type", "other"),
+        title=request.form.get("title", ""),
+        course_id=course_id,
+        start=request.form.get("start", ""),
+        duration_minutes=request.form.get("duration_minutes", 60),
+        recurrence=request.form.get("recurrence", "none"),
+        weekday=request.form.get("weekday", ""),
+    )
+    flash("Event added.", "success")
+    return redirect(url_for("calendar"))
+
+
+@app.post("/calendar/<event_id>/delete")
+@login_required
+def calendar_delete(event_id):
+    """Delete a calendar event."""
+    user = current_user()
+    planner.delete_event(user["id"], event_id)
+    flash("Event removed.", "success")
+    return redirect(url_for("calendar"))
+
+
+# ---------------------------------------------------------------------------
+# Deadlines
+# ---------------------------------------------------------------------------
+
+@app.get("/deadlines")
+@login_required
+def deadlines():
+    """Render the deadline & assessment manager."""
+    user = current_user()
+    return render_template("deadlines.html", user=user, deadlines=planner.list_deadlines(user["id"]), courses=planner.list_courses(user["id"]), courses_by_id={c["id"]: c for c in planner.list_courses(user["id"])})
+
+
+@app.post("/deadlines")
+@login_required
+def deadlines_add():
+    """Create a new deadline."""
+    user = current_user()
+    planner.create_deadline(
+        user["id"],
+        course_id=request.form.get("course_id"),
+        title=request.form.get("title", ""),
+        type=request.form.get("type", "assignment"),
+        due_date=request.form.get("due_date", ""),
+        weight=request.form.get("weight", 0),
+        estimated_hours=request.form.get("estimated_hours", 0),
+    )
+    flash("Deadline added.", "success")
+    return redirect(url_for("deadlines"))
+
+
+@app.get("/deadlines/<deadline_id>")
+@login_required
+def deadline_detail(deadline_id):
+    """Render a single deadline with its lead-up steps."""
+    user = current_user()
+    deadline = planner.get_deadline(user["id"], deadline_id)
+    if not deadline:
+        flash("Deadline not found.", "error")
+        return redirect(url_for("deadlines"))
+    course = planner.get_course(user["id"], deadline.get("course_id")) if deadline.get("course_id") else None
+    all_tasks = {t["id"]: t for t in planner.list_tasks(user["id"])}
+    steps = [all_tasks[tid] for tid in deadline.get("steps", []) if tid in all_tasks]
+    return render_template(
+        "deadline_detail.html",
+        user=user,
+        deadline=deadline,
+        course=course,
+        steps=steps,
+        remaining_days=planner.remaining_hours,
+    )
+
+
+@app.post("/deadlines/<deadline_id>/step")
+@login_required
+def deadline_step_add(deadline_id):
+    """Add a manual lead-up step to a deadline."""
+    user = current_user()
+    deadline = planner.get_deadline(user["id"], deadline_id)
+    if not deadline:
+        flash("Deadline not found.", "error")
+        return redirect(url_for("deadlines"))
+    planner.add_task(
+        user["id"],
+        deadline_id=deadline_id,
+        course_id=deadline.get("course_id"),
+        title=request.form.get("title", ""),
+        due_date=request.form.get("due_date", deadline.get("due_date")),
+        estimated_minutes=int(request.form.get("estimated_minutes") or 60),
+        priority=request.form.get("priority", "medium"),
+    )
+    flash("Step added.", "success")
+    return redirect(url_for("deadline_detail", deadline_id=deadline_id))
+
+
+@app.post("/deadlines/<deadline_id>/complete")
+@login_required
+def deadline_complete(deadline_id):
+    """Mark a deadline as completed."""
+    user = current_user()
+    planner.complete_deadline(user["id"], deadline_id)
+    flash("Deadline marked complete.", "success")
+    return redirect(url_for("deadlines"))
 
 
 @app.get("/progress")
