@@ -1,0 +1,19 @@
+{
+  "name": "Study Planner",
+  "short_name": "StudyPlanner",
+  "description": "Plan study sessions, deadlines, and track progress.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f3a52",
+  "theme_color": "#0f3a52",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -274,6 +274,64 @@
   background: var(--color-bg);
 }
 
+/* Command palette (Ctrl/Cmd+K) */
+.palette {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}
+
+.palette__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(10 18 26 / 0.5);
+}
+
+.palette__panel {
+  position: relative;
+  width: min(28rem, 90vw);
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.palette__input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4);
+  font-size: 1rem;
+  outline: none;
+}
+
+.palette__list {
+  list-style: none;
+  max-height: 50vh;
+  overflow: auto;
+  padding: var(--space-2);
+  display: grid;
+  gap: var(--space-1);
+}
+
+.palette__list a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.palette__list a:hover {
+  background: var(--color-bg);
+  color: var(--color-primary-light);
+}
+
 /* Onboarding */
 .onboarding {
   max-width: 32rem;

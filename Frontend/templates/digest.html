@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Digest — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                {% include '_nav.html' %}
+                <a class="nav-bar__link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="dashboard-heading">
+            <h2>Weekly Digest</h2>
+            <span class="text-muted">Everything on your plate by {{ week_end }}.</span>
+        </div>
+
+        <div class="stat-grid">
+            <div class="stat"><p class="stat__value">{{ upcoming_deadlines|length }}</p><p class="stat__label">Deadlines</p></div>
+            <div class="stat"><p class="stat__value">{{ upcoming_tasks|length }}</p><p class="stat__label">Tasks</p></div>
+            <div class="stat"><p class="stat__value">{{ (total_minutes // 60) }}h {{ total_minutes % 60 }}m</p><p class="stat__label">Estimated effort</p></div>
+            <div class="stat"><p class="stat__value">{{ (total_minutes // 60 // 7 or 1) }}</p><p class="stat__label">Avg hrs/day</p></div>
+        </div>
+
+        <div class="subject-content">
+            <section class="card">
+                <h3 class="card__title">Deadlines this week</h3>
+                {% if upcoming_deadlines %}
+                    <ul class="task-list">
+                        {% for d in upcoming_deadlines %}
+                            <li class="task">
+                                <a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">
+                                    <strong>{{ d.title }}</strong>
+                                    {% if d.course_id %}<span class="text-muted"> · {{ (by_id.get(d.course_id) or {}).code }}</span>{% endif %}
+                                </a>
+                                <span class="badge badge--open">due {{ d.due_date }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">No deadlines in the next 7 days. Enjoy the breathing room.</p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h3 class="card__title">Tasks this week</h3>
+                {% if upcoming_tasks %}
+                    <ul class="task-list">
+                        {% for t in upcoming_tasks %}
+                            <li class="task task--{{ t.priority }}">
+                                <span>{{ t.title }} <span class="text-muted">· {{ t.estimated_minutes }} min</span></span>
+                                <span class="badge badge--{{ t.priority }}">{{ t.due_date }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">No tasks due in the next 7 days.</p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <div class="dashboard-heading">
+                    <h3 class="card__title mb-0">Plan your week</h3>
+                    <a class="button button--ghost button--small" href="{{ url_for('session_page') }}">Start a focus session</a>
+                </div>
+                <p class="text-muted mb-0">Protect a little time each day to stay ahead of these deadlines.</p>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

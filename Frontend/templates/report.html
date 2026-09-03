@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Report — {{ user.name if user else '' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        body.compact { background:#fff; }
+        .report-head { margin-bottom: var(--space-6); }
+        .report-actions { margin-bottom: var(--space-4); }
+        @media print {
+            .report-actions, .page-header { display: none; }
+            .card { box-shadow: none; border-color:#d7dde3; }
+        }
+    </style>
+</head>
+<body class="compact">
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">{{ user.name if user else 'Student' }}</span>
+                <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('progress') }}">Back to Progress</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="report-actions">
+            <button class="button button--primary" onclick="window.print()">Print / Save PDF</button>
+            <a class="button button--ghost" href="{{ url_for('report', _external=True) }}">Open report</a>
+        </div>
+
+        <div class="report-head">
+            <h2>Study Progress Report — {{ user.name if user else '' }}</h2>
+            <p class="text-muted mb-0">Generated {{ generated }} · Study Planner</p>
+        </div>
+
+        <div class="stat-grid">
+            <div class="stat"><p class="stat__value">{{ stats.streak }}</p><p class="stat__label">Day streak</p></div>
+            <div class="stat"><p class="stat__value">{{ stats.total_minutes }}</p><p class="stat__label">Study minutes</p></div>
+            <div class="stat"><p class="stat__value">{{ stats.tasks_done }}/{{ stats.tasks_total }}</p><p class="stat__label">Tasks done</p></div>
+            <div class="stat"><p class="stat__value">{{ stats.total_attempts }}</p><p class="stat__label">Quizzes</p></div>
+        </div>
+
+        <section class="card mb-4">
+            <h3 class="card__title">Courses</h3>
+            {% if courses %}
+                <ul class="subject-overview">
+                    {% for c in courses %}
+                        <li><strong>{{ c.code }}</strong> — {{ c.title }} ({{ c.credits }} credits)</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-muted mb-0">No courses yet.</p>
+            {% endif %}
+        </section>
+
+        <section class="card">
+            <h3 class="card__title">Open deadlines</h3>
+            {% if deadlines %}
+                <table class="data-table">
+                    <thead><tr><th>Item</th><th>Type</th><th>Due</th><th>Weight</th></tr></thead>
+                    <tbody>
+                        {% for d in deadlines %}
+                            <tr><td>{{ d.title }}</td><td>{{ d.type }}</td><td>{{ d.due_date }}</td><td>{{ d.weight }}%</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted mb-0">No open deadlines. Great.</p>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

@@ -16,5 +16,20 @@
     <a class="nav-sub__link" href="{{ url_for('deadlines') }}">Deadlines</a>
     <a class="nav-sub__link" href="{{ url_for('session_page') }}">Focus</a>
     <a class="nav-sub__link" href="{{ url_for('notes') }}">Notes</a>
+    <a class="nav-sub__link" href="{{ url_for('digest') }}">Digest</a>
+    <a class="nav-sub__link" href="{{ url_for('settings') }}">Export</a>
     <a class="nav-sub__link" href="{{ url_for('about') }}">About</a>
 </div>
+
+<!-- Command palette (Ctrl/Cmd+K) -->
+<div class="palette" data-palette
+     data-routes='[{"label":"Home","url":{{ url_for("home")|tojson }}},{"label":"Courses","url":{{ url_for("courses")|tojson }}},{"label":"Calendar","url":{{ url_for("calendar")|tojson }}},{"label":"Practice / Tasks","url":{{ url_for("task")|tojson }}},{"label":"Deadlines","url":{{ url_for("deadlines")|tojson }}},{"label":"Focus Timer","url":{{ url_for("session_page")|tojson }}},{"label":"Notes","url":{{ url_for("notes")|tojson }}},{"label":"Weekly Digest","url":{{ url_for("digest")|tojson }}},{"label":"Progress","url":{{ url_for("progress")|tojson }}},{"label":"AI Learning Hub","url":{{ url_for("ai_hub")|tojson }}},{"label":"Settings & Privacy","url":{{ url_for("settings")|tojson }}}]'
+     hidden>
+    <div class="palette__backdrop" data-palette-close></div>
+    <div class="palette__panel">
+        <input class="palette__input" type="text" placeholder="Jump to a page…  (Esc to close)" data-palette-input autocomplete="off">
+        <ul class="palette__list" data-palette-list></ul>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/palette.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/pwa.js') }}" defer></script>

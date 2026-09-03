@@ -419,6 +419,132 @@ def _column_exists(table):
         return False
 
 
+@app.get("/digest")
+@login_required
+def digest():
+    """Weekly digest: everything upcoming in the next 7 days."""
+    user = current_user()
+    from datetime import datetime as _dt, timedelta as _td
+    today = _dt.now().date()
+    week = today + _td(days=7)
+
+    deadlines = planner.list_deadlines(user["id"])
+    upcoming_deadlines = [
+        d for d in deadlines
+        if d.get("status") != "done" and planner.parse_date(d.get("due_date"))
+        and today <= planner.parse_date(d.get("due_date")) <= week
+    ]
+    tasks = planner.list_tasks(user["id"])
+    upcoming_tasks = [
+        t for t in tasks
+        if t.get("status") != "done" and t.get("due_date") and today <= planner.parse_date(t.get("due_date")) <= week
+    ]
+    courses = planner.list_courses(user["id"])
+    by_id = {c["id"]: c for c in courses}
+    upcoming_deadlines.sort(key=lambda d: d.get("due_date", ""))
+    upcoming_tasks.sort(key=lambda t: t.get("due_date", ""))
+
+    # estimate total effort for the week
+    total_minutes = sum(int(t.get("estimated_minutes") or 0) for t in upcoming_tasks)
+    return render_template(
+        "digest.html",
+        user=user,
+        active_nav="home",
+        upcoming_deadlines=upcoming_deadlines,
+        upcoming_tasks=upcoming_tasks,
+        by_id=by_id,
+        total_minutes=total_minutes,
+        week_end=week.isoformat(),
+    )
+
+
+@app.get("/calendar/export")
+@login_required
+def calendar_export():
+    """Download the user's deadlines and events as an .ics calendar feed."""
+    from flask import Response
+
+    user = current_user()
+    from datetime import datetime as _dt
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Study Planner//Study Planner//EN",
+        "CALSCALE:GREGORIAN",
+    ]
+    for d in planner.list_deadlines(user["id"]):
+        due = planner.parse_date(d.get("due_date"))
+        if not due:
+            continue
+        due_dt = _dt.combine(due, _dt.min.time())
+        uid = f"deadline-{d['id']}@studyplanner"
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:{uid}",
+            f"DTSTAMP:{_dt.utcnow().strftime('%Y%m%dT%H%M%SZ')}",
+            f"DTSTART;VALUE=DATE:{due.strftime('%Y%m%d')}",
+            f"SUMMARY:{_ics_esc(d.get('title', 'Deadline'))}",
+            f"DESCRIPTION:{_ics_esc(str(d.get('weight', '')))}% weight deadline",
+            "END:VEVENT",
+        ]
+    for e in planner.list_events(user["id"]):
+        start = e.get("start", "")
+        if not start:
+            continue
+        lines.append("BEGIN:VEVENT")
+        lines.append(f"UID:event-{e['id']}@studyplanner")
+        lines.append(f"DTSTAMP:{_dt.utcnow().strftime('%Y%m%dT%H%M%SZ')}")
+        lines.append(f"DTSTART:{_ics_dt(start)}")
+        lines.append(f"SUMMARY:{_ics_esc(e.get('title', 'Event'))}")
+        lines.append("END:VEVENT")
+    lines.append("END:VCALENDAR")
+    payload = "\r\n".join(lines) + "\r\n"
+    return Response(
+        payload,
+        mimetype="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=study-planner.ics"},
+    )
+
+
+def _ics_esc(value):
+    return (value or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+
+
+def _ics_dt(value):
+    """Best-effort conversion of a 'YYYY-MM-DD HH:MM' or 'YYYY-MM-DD' to iCal."""
+    from datetime import datetime as _dt
+    v = (value or "").strip()
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%d"):
+        try:
+            d = _dt.strptime(v, fmt)
+            if fmt == "%Y-%m-%d":
+                return d.strftime("%Y%m%d")
+            return d.strftime("%Y%m%dT%H%M%S")
+        except ValueError:
+            continue
+    return _dt.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+
+@app.get("/report")
+@login_required
+def report():
+    """Print-friendly progress report (add ?print=1 or use browser print)."""
+    user = current_user()
+    overview = stats.overview(user["id"], db, planner)
+    courses = planner.list_courses(user["id"])
+    deadlines = planner.list_deadlines(user["id"])
+    open_deadlines = [d for d in deadlines if d.get("status") != "done"]
+    return render_template(
+        "report.html",
+        user=user,
+        stats=overview,
+        courses=courses,
+        deadlines=open_deadlines,
+        generated=time.strftime("%Y-%m-%d %H:%M"),
+    )
+
+
 def current_user():
     """Return the logged-in user dict, or None."""
     return db.get_user(session.get("user_id"))
