@@ -144,6 +144,160 @@ CREATE TABLE IF NOT EXISTS sessions (
     notes         TEXT
 );
 
+-- ---------------------------------------------------------------------------
+-- Collaborative workspace tables (Backend/collaboration/).
+-- users.id is TEXT, so user FKs are TEXT to match the existing PK type.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS workspaces (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    course_code TEXT,
+    description TEXT,
+    owner_id    TEXT NOT NULL REFERENCES users(id),
+    invite_code TEXT NOT NULL UNIQUE,
+    deadline    TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    archived    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS workspace_members (
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id      TEXT NOT NULL REFERENCES users(id),
+    role         TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('owner','member')),
+    joined_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (workspace_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS milestones (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    title        TEXT NOT NULL,
+    due_date     TEXT,
+    sort_order   INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS labels (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    color        TEXT NOT NULL DEFAULT '#64748b'
+);
+
+CREATE TABLE IF NOT EXISTS work_items (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id    INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    parent_id       INTEGER REFERENCES work_items(id) ON DELETE CASCADE,
+    milestone_id    INTEGER REFERENCES milestones(id),
+    title           TEXT NOT NULL,
+    description     TEXT,
+    assignee_id     TEXT REFERENCES users(id),
+    status          TEXT NOT NULL DEFAULT 'todo' CHECK(status IN
+        ('todo','in_progress','in_review','blocked','completed','cancelled')),
+    priority        TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high','urgent')),
+    due_date        TEXT,
+    blocked_reason  TEXT,
+    created_by      TEXT NOT NULL REFERENCES users(id),
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS work_item_labels (
+    work_item_id INTEGER NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+    label_id     INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+    PRIMARY KEY (work_item_id, label_id)
+);
+
+CREATE TABLE IF NOT EXISTS work_item_dependencies (
+    work_item_id   INTEGER NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+    depends_on_id  INTEGER NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+    PRIMARY KEY (work_item_id, depends_on_id)
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_item_id  INTEGER REFERENCES work_items(id) ON DELETE CASCADE,
+    workspace_id  INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    author_id     TEXT NOT NULL REFERENCES users(id),
+    body          TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS information_requests (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id  INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    work_item_id  INTEGER REFERENCES work_items(id),
+    requester_id  TEXT NOT NULL REFERENCES users(id),
+    recipient_id  TEXT NOT NULL REFERENCES users(id),
+    what_needed   TEXT NOT NULL,
+    why_needed    TEXT,
+    needed_by     TEXT,
+    status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN
+        ('pending','provided','unavailable','reassigned')),
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS daily_logs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id    INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id         TEXT NOT NULL REFERENCES users(id),
+    log_date        TEXT NOT NULL,
+    summary         TEXT NOT NULL,
+    minutes_spent   INTEGER,
+    blocked_by      TEXT,
+    plan_for_tomorrow TEXT,
+    UNIQUE(workspace_id, user_id, log_date)
+);
+
+CREATE TABLE IF NOT EXISTS activity_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    actor_id     TEXT REFERENCES users(id),
+    event_type   TEXT NOT NULL,
+    payload      TEXT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS collab_quizzes (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id        INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    created_by          TEXT NOT NULL REFERENCES users(id),
+    title               TEXT NOT NULL,
+    duration_minutes    INTEGER NOT NULL,
+    opens_at            TEXT,
+    closes_at           TEXT,
+    randomize_questions INTEGER NOT NULL DEFAULT 0,
+    private_results     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS quiz_questions (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    quiz_id       INTEGER NOT NULL REFERENCES collab_quizzes(id) ON DELETE CASCADE,
+    prompt        TEXT NOT NULL,
+    options       TEXT NOT NULL,
+    correct_index INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    quiz_id       INTEGER NOT NULL REFERENCES collab_quizzes(id) ON DELETE CASCADE,
+    user_id       TEXT NOT NULL REFERENCES users(id),
+    answers       TEXT,
+    score         INTEGER,
+    started_at    TEXT,
+    submitted_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      TEXT NOT NULL REFERENCES users(id),
+    workspace_id INTEGER REFERENCES workspaces(id),
+    kind         TEXT NOT NULL,
+    body         TEXT NOT NULL,
+    link         TEXT,
+    read_at      TEXT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_materials_slug ON materials (slug);
 CREATE INDEX IF NOT EXISTS idx_quizzes_subject  ON quizzes (subject);
 CREATE INDEX IF NOT EXISTS idx_attempts_quiz    ON attempts (quiz_id);
@@ -152,6 +306,12 @@ CREATE INDEX IF NOT EXISTS idx_ai_msg_conv      ON ai_messages (conversation_id)
 CREATE INDEX IF NOT EXISTS idx_notes_user       ON notes (user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_user       ON ai_audit (user_id);
+CREATE INDEX IF NOT EXISTS idx_collab_members_user ON workspace_members (user_id);
+CREATE INDEX IF NOT EXISTS idx_collab_items_ws  ON work_items (workspace_id);
+CREATE INDEX IF NOT EXISTS idx_collab_items_parent ON work_items (parent_id);
+CREATE INDEX IF NOT EXISTS idx_collab_comments_item ON comments (work_item_id);
+CREATE INDEX IF NOT EXISTS idx_collab_activity_ws ON activity_log (workspace_id);
+CREATE INDEX IF NOT EXISTS idx_collab_requests_ws ON information_requests (workspace_id);
 """
 
 _COLUMN_CACHE = {}
@@ -885,6 +1045,592 @@ def compute_streak(active_days):
         streak += 1
         cursor -= timedelta(days=1)
     return streak
+
+
+# -------------------------------------------------------------- workspaces
+
+_COLLAB_STATUSES = ("todo", "in_progress", "in_review", "blocked", "completed", "cancelled")
+_COLLAB_REQUEST_STATUSES = ("pending", "provided", "unavailable", "reassigned")
+
+
+def _conn_or_new(conn):
+    """Return (conn, owns). If conn is provided, the caller keeps transaction control."""
+    if conn is not None:
+        return conn, False
+    return _conn_context(), True
+
+
+def collab_role(workspace_id, user_id):
+    """Return the member role ('owner'/'member') or None."""
+    row = _query_one(
+        "SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?",
+        (workspace_id, user_id),
+    )
+    return row["role"] if row else None
+
+
+def collab_members(workspace_id):
+    """Members of a workspace with display info, oldest first."""
+    return _query_all(
+        "SELECT wm.user_id, wm.role, u.name, u.email "
+        "FROM workspace_members wm JOIN users u ON u.id = wm.user_id "
+        "WHERE wm.workspace_id = ? ORDER BY wm.joined_at ASC",
+        (workspace_id,),
+    )
+
+
+def collab_workspace(workspace_id):
+    return _query_one("SELECT * FROM workspaces WHERE id = ?", (workspace_id,))
+
+
+def collab_workspaces_for(user_id):
+    """Workspaces the user belongs to, with usage counts."""
+    return _query_all(
+        "SELECT w.id, w.name, w.course_code, w.description, w.owner_id, w.invite_code, "
+        "w.deadline, w.created_at, w.archived, "
+        "(SELECT COUNT(*) FROM workspace_members wm WHERE wm.workspace_id = w.id) AS member_count, "
+        "(SELECT COUNT(*) FROM work_items wi WHERE wi.workspace_id = w.id) AS num_tasks, "
+        "(SELECT COUNT(*) FROM work_items wi WHERE wi.workspace_id = w.id AND wi.status = 'completed') AS num_completed "
+        "FROM workspaces w JOIN workspace_members wm ON wm.workspace_id = w.id "
+        "WHERE wm.user_id = ? AND w.archived = 0 "
+        "ORDER BY w.created_at DESC",
+        (user_id,),
+    )
+
+
+def collab_find_workspace_by_invite(code):
+    if not code:
+        return None
+    return _query_one(
+        "SELECT * FROM workspaces WHERE invite_code = ?", (str(code).strip().upper(),)
+    )
+
+
+def collab_create_workspace(conn, name, course_code, description, deadline,
+                            owner_id, invite_code):
+    """Create a workspace and its owner membership in one transaction."""
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT INTO workspaces (name, course_code, description, deadline, "
+            "owner_id, invite_code) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, course_code, description, deadline, owner_id, invite_code),
+        )
+        ws_id = cur.lastrowid
+        c.execute(
+            "INSERT INTO workspace_members (workspace_id, user_id, role) "
+            "VALUES (?, ?, 'owner')",
+            (ws_id, owner_id),
+        )
+        if commit:
+            c.commit()
+        return ws_id
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_add_member(conn, workspace_id, user_id, role="member"):
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT OR IGNORE INTO workspace_members (workspace_id, user_id, role) "
+            "VALUES (?, ?, ?)",
+            (workspace_id, user_id, role),
+        )
+        added = cur.rowcount > 0
+        if added and commit:
+            c.commit()
+        return added
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_remove_member(conn, workspace_id, user_id):
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "DELETE FROM workspace_members WHERE workspace_id = ? AND user_id = ?",
+            (workspace_id, user_id),
+        )
+        if commit:
+            c.commit()
+        return cur.rowcount > 0
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_log_activity(conn, workspace_id, actor_id, event_type, payload):
+    """Insert an activity_log row (share the caller's transaction via conn)."""
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT INTO activity_log (workspace_id, actor_id, event_type, payload) "
+            "VALUES (?, ?, ?, ?)",
+            (workspace_id, actor_id, event_type, payload),
+        )
+        if commit:
+            c.commit()
+        return cur.lastrowid
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_activity(workspace_id, limit=100):
+    return _query_all(
+        "SELECT a.id, a.actor_id, a.event_type, a.payload, a.created_at, "
+        "u.name AS actor_name FROM activity_log a "
+        "LEFT JOIN users u ON u.id = a.actor_id "
+        "WHERE a.workspace_id = ? ORDER BY a.id DESC LIMIT ?",
+        (workspace_id, limit),
+    )
+
+
+# ------------------------------------------------------------------ work items
+
+def collab_work_item(item_id):
+    return _query_one(
+        "SELECT wi.*, u.name AS assignee_name FROM work_items wi "
+        "LEFT JOIN users u ON u.id = wi.assignee_id WHERE wi.id = ?",
+        (item_id,),
+    )
+
+
+def collab_work_items(workspace_id, status=None, assignee_id=None,
+                      milestone_id=None, parent_id=None):
+    """Tasks in a workspace. parent_id=0 means top-level tasks only."""
+    sql = ("SELECT wi.*, u.name AS assignee_name, p.title AS parent_title "
+           "FROM work_items wi LEFT JOIN users u ON u.id = wi.assignee_id "
+           "LEFT JOIN work_items p ON p.id = wi.parent_id "
+           "WHERE wi.workspace_id = ?")
+    params = [workspace_id]
+    if status:
+        sql += " AND wi.status = ?"
+        params.append(status)
+    if assignee_id:
+        sql += " AND wi.assignee_id = ?"
+        params.append(assignee_id)
+    if milestone_id:
+        sql += " AND wi.milestone_id = ?"
+        params.append(milestone_id)
+    if parent_id is not None:
+        if parent_id == 0:
+            sql += " AND wi.parent_id IS NULL"
+        else:
+            sql += " AND wi.parent_id = ?"
+            params.append(parent_id)
+    sql += " ORDER BY wi.created_at DESC"
+    return _query_all(sql, tuple(params))
+
+
+def collab_create_work_item(conn, workspace_id, title, description, assignee_id,
+                            priority, due_date, created_by, milestone_id=None,
+                            parent_id=None):
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT INTO work_items (workspace_id, parent_id, milestone_id, title, "
+            "description, assignee_id, priority, due_date, created_by) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (workspace_id, parent_id, milestone_id, title, description,
+             assignee_id, priority, due_date, created_by),
+        )
+        item_id = cur.lastrowid
+        if commit:
+            c.commit()
+        return item_id
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_update_work_item(conn, item_id, **fields):
+    allowed = ("title", "description", "assignee_id", "priority", "due_date",
+               "milestone_id", "parent_id")
+    cols = {k: v for k, v in fields.items() if k in allowed}
+    if not cols:
+        return False
+    sets = ", ".join(f"{k} = ?" for k in cols)
+    params = list(cols.values()) + [item_id]
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            f"UPDATE work_items SET {sets}, updated_at = datetime('now') "
+            f"WHERE id = ?",
+            params,
+        )
+        if commit:
+            c.commit()
+        return cur.rowcount > 0
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_set_status(conn, item_id, status, blocked_reason=None):
+    """Set status enforcing that 'blocked' requires a blocker reason."""
+    if status not in _COLLAB_STATUSES:
+        raise ValueError(f"invalid status: {status}")
+    if status == "blocked" and not (blocked_reason and blocked_reason.strip()):
+        raise ValueError("blocked status requires a blocker reason")
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "UPDATE work_items SET status = ?, blocked_reason = ?, "
+            "updated_at = datetime('now') WHERE id = ?",
+            (status, blocked_reason, item_id),
+        )
+        if commit:
+            c.commit()
+        return cur.rowcount > 0
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_item_labels(work_item_id):
+    return _query_all(
+        "SELECT l.id, l.name, l.color FROM labels l "
+        "JOIN work_item_labels wil ON wil.label_id = l.id "
+        "WHERE wil.work_item_id = ? ORDER BY l.id",
+        (work_item_id,),
+    )
+
+
+def collab_ws_labels_map(workspace_id):
+    """Return {work_item_id: [label dicts]} for all items in a workspace."""
+    rows = _query_all(
+        "SELECT wil.work_item_id, l.id, l.name, l.color FROM work_item_labels wil "
+        "JOIN labels l ON l.id = wil.label_id "
+        "JOIN work_items wi ON wi.id = wil.work_item_id "
+        "WHERE wi.workspace_id = ? ORDER BY l.id",
+        (workspace_id,),
+    )
+    out = {}
+    for r in rows:
+        out.setdefault(r["work_item_id"], []).append(r)
+    return out
+
+
+def collab_ws_comment_counts(workspace_id):
+    """Return {work_item_id: comment_count} for a workspace."""
+    rows = _query_all(
+        "SELECT c.work_item_id, COUNT(*) AS n FROM comments c "
+        "JOIN work_items wi ON wi.id = c.work_item_id "
+        "WHERE wi.workspace_id = ? AND c.work_item_id IS NOT NULL "
+        "GROUP BY c.work_item_id",
+        (workspace_id,),
+    )
+    return {r["work_item_id"]: r["n"] for r in rows}
+
+
+def collab_ws_dependency_pairs(workspace_id):
+    """Return [(work_item_id, depends_on_id)] for a workspace."""
+    rows = _query_all(
+        "SELECT wid.work_item_id, wid.depends_on_id FROM work_item_dependencies wid "
+        "JOIN work_items wi ON wi.id = wid.work_item_id "
+        "WHERE wi.workspace_id = ?",
+        (workspace_id,),
+    )
+    return [(r["work_item_id"], r["depends_on_id"]) for r in rows]
+
+
+def collab_item_dependencies(item_id):
+    """Tasks that this item depends on."""
+    return _query_all(
+        "SELECT wi.id, wi.title, wi.status, wi.blocked_reason FROM work_items wi "
+        "JOIN work_item_dependencies wid ON wid.depends_on_id = wi.id "
+        "WHERE wid.work_item_id = ? ORDER BY wi.id",
+        (item_id,),
+    )
+
+
+def collab_item_dependents(item_id):
+    """Tasks that depend on this item."""
+    return _query_all(
+        "SELECT wi.id, wi.title, wi.status FROM work_items wi "
+        "JOIN work_item_dependencies wid ON wid.work_item_id = wi.id "
+        "WHERE wid.depends_on_id = ? ORDER BY wi.id",
+        (item_id,),
+    )
+
+
+# ----------------------------------------------------------------- milestones
+
+def collab_milestones(workspace_id, with_counts=False):
+    sql = ("SELECT * FROM milestones WHERE workspace_id = ? ORDER BY sort_order, id")
+    if with_counts:
+        sql = ("SELECT m.*, (SELECT COUNT(*) FROM work_items wi WHERE wi.milestone_id = m.id) "
+               "AS num_tasks FROM milestones m WHERE m.workspace_id = ? ORDER BY m.sort_order, m.id")
+    return _query_all(sql, (workspace_id,))
+
+
+def collab_create_milestone(conn, workspace_id, title, due_date=None):
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT INTO milestones (workspace_id, title, due_date) VALUES (?, ?, ?)",
+            (workspace_id, title, due_date),
+        )
+        mid = cur.lastrowid
+        if commit:
+            c.commit()
+        return mid
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_delete_milestone(conn, milestone_id):
+    c, commit = _conn_or_new(conn)
+    try:
+        c.execute("UPDATE work_items SET milestone_id = NULL WHERE milestone_id = ?",
+                  (milestone_id,))
+        cur = c.execute("DELETE FROM milestones WHERE id = ?", (milestone_id,))
+        if commit:
+            c.commit()
+        return cur.rowcount > 0
+    finally:
+        if commit:
+            c.close()
+
+
+# --------------------------------------------------------------------- labels
+
+def collab_labels(workspace_id):
+    return _query_all(
+        "SELECT * FROM labels WHERE workspace_id = ? ORDER BY id", (workspace_id,)
+    )
+
+
+def collab_create_label(conn, workspace_id, name, color="#64748b"):
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT INTO labels (workspace_id, name, color) VALUES (?, ?, ?)",
+            (workspace_id, name, color),
+        )
+        if commit:
+            c.commit()
+        return cur.lastrowid
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_delete_label(conn, label_id):
+    c, commit = _conn_or_new(conn)
+    try:
+        c.execute("DELETE FROM work_item_labels WHERE label_id = ?", (label_id,))
+        cur = c.execute("DELETE FROM labels WHERE id = ?", (label_id,))
+        if commit:
+            c.commit()
+        return cur.rowcount > 0
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_toggle_label(conn, work_item_id, label_id):
+    """Attach a label to an item; toggle it off if already attached. Returns attached."""
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT OR IGNORE INTO work_item_labels (work_item_id, label_id) "
+            "VALUES (?, ?)",
+            (work_item_id, label_id),
+        )
+        attached = cur.rowcount > 0
+        if not attached:
+            c.execute(
+                "DELETE FROM work_item_labels WHERE work_item_id = ? AND label_id = ?",
+                (work_item_id, label_id),
+            )
+        if commit:
+            c.commit()
+        return attached
+    finally:
+        if commit:
+            c.close()
+
+
+# ---------------------------------------------------------------- dependencies
+
+def collab_add_dependency(conn, work_item_id, depends_on_id):
+    if work_item_id == depends_on_id:
+        raise ValueError("a task cannot depend on itself")
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT OR IGNORE INTO work_item_dependencies (work_item_id, depends_on_id) "
+            "VALUES (?, ?)",
+            (work_item_id, depends_on_id),
+        )
+        if commit:
+            c.commit()
+        return cur.rowcount > 0
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_remove_dependency(conn, work_item_id, depends_on_id):
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "DELETE FROM work_item_dependencies WHERE work_item_id = ? AND depends_on_id = ?",
+            (work_item_id, depends_on_id),
+        )
+        if commit:
+            c.commit()
+        return cur.rowcount > 0
+    finally:
+        if commit:
+            c.close()
+
+
+# -------------------------------------------------------------------- comments
+
+def collab_comments(workspace_id, work_item_id=None):
+    if work_item_id is None:
+        return _query_all(
+            "SELECT c.*, u.name AS author_name FROM comments c JOIN users u ON u.id = c.author_id "
+            "WHERE c.workspace_id = ? AND c.work_item_id IS NULL ORDER BY c.id ASC",
+            (workspace_id,),
+        )
+    return _query_all(
+        "SELECT c.*, u.name AS author_name FROM comments c JOIN users u ON u.id = c.author_id "
+        "WHERE c.workspace_id = ? AND c.work_item_id = ? ORDER BY c.id ASC",
+        (workspace_id, work_item_id),
+    )
+
+
+def collab_add_comment(conn, workspace_id, author_id, body, work_item_id=None):
+    c, commit = _conn_or_new(conn)
+    try:
+        if work_item_id is None:
+            cur = c.execute(
+                "INSERT INTO comments (workspace_id, author_id, body) VALUES (?, ?, ?)",
+                (workspace_id, author_id, body),
+            )
+        else:
+            cur = c.execute(
+                "INSERT INTO comments (workspace_id, work_item_id, author_id, body) "
+                "VALUES (?, ?, ?, ?)",
+                (workspace_id, work_item_id, author_id, body),
+            )
+        if commit:
+            c.commit()
+        return cur.lastrowid
+    finally:
+        if commit:
+            c.close()
+
+
+# -------------------------------------------------------- information requests
+
+def collab_requests(workspace_id, status=None):
+    if status:
+        return _query_all(
+            "SELECT r.*, requester.name AS requester_name, recipient.name AS recipient_name "
+            "FROM information_requests r "
+            "JOIN users requester ON requester.id = r.requester_id "
+            "JOIN users recipient ON recipient.id = r.recipient_id "
+            "WHERE r.workspace_id = ? AND r.status = ? ORDER BY r.id ASC",
+            (workspace_id, status),
+        )
+    return _query_all(
+        "SELECT r.*, requester.name AS requester_name, recipient.name AS recipient_name "
+        "FROM information_requests r "
+        "JOIN users requester ON requester.id = r.requester_id "
+        "JOIN users recipient ON recipient.id = r.recipient_id "
+        "WHERE r.workspace_id = ? ORDER BY r.id ASC",
+        (workspace_id,),
+    )
+
+
+def collab_create_request(conn, workspace_id, work_item_id, requester_id,
+                          recipient_id, what_needed, why_needed, needed_by):
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT INTO information_requests (workspace_id, work_item_id, requester_id, "
+            "recipient_id, what_needed, why_needed, needed_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (workspace_id, work_item_id, requester_id, recipient_id,
+             what_needed, why_needed, needed_by),
+        )
+        if commit:
+            c.commit()
+        return cur.lastrowid
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_update_request_status(conn, request_id, status):
+    if status not in _COLLAB_REQUEST_STATUSES:
+        raise ValueError(f"invalid request status: {status}")
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "UPDATE information_requests SET status = ? WHERE id = ?",
+            (status, request_id),
+        )
+        if commit:
+            c.commit()
+        return cur.rowcount > 0
+    finally:
+        if commit:
+            c.close()
+
+
+# ------------------------------------------------------------------- daily logs
+
+def collab_daily_log_for(workspace_id, user_id, log_date):
+    return _query_one(
+        "SELECT * FROM daily_logs WHERE workspace_id = ? AND user_id = ? AND log_date = ?",
+        (workspace_id, user_id, log_date),
+    )
+
+
+def collab_upsert_daily_log(conn, workspace_id, user_id, log_date, summary,
+                            minutes_spent, blocked_by, plan_for_tomorrow):
+    c, commit = _conn_or_new(conn)
+    try:
+        cur = c.execute(
+            "INSERT INTO daily_logs (workspace_id, user_id, log_date, summary, "
+            "minutes_spent, blocked_by, plan_for_tomorrow) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(workspace_id, user_id, log_date) DO UPDATE SET "
+            "summary = excluded.summary, minutes_spent = excluded.minutes_spent, "
+            "blocked_by = excluded.blocked_by, "
+            "plan_for_tomorrow = excluded.plan_for_tomorrow",
+            (workspace_id, user_id, log_date, summary, minutes_spent,
+             blocked_by, plan_for_tomorrow),
+        )
+        if commit:
+            c.commit()
+        return cur.lastrowid
+    finally:
+        if commit:
+            c.close()
+
+
+def collab_daily_logs(workspace_id, log_date=None):
+    if log_date:
+        return _query_all(
+            "SELECT l.*, u.name AS user_name FROM daily_logs l JOIN users u ON u.id = l.user_id "
+            "WHERE l.workspace_id = ? AND l.log_date = ? ORDER BY l.id ASC",
+            (workspace_id, log_date),
+        )
+    return _query_all(
+        "SELECT l.*, u.name AS user_name FROM daily_logs l JOIN users u ON u.id = l.user_id "
+        "WHERE l.workspace_id = ? ORDER BY l.log_date DESC, l.id ASC LIMIT 500",
+        (workspace_id,),
+    )
 
 
 # ------------------------------------------------------------- test helpers
