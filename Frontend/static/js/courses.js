@@ -1,95 +1,123 @@
+/*
+ * Courses page — Add-a-course modal + live preview.
+ *
+ * The add form is an "occasional" interaction (a few per semester) so it gets
+ * a real transition: the modal fades + scales in from the trigger, traps focus
+ * while open, closes on Escape / backdrop click / Cancel, and returns focus to
+ * the trigger on close. The swatch picker replaces a native color-name
+ * dropdown with see-and-pick swatches, and the preview card shows the real
+ * course card (code, title, colour) as the student types.
+ */
 (function () {
-    "use strict";
+  "use strict";
 
-    var trigger = document.getElementById("add-course-trigger");
-    var modal = document.getElementById("add-course-modal");
-    if (!trigger || !modal) return;
+  var trigger = document.getElementById("add-course-trigger");
+  var modal = document.getElementById("add-course-modal");
+  if (!trigger || !modal) return;
 
-    var panel = modal.querySelector(".modal__panel");
-    var backdrop = modal.querySelector(".modal__backdrop");
-    var cancel = document.getElementById("cancel-add-course");
-    var form = modal.querySelector(".course-form");
-    var codeInput = document.getElementById("course_code");
-    var titleInput = document.getElementById("title");
-    var colorInput = document.getElementById("course-color");
-    var preview = document.getElementById("course-preview-card");
-    var previewCode = document.getElementById("preview-code");
-    var previewTitle = document.getElementById("preview-title");
-    var lastFocused = trigger;
-    var closeTimer;
+  var lastFocused = null;
 
-    function focusableElements() {
-        return panel.querySelectorAll(
-            "a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex=\"-1\"])"
-        );
+  function focusables() {
+    var nodes = modal.querySelectorAll(
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    );
+    return Array.prototype.filter.call(nodes, function (el) {
+      return el.offsetParent !== null || el === document.activeElement;
+    });
+  }
+
+  function openModal() {
+    lastFocused = trigger;
+    modal.hidden = false;
+    modal.setAttribute("aria-hidden", "false");
+    // Next frame so the entrance transition (opacity + scale) actually runs.
+    requestAnimationFrame(function () {
+      modal.classList.add("modal--open");
+      var code = document.getElementById("course_code");
+      if (code) code.focus();
+    });
+  }
+
+  function closeModal() {
+    modal.classList.remove("modal--open");
+    modal.setAttribute("aria-hidden", "true");
+    modal.hidden = true;
+    if (lastFocused && lastFocused.focus) lastFocused.focus();
+  }
+
+  trigger.addEventListener("click", function (e) {
+    e.preventDefault();
+    openModal();
+  });
+
+  var backdrop = modal.querySelector(".modal__backdrop");
+  if (backdrop) {
+    backdrop.addEventListener("click", function () {
+      closeModal();
+    });
+  }
+
+  var cancel = document.getElementById("cancel-add-course");
+  if (cancel) cancel.addEventListener("click", closeModal);
+
+  modal.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      closeModal();
+      return;
     }
-
-    function openModal() {
-        window.clearTimeout(closeTimer);
-        lastFocused = document.activeElement || trigger;
-        modal.hidden = false;
-        modal.setAttribute("aria-hidden", "false");
-        modal.classList.add("modal--open");
-        document.body.classList.add("modal-open");
-        window.setTimeout(function () { codeInput.focus(); }, 0);
+    if (e.key === "Tab" && modal.classList.contains("modal--open")) {
+      var list = focusables();
+      if (!list.length) return;
+      var idx = list.indexOf(document.activeElement);
+      if (e.shiftKey) {
+        e.preventDefault();
+        list[(idx - 1 + list.length) % list.length].focus();
+      } else if (idx === list.length - 1 || idx === -1) {
+        e.preventDefault();
+        list[0].focus();
+      }
     }
+  });
 
-    function closeModal() {
-        modal.classList.remove("modal--open");
-        modal.setAttribute("aria-hidden", "true");
-        document.body.classList.remove("modal-open");
-        closeTimer = window.setTimeout(function () {
-            modal.hidden = true;
-        }, 240);
-        lastFocused.focus();
-    }
-
-    function updatePreview() {
-        previewCode.textContent = codeInput.value.trim() || "DCIT 204";
-        previewTitle.textContent = titleInput.value.trim() || "To be assigned";
-    }
-
-    function selectColor(button) {
-        var swatches = modal.querySelectorAll(".color-swatch");
-        swatches.forEach(function (swatch) {
-            swatch.setAttribute("aria-checked", swatch === button ? "true" : "false");
+  // Colour swatch picker: buttons implementing the radio pattern; the picked
+  // flat hue (the value stored per course) goes into the hidden input so the
+  // fallback path without JS still submits a colour.
+  var picker = document.querySelector(".color-swatch-picker");
+  var colorInput = document.getElementById("course-color");
+  var previewCard = document.getElementById("course-preview-card");
+  if (picker) {
+    var swatches = picker.querySelectorAll(".color-swatch");
+    Array.prototype.forEach.call(swatches, function (sw) {
+      sw.addEventListener("click", function () {
+        Array.prototype.forEach.call(swatches, function (o) {
+          o.setAttribute("aria-checked", String(o === sw));
         });
-        colorInput.value = button.getAttribute("data-color") || "";
-        preview.style.setProperty("--card-color", button.getAttribute("data-color") ? button.style.getPropertyValue("--swatch") : "var(--color-accent)");
+        var color = sw.getAttribute("data-color") || "";
+        if (colorInput) colorInput.value = color;
+        if (previewCard) {
+          previewCard.style.setProperty(
+            "--card-color",
+            color || "var(--color-accent)"
+          );
+        }
+      });
+    });
+  }
+
+  // Live preview: code + title update as the student types; empty fields fall
+  // back to the same placeholder text the card renders for a stub row.
+  var codeInput = document.getElementById("course_code");
+  var titleInput = document.getElementById("title");
+  var previewCode = document.getElementById("preview-code");
+  var previewTitle = document.getElementById("preview-title");
+  function syncPreview() {
+    if (previewCode) {
+      previewCode.textContent = (codeInput && codeInput.value.trim()) || "DCIT 204";
     }
-
-    trigger.addEventListener("click", openModal);
-    if (cancel) cancel.addEventListener("click", closeModal);
-    if (backdrop) backdrop.addEventListener("click", closeModal);
-    codeInput.addEventListener("input", updatePreview);
-    titleInput.addEventListener("input", updatePreview);
-
-    modal.querySelectorAll(".color-swatch").forEach(function (button) {
-        button.addEventListener("click", function () { selectColor(button); });
-    });
-
-    modal.addEventListener("keydown", function (event) {
-        if (event.key === "Escape") {
-            event.preventDefault();
-            closeModal();
-            return;
-        }
-        if (event.key !== "Tab") return;
-
-        var elements = focusableElements();
-        if (!elements.length) return;
-        var first = elements[0];
-        var last = elements[elements.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-        }
-    });
-
-    if (form) form.addEventListener("submit", function () {
-        modal.setAttribute("aria-hidden", "true");
-    });
+    if (previewTitle) {
+      previewTitle.textContent = (titleInput && titleInput.value.trim()) || "To be assigned";
+    }
+  }
+  if (codeInput) codeInput.addEventListener("input", syncPreview);
+  if (titleInput) titleInput.addEventListener("input", syncPreview);
 })();

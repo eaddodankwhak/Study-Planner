@@ -202,5 +202,110 @@ class CoursesRoutesTest(unittest.TestCase):
         self.assertEqual(rows[0]["code"], "MATH 101")
 
 
+class CoursesPageModernizationTest(unittest.TestCase):
+    """Invariants for the modernized courses page.
+
+    The grid renders first (courses are the content); Add-a-course lives behind
+    a triggered modal, the colour picker is see-and-pick swatches rather than
+    a native name dropdown, and the live preview reflects the typed values.
+    """
+
+    def setUp(self):
+        self.uid = "courses-page-user"
+        db._execute("DELETE FROM courses WHERE user_id = ?", (self.uid,))
+        db._execute("DELETE FROM users WHERE id = ?", (self.uid,))
+        db.create_user(self.uid, "Page Test", "page@example.com", "hash")
+
+        from app import app
+        app.config["TESTING"] = True
+        self.client = app.test_client()
+        with self.client.session_transaction() as s:
+            s["user_id"] = self.uid
+            s["user_name"] = "Page Test"
+
+    def tearDown(self):
+        db._execute("DELETE FROM courses WHERE user_id = ?", (self.uid,))
+        db._execute("DELETE FROM users WHERE id = ?", (self.uid,))
+
+    def _page(self):
+        r = self.client.get("/courses")
+        self.assertEqual(r.status_code, 200)
+        return r.data.decode()
+
+    def test_courses_render_first_add_form_is_triggered_not_permanent(self):
+        courses.upsert_course(self.uid, "DCIT 204")
+        html = self._page()
+        # The grid of existing courses comes first; the add form is inside a
+        # hidden modal after it — not permanent page real estate above the fold.
+        self.assertLess(html.index('class="courses-grid"'), html.index('id="add-course-modal"'))
+        self.assertIn("course-card course-card--", html)
+        self.assertIn('id="add-course-trigger"', html)
+        # The old inline "Add a Course" card is gone.
+        self.assertNotIn(">Add a Course<", html)
+
+    def test_modal_is_a_hidden_dialog(self):
+        html = self._page()
+        self.assertIn('id="add-course-modal"', html)
+        self.assertIn('class="modal"', html)
+        self.assertIn('aria-hidden="true"', html)
+        self.assertIn('role="dialog"', html)
+        self.assertIn('aria-modal="true"', html)
+        self.assertIn('aria-labelledby="add-course-title"', html)
+        self.assertIn('class="modal__backdrop"', html)
+        self.assertIn('id="cancel-add-course"', html)
+        self.assertNotIn('class="dashboard-heading"', html)
+
+    def test_color_is_swatch_picker_not_native_select(self):
+        html = self._page()
+        self.assertIn('role="radiogroup"', html)
+        # Auto pill + six palette swatches, each aligning to the stored hues.
+        self.assertEqual(html.count('class="color-swatch"'), 6)
+        self.assertIn('class="color-swatch color-swatch--auto"', html)
+        for hue in ("navy", "teal", "orange", "green", "purple", "red"):
+            self.assertIn('data-color="%s"' % hue, html, hue)
+        # No native <select> for the card colour (or anywhere on the page).
+        self.assertNotIn("<select", html)
+
+    def test_live_preview_updates_with_typed_values(self):
+        html = self._page()
+        self.assertIn('id="course-preview-card"', html)
+        self.assertIn('id="preview-code"', html)
+        self.assertIn('id="preview-title"', html)
+        # Placeholder text matches what a stub row card renders.
+        self.assertIn(">DCIT 204<", html)
+        self.assertIn(">To be assigned<", html)
+        # The hidden colour input keeps the no-JS fallback working.
+        self.assertIn('name="color"', html)
+        self.assertIn('type="hidden"', html)
+
+    def test_field_grid_uses_consistent_responsive_layout(self):
+        html = self._page()
+        self.assertIn('class="course-form__grid"', html)
+        self.assertIn('name="course_code"', html)
+        self.assertIn('class="field"', html)
+        self.assertIn("field--narrow", html)
+        self.assertIn('name="credits"', html)
+        self.assertIn('type="number"', html)
+        self.assertIn('min="0"', html)
+        self.assertIn('max="12"', html)
+        self.assertIn('name="description"', html)
+        self.assertIn('class="course-form__footer"', html)
+
+    def test_post_accepts_new_course_code_field(self):
+        r = self.client.post(
+            "/courses",
+            data={
+                "course_code": "dcit  204",
+                "title": "Picked from the new form", "credits": "3",
+                "color": "purple",
+            },
+        )
+        self.assertEqual(r.status_code, 302)
+        row = courses.get_user_courses(self.uid)[0]
+        self.assertEqual(row["code"], "DCIT 204")
+        self.assertEqual(row["title"], "Picked from the new form")
+        self.assertEqual(row["color"], "purple")
+
+
 if __name__ == "__main__":
     unittest.main()
