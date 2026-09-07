@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ quiz.title }} — Practice{% endblock %}
+{% block main %}
+<div class="dashboard-heading"><div><p class="text-muted mb-0">Private PDF practice</p><h1>{{ quiz.title }}</h1></div><strong id="quiz-timer" data-seconds="{{ quiz.duration_minutes * 60 }}">{{ quiz.duration_minutes }}:00</strong></div>
+<form id="personal-quiz-form" class="card" method="post" action="{{ url_for('personal_quiz_submit', quiz_id=quiz.id) }}">
+{% for question in quiz.questions %}{% set question_index = loop.index0 %}<fieldset class="quiz-question personal-question{{ ' is-current' if loop.first else '' }}" data-question><legend>{{ loop.index }}. {{ question.prompt }}</legend>{% for option in question.options %}<label class="quiz-option"><input type="radio" name="q{{ question_index }}" value="{{ option.label }}"> <strong>{{ option.label }}.</strong> {{ option.text }}</label>{% endfor %}</fieldset>{% endfor %}
+<div class="form-actions"><button class="button button--ghost" type="button" data-previous>Previous</button><span data-progress>1 / {{ quiz.questions|length }}</span><button class="button" type="button" data-next>Next</button><button class="button" type="submit" data-submit hidden>Finish attempt</button></div></form>
+{% endblock %}{% block scripts %}<script src="{{ url_for('static', filename='js/personal-quiz.js') }}" defer></script>{% endblock %}

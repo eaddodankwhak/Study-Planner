@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Enter answer key — {{ quiz.title }}{% endblock %}{% block main %}
+<div class="dashboard-heading"><div><p class="text-muted mb-0">Attempt saved</p><h1>Enter the answer key</h1><p class="text-muted mb-0">Answers were not shown during your attempt. Add the correct option for each question to mark it.</p></div></div>
+<form class="card form" method="post">{% for question in quiz.questions %}<div class="form-field"><label class="form-label" for="a{{ loop.index0 }}">{{ loop.index }}. Correct answer</label><select class="form-input form-input--small" id="a{{ loop.index0 }}" name="a{{ loop.index0 }}" required><option value="">Choose</option>{% for option in question.options %}<option value="{{ option.label }}">{{ option.label }}</option>{% endfor %}</select></div>{% endfor %}<button class="button" type="submit">Mark my quiz</button></form>
+{% endblock %}

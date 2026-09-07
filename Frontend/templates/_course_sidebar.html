@@ -1,0 +1,25 @@
+<aside class="sites-nav">
+    <nav aria-label="My courses">
+        <div class="sites-nav__heading">My Courses</div>
+        <ul class="sites-nav__list" data-course-sidebar>
+            {% for s in subjects %}
+            {% set is_current_course = s.slug == subject.slug %}
+            <li class="sites-nav__item">
+                <button class="sites-nav__course{{ ' sites-nav__course--active' if is_current_course else '' }}"
+                    type="button" data-course-toggle data-course-url="{{ url_for('subject', slug=s.slug) }}"
+                    data-course-current="{{ 'true' if is_current_course else 'false' }}"
+                    aria-expanded="{{ 'true' if is_current_course else 'false' }}" aria-controls="course-tools-{{ s.slug }}">
+                    <span class="sites-nav__code">{{ s.code }}</span>
+                    <svg class="sites-nav__chevron" aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </button>
+                <ul class="sites-nav__sublist{{ ' is-open' if is_current_course else '' }}" id="course-tools-{{ s.slug }}">
+                    {% for tool, label in [('home', 'Home'), ('resources', 'Resources'), ('assignments', 'Assignments'), ('calendar', 'Calendar'), ('grades', 'Grades'), ('collab', 'Collaborate'), ('quizzes', 'Quizzes')] %}
+                    <li><a class="sites-nav__sublink{{ ' is-active' if is_current_course and active_tool|default('home') == tool else '' }}"
+                        href="{{ url_for('subject', slug=s.slug, tool=tool) }}" data-course-nav-item{% if is_current_course and active_tool|default('home') == tool %} aria-current="page"{% endif %}>{{ label }}</a></li>
+                    {% endfor %}
+                </ul>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+</aside>

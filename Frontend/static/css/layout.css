@@ -299,6 +299,83 @@
   display: block;
 }
 
+.sites-nav__course {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  color: #d7e4ee;
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+}
+
+.sites-nav__course:hover {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.sites-nav__course--active {
+  background: var(--color-accent);
+  color: #2b1b00;
+  font-weight: var(--font-weight-bold);
+}
+
+.sites-nav__chevron {
+  flex: 0 0 auto;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.sites-nav__course[aria-expanded="true"] .sites-nav__chevron {
+  transform: rotate(180deg);
+}
+
+.sites-nav__sublist {
+  display: grid;
+  grid-template-rows: 0fr;
+  gap: var(--space-1);
+  max-height: 0;
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  overflow: hidden;
+  list-style: none;
+  opacity: 0;
+  transition: max-height var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out), padding var(--dur-fast) var(--ease-out);
+}
+
+.sites-nav__sublist.is-open {
+  max-height: 20rem;
+  padding-block: var(--space-1) var(--space-2);
+  opacity: 1;
+}
+
+.sites-nav__sublink {
+  display: block;
+  padding: var(--space-1) var(--space-3);
+  border-left: 1px solid rgb(215 228 238 / 0.28);
+  color: #b8cbd7;
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-regular);
+  text-decoration: none;
+}
+
+.sites-nav__sublink:hover {
+  color: var(--color-text-inverse);
+  text-decoration: none;
+}
+
+.sites-nav__sublink.is-active {
+  border-left-color: var(--color-accent);
+  background: rgb(214 163 93 / 0.16);
+  color: #f4cf92;
+  font-weight: var(--font-weight-medium);
+}
+
 .sites-nav__link {
   display: flex;
   align-items: center;
@@ -336,5 +413,12 @@
 
   .sites-nav {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sites-nav__chevron,
+  .sites-nav__sublist {
+    transition: none;
   }
 }

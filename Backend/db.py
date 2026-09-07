@@ -111,6 +111,25 @@ CREATE TABLE IF NOT EXISTS attempts (
     date    TEXT
 );
 
+-- Private PDF practice quizzes. Answer keys are deliberately stored only
+-- after an attempt, so importing a question paper cannot reveal answers.
+CREATE TABLE IF NOT EXISTS personal_quizzes (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    subject_slug   TEXT NOT NULL,
+    title          TEXT NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    questions_json TEXT NOT NULL,
+    responses_json TEXT,
+    answer_key_json TEXT,
+    score          INTEGER,
+    completed_at   INTEGER,
+    created_at     INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_personal_quizzes_user_subject
+    ON personal_quizzes (user_id, subject_slug);
+
 CREATE TABLE IF NOT EXISTS ai_conversations (
     id         TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL,
@@ -764,6 +783,56 @@ def get_attempts(quiz_id):
     return _query_all(
         "SELECT * FROM attempts WHERE quiz_id = ? ORDER BY rowid", (quiz_id,)
     )
+
+
+def _personal_quiz_from_row(row):
+    item = dict(row)
+    item["questions"] = json.loads(item.pop("questions_json") or "[]")
+    item["responses"] = json.loads(item.pop("responses_json") or "{}")
+    item["answer_key"] = json.loads(item.pop("answer_key_json") or "{}")
+    return item
+
+
+def create_personal_quiz(user_id, subject_slug, title, duration_minutes, questions):
+    quiz_id = uuid.uuid4().hex
+    _execute(
+        "INSERT INTO personal_quizzes (id, user_id, subject_slug, title, duration_minutes, questions_json, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (quiz_id, user_id, subject_slug, title, duration_minutes, json.dumps(questions), int(time.time())),
+    )
+    return get_personal_quiz(quiz_id, user_id)
+
+
+def get_personal_quiz(quiz_id, user_id):
+    row = _query_one("SELECT * FROM personal_quizzes WHERE id = ? AND user_id = ?", (quiz_id, user_id))
+    return _personal_quiz_from_row(row) if row else None
+
+
+def list_personal_quizzes(user_id, subject_slug):
+    rows = _query_all(
+        "SELECT * FROM personal_quizzes WHERE user_id = ? AND subject_slug = ? ORDER BY created_at DESC",
+        (user_id, subject_slug),
+    )
+    return [_personal_quiz_from_row(row) for row in rows]
+
+
+def save_personal_responses(quiz_id, user_id, responses):
+    _execute(
+        "UPDATE personal_quizzes SET responses_json = ? WHERE id = ? AND user_id = ?",
+        (json.dumps(responses), quiz_id, user_id),
+    )
+
+
+def mark_personal_quiz(quiz_id, user_id, answer_key):
+    quiz = get_personal_quiz(quiz_id, user_id)
+    if not quiz:
+        return None
+    score = sum(1 for index, answer in answer_key.items() if quiz["responses"].get(str(index)) == answer)
+    _execute(
+        "UPDATE personal_quizzes SET answer_key_json = ?, score = ?, completed_at = ? WHERE id = ? AND user_id = ?",
+        (json.dumps(answer_key), score, int(time.time()), quiz_id, user_id),
+    )
+    return get_personal_quiz(quiz_id, user_id)
 
 
 # -------------------------------------------------------------- AI storage

@@ -7,7 +7,7 @@
             <a class="button button--ghost" href="{{ url_for('courses') }}">← All Courses</a>
         </div>
 
-        <section class="subject-banner course-card--{{ course.color }}" style="background: currentColor;">
+        <section class="subject-banner course-card--{{ course.color }}">
             <p class="subject-banner__code">{{ course.code }}</p>
             <h2 class="subject-banner__title">{{ course.title }}</h2>
             <p class="subject-banner__meta">
@@ -20,8 +20,17 @@
             {% endif %}
         </section>
 
+        <nav class="course-hub-nav" aria-label="{{ course.code }} study tools">
+            <a class="course-hub-nav__link" href="#deadlines">Deadlines <span>{{ deadlines|length }}</span></a>
+            <a class="course-hub-nav__link" href="#tasks">Tasks <span>{{ tasks|length }}</span></a>
+            <a class="course-hub-nav__link" href="#notes">Notes <span>{{ notes|length }}</span></a>
+            <a class="course-hub-nav__link" href="{{ url_for('session_page', course_id=course.id) }}">Focus session</a>
+            <a class="course-hub-nav__link" href="{{ url_for('subject', slug=subject_slug, tool='resources') }}">Materials</a>
+            <a class="course-hub-nav__link" href="{{ url_for('subject', slug=subject_slug, tool='quizzes') }}">Quizzes</a>
+        </nav>
+
         <div class="subject-content">
-            <section class="card">
+            <section class="card" id="deadlines">
                 <h3 class="card__title">Deadlines</h3>
                 {% if deadlines %}
                     <table class="data-table">
@@ -45,7 +54,7 @@
                 {% endif %}
             </section>
 
-            <section class="card">
+            <section class="card" id="tasks">
                 <h3 class="card__title">Tasks</h3>
                 {% if tasks %}
                     <ul class="task-list">
@@ -64,7 +73,7 @@
                 {% endif %}
             </section>
 
-            <section class="card">
+            <section class="card" id="notes">
                 <h3 class="card__title">Notes</h3>
                 <form method="POST" action="{{ url_for('notes_create') }}" class="form">
                     <input type="hidden" name="course_id" value="{{ course.id }}">

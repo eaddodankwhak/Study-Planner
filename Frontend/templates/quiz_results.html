@@ -4,18 +4,7 @@
 
 {% block content %}
     <div class="app-shell">
-        <aside class="sites-nav">
-            <div class="sites-nav__heading">My Subjects</div>
-            <ul class="sites-nav__list">
-                {% for s in subjects %}
-                    <li class="sites-nav__item">
-                        <a class="sites-nav__link{{ ' sites-nav__link--active' if s.slug == subject.slug }}" href="{{ url_for('subject', slug=s.slug) }}">
-                            <span class="sites-nav__code">{{ s.code }}</span>
-                        </a>
-                    </li>
-                {% endfor %}
-            </ul>
-        </aside>
+        {% include '_course_sidebar.html' %}
 
         <main class="page-main">
             <div class="subject-banner course-card--{{ subject.color }}">
@@ -59,4 +48,5 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/course-sidebar.js') }}" defer></script>
 {% endblock %}

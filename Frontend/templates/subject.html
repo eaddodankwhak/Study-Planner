@@ -4,18 +4,7 @@
 
 {% block content %}
     <div class="app-shell">
-        <aside class="sites-nav">
-            <div class="sites-nav__heading">My Subjects</div>
-            <ul class="sites-nav__list">
-                {% for s in subjects %}
-                    <li class="sites-nav__item">
-                        <a class="sites-nav__link{{ ' sites-nav__link--active' if s.slug == subject.slug }}" href="{{ url_for('subject', slug=s.slug) }}">
-                            <span class="sites-nav__code">{{ s.code }}</span>
-                        </a>
-                    </li>
-                {% endfor %}
-            </ul>
-        </aside>
+        {% include '_course_sidebar.html' %}
 
         <main class="page-main">
             <!-- Subject title bar / breadcrumb -->
@@ -26,17 +15,6 @@
                     <p class="subject-banner__meta">{{ subject.term }} · {{ subject.instructor }}</p>
                 </div>
             </div>
-
-            <!-- Sakai-style tool menu -->
-            <nav class="subject-tools">
-                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'home' }}" href="{{ url_for('subject', slug=subject.slug, tool='home') }}">Home</a>
-                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'resources' }}" href="{{ url_for('subject', slug=subject.slug, tool='resources') }}">Resources</a>
-                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'assignments' }}" href="{{ url_for('subject', slug=subject.slug, tool='assignments') }}">Assignments</a>
-                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'calendar' }}" href="{{ url_for('subject', slug=subject.slug, tool='calendar') }}">Calendar</a>
-                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'grades' }}" href="{{ url_for('subject', slug=subject.slug, tool='grades') }}">Grades</a>
-                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'collab' }}" href="{{ url_for('subject', slug=subject.slug, tool='collab') }}">Collaborate</a>
-                <a class="subject-tools__link{{ ' subject-tools__link--active' if active_tool == 'quizzes' }}" href="{{ url_for('subject', slug=subject.slug, tool='quizzes') }}">Quizzes</a>
-            </nav>
 
             <div class="subject-content">
                 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -145,6 +123,23 @@
 
                 {% if active_tool == 'quizzes' %}
                     <section class="card">
+                        <h2 class="card__title">Private PDF Practice</h2>
+                        <p class="text-muted mb-4">Upload a text-based PDF with numbered multiple-choice questions. You will enter the answer key only after your timed attempt.</p>
+                        <form class="form" action="{{ url_for('personal_quiz_import', slug=subject.slug) }}" method="post" enctype="multipart/form-data">
+                            <div class="form-field"><label class="form-label" for="pdf-title">Quiz title</label><input class="form-input" id="pdf-title" name="title" placeholder="e.g. Week 4 revision"></div>
+                            <div class="form-field"><label class="form-label" for="question-pdf">Question PDF</label><input class="form-input" id="question-pdf" name="question_pdf" type="file" accept="application/pdf" required></div>
+                            <div class="form-field"><label class="form-label" for="pdf-duration">Time limit (minutes)</label><input class="form-input form-input--small" id="pdf-duration" name="duration_minutes" type="number" min="1" max="180" value="30" required></div>
+                            <button class="button" type="submit">Import and start practice</button>
+                        </form>
+                        {% if personal_quizzes %}
+                        <ul class="quiz-list mt-4">
+                            {% for personal in personal_quizzes %}
+                            <li class="quiz-list__item"><div class="quiz-list__info"><strong>{{ personal.title }}</strong><span class="text-muted">{{ personal.questions|length }} questions · {{ personal.duration_minutes }} min{% if personal.answer_key %} · {{ personal.score }}/{{ personal.questions|length }}{% endif %}</span></div><a class="button button--small" href="{{ url_for('personal_quiz_result' if personal.answer_key else 'personal_quiz_take', quiz_id=personal.id) }}">{{ 'View result' if personal.answer_key else 'Continue' }}</a></li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </section>
+                    <section class="card">
                         <h2 class="card__title">Create a Quiz</h2>
                         <p class="text-muted mb-4">Build a quiz (up to 10 questions). Classmates can take it with the auto-generated invite code.</p>
                         <form class="quiz-create" action="{{ url_for('quiz_create', slug=subject.slug) }}" method="post">
@@ -251,6 +246,7 @@
 
 {% block scripts %}
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/course-sidebar.js') }}" defer></script>
     <script>
         const addQuestionBtn = document.getElementById('add-question');
         if (addQuestionBtn) {

@@ -11,6 +11,7 @@ Provides a Sakai-style interface with real authentication:
 
 import json
 import os
+import re
 import time
 import uuid
 
@@ -271,6 +272,34 @@ def member_names(slug):
 def allowed_file(filename):
     """Return True if the file extension is allowed."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def parse_multiple_choice_pdf(content):
+    """Extract common numbered A-D question blocks from a text-based PDF."""
+    try:
+        import PyPDF2
+    except ImportError:
+        raise ValueError("PDF quiz import needs PyPDF2. Install the project requirements and try again.")
+
+    try:
+        reader = PyPDF2.PdfReader(__import__("io").BytesIO(content))
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception as exc:
+        raise ValueError("This PDF could not be read. Use a text-based PDF rather than a scan.") from exc
+
+    questions = []
+    blocks = re.findall(r"(?ms)^\s*\d{1,3}[.)]\s*(.+?)(?=^\s*\d{1,3}[.)]|\Z)", text)
+    for block in blocks:
+        option_matches = list(re.finditer(r"(?mi)^\s*([A-D])[.)]\s*(.+?)(?=^\s*[A-D][.)]|\Z)", block))
+        if len(option_matches) < 2:
+            continue
+        prompt = block[:option_matches[0].start()].strip()
+        options = [{"label": match.group(1).upper(), "text": " ".join(match.group(2).split())} for match in option_matches]
+        if prompt and all(option["text"] for option in options):
+            questions.append({"prompt": " ".join(prompt.split()), "options": options})
+    if not questions:
+        raise ValueError("No multiple-choice questions were found. Format questions as 1. ... followed by A. ... B. ...")
+    return questions
 
 
 def load_users():
@@ -858,6 +887,7 @@ def subject(slug):
         shared_files=shared_files,
         user_name=user_name,
         quizzes=collab.list_quizzes(slug),
+        personal_quizzes=db.list_personal_quizzes(user["id"], slug),
     )
 
 
@@ -910,6 +940,90 @@ def subject_download(slug, filepath):
 
     folder = os.path.join(UPLOADS_DIR, slug)
     return send_from_directory(folder, filepath, as_attachment=True)
+
+
+@app.post("/subject/<slug>/personal-quiz/import")
+@login_required
+def personal_quiz_import(slug):
+    if not get_subject(slug):
+        flash("Course not found.", "error")
+        return redirect(url_for("home"))
+    uploaded = request.files.get("question_pdf")
+    if not uploaded or not uploaded.filename or not uploaded.filename.lower().endswith(".pdf"):
+        flash("Choose a PDF containing numbered multiple-choice questions.", "error")
+        return redirect(url_for("subject", slug=slug, tool="quizzes"))
+    content = uploaded.read()
+    if len(content) > 12 * 1024 * 1024:
+        flash("Keep the PDF below 12 MB.", "error")
+        return redirect(url_for("subject", slug=slug, tool="quizzes"))
+    try:
+        questions = parse_multiple_choice_pdf(content)
+        duration = max(1, min(int(request.form.get("duration_minutes") or 30), 180))
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("subject", slug=slug, tool="quizzes"))
+    title = request.form.get("title", "").strip() or uploaded.filename.rsplit(".", 1)[0]
+    quiz = db.create_personal_quiz(current_user()["id"], slug, title, duration, questions)
+    flash(f"Imported {len(questions)} questions. Your answer key will be requested after the attempt.", "success")
+    return redirect(url_for("personal_quiz_take", quiz_id=quiz["id"]))
+
+
+@app.get("/personal-quiz/<quiz_id>")
+@login_required
+def personal_quiz_take(quiz_id):
+    quiz = db.get_personal_quiz(quiz_id, current_user()["id"])
+    if not quiz:
+        flash("Practice quiz not found.", "error")
+        return redirect(url_for("home"))
+    if quiz["answer_key"]:
+        return redirect(url_for("personal_quiz_result", quiz_id=quiz_id))
+    return render_template("personal_quiz_take.html", user=current_user(), active_nav="practice", quiz=quiz)
+
+
+@app.post("/personal-quiz/<quiz_id>/submit")
+@login_required
+def personal_quiz_submit(quiz_id):
+    quiz = db.get_personal_quiz(quiz_id, current_user()["id"])
+    if not quiz:
+        flash("Practice quiz not found.", "error")
+        return redirect(url_for("home"))
+    responses = {str(index): request.form.get(f"q{index}", "").upper() for index in range(len(quiz["questions"]))}
+    db.save_personal_responses(quiz_id, current_user()["id"], responses)
+    return redirect(url_for("personal_quiz_key", quiz_id=quiz_id))
+
+
+@app.get("/personal-quiz/<quiz_id>/answer-key")
+@login_required
+def personal_quiz_key(quiz_id):
+    quiz = db.get_personal_quiz(quiz_id, current_user()["id"])
+    if not quiz:
+        flash("Practice quiz not found.", "error")
+        return redirect(url_for("home"))
+    return render_template("personal_quiz_key.html", user=current_user(), active_nav="practice", quiz=quiz)
+
+
+@app.post("/personal-quiz/<quiz_id>/answer-key")
+@login_required
+def personal_quiz_mark(quiz_id):
+    quiz = db.get_personal_quiz(quiz_id, current_user()["id"])
+    if not quiz:
+        flash("Practice quiz not found.", "error")
+        return redirect(url_for("home"))
+    key = {str(index): request.form.get(f"a{index}", "").upper() for index in range(len(quiz["questions"]))}
+    if any(not answer for answer in key.values()):
+        flash("Enter an answer for every question before marking.", "error")
+        return redirect(url_for("personal_quiz_key", quiz_id=quiz_id))
+    db.mark_personal_quiz(quiz_id, current_user()["id"], key)
+    return redirect(url_for("personal_quiz_result", quiz_id=quiz_id))
+
+
+@app.get("/personal-quiz/<quiz_id>/result")
+@login_required
+def personal_quiz_result(quiz_id):
+    quiz = db.get_personal_quiz(quiz_id, current_user()["id"])
+    if not quiz or not quiz["answer_key"]:
+        return redirect(url_for("personal_quiz_take", quiz_id=quiz_id))
+    return render_template("personal_quiz_result.html", user=current_user(), active_nav="practice", quiz=quiz)
 
 
 @app.post("/subject/<slug>/collab/join")
@@ -985,6 +1099,7 @@ def quiz_take(quiz_id):
         subjects=user_subjects(current_user()),
         quiz=quiz,
         subject=subject_info,
+        active_tool="quizzes",
         user_name=user_name,
     )
 
@@ -1090,6 +1205,7 @@ def quiz_results(quiz_id):
         subjects=user_subjects(current_user()),
         quiz=quiz,
         subject=subject_info,
+        active_tool="quizzes",
         rows=rows,
     )
 
@@ -1195,6 +1311,7 @@ def course_detail(course_id):
         deadlines=course_deadlines,
         tasks=course_tasks,
         notes=course_notes,
+        subject_slug=subject_slug(course["code"]),
     )
 
 

@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Result — {{ quiz.title }}{% endblock %}{% block main %}
+<section class="card text-center"><p class="text-muted">{{ quiz.title }}</p><h1>{{ quiz.score }} / {{ quiz.questions|length }}</h1><p class="text-muted mb-0">{{ ((quiz.score / quiz.questions|length) * 100)|round|int }}% correct</p></section>
+<section class="card mt-4"><h2 class="card__title">Review</h2>{% for question in quiz.questions %}<div class="task"><span><strong>{{ loop.index }}. {{ question.prompt }}</strong><br><span class="text-muted">Your answer: {{ quiz.responses.get(loop.index0|string) or 'Not answered' }} · Correct: {{ quiz.answer_key.get(loop.index0|string) }}</span></span></div>{% endfor %}</section>
+{% endblock %}
