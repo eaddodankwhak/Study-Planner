@@ -932,6 +932,17 @@ def subject(slug):
     users = load_users()
     is_member = collab.is_member(slug, user["id"]) if user else False
     shared_files = collab.get_materials(slug)
+    previewable_extensions = {
+        "pdf", "txt", "md", "markdown", "csv", "png", "jpg", "jpeg", "gif", "webp", "mp4", "webm"
+    }
+    requested_view = request.args.get("view", "")
+    preview_file = next((item for item in shared_files if item["filename"] == requested_view), None)
+    preview_extension = (
+        preview_file["filename"].rsplit(".", 1)[-1].lower()
+        if preview_file and "." in preview_file["filename"] else ""
+    )
+    if preview_extension not in previewable_extensions:
+        preview_file = None
 
     # Course-scoped planner/db data (only meaningful for rows backed by the
     # courses table, which carry a uuid id; the preloaded sample subjects have
@@ -965,6 +976,8 @@ def subject(slug):
         deadlines=course_deadlines,
         tasks=course_tasks,
         notes=course_notes,
+        preview_file=preview_file,
+        preview_extension=preview_extension,
     )
 
 
@@ -1017,6 +1030,19 @@ def subject_download(slug, filepath):
 
     folder = os.path.join(UPLOADS_DIR, slug)
     return send_from_directory(folder, filepath, as_attachment=True)
+
+
+@app.get("/subject/<slug>/open/<path:filepath>")
+@login_required
+def subject_open(slug, filepath):
+    """Open a course material inline when the browser supports previewing it."""
+    subject_info = get_subject(slug)
+    if not subject_info:
+        flash("Subject not found.", "error")
+        return redirect(url_for("home"))
+
+    folder = os.path.join(UPLOADS_DIR, slug)
+    return send_from_directory(folder, filepath, as_attachment=False)
 
 
 @app.post("/subject/<slug>/personal-quiz/import")

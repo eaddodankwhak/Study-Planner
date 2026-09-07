@@ -3,327 +3,413 @@
 {% block title %}{{ subject.code }} — {{ subject.title }} | Study Planner{% endblock %}
 
 {% block content %}
-    <div class="app-shell">
-        {% include '_course_sidebar.html' %}
+<div class="app-shell">
+    {% include '_course_sidebar.html' %}
 
-        <main class="page-main">
-            <!-- Subject title bar / breadcrumb -->
-            <div class="subject-banner course-card--{{ subject.color }}">
-                <div class="subject-banner__info">
-                    <span class="subject-banner__code">{{ subject.code }}</span>
-                    <h1 class="subject-banner__title">{{ subject.title }}</h1>
-                    <p class="subject-banner__meta">{{ subject.term }} · {{ subject.instructor }}</p>
+    <main class="page-main">
+        <!-- Subject title bar / breadcrumb -->
+        <div class="subject-banner course-card--{{ subject.color }}">
+            <div class="subject-banner__info">
+                <span class="subject-banner__code">{{ subject.code }}</span>
+                <h1 class="subject-banner__title">{{ subject.title }}</h1>
+                <p class="subject-banner__meta">{{ subject.term }} · {{ subject.instructor }}</p>
+            </div>
+        </div>
+
+        <div class="subject-content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <ul class="flashes">
+                {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% endwith %}
+
+            {% if active_tool == 'home' %}
+            <section class="card">
+                <h2 class="card__title">Course Overview</h2>
+                <p>{{ subject.description }}</p>
+                <ul class="subject-overview">
+                    <li><strong>Instructor:</strong> {{ subject.instructor }}</li>
+                    <li><strong>Term:</strong> {{ subject.term }}</li>
+                    <li><strong>Course code:</strong> {{ subject.code }}</li>
+                </ul>
+            </section>
+
+            <section class="card subject-announcements">
+                <h2 class="card__title">Announcements</h2>
+                <div class="task">
+                    <span>Welcome to {{ subject.title }}! Review the course overview and upload any shared slides under
+                        Resources.</span>
                 </div>
-            </div>
+            </section>
+            {% endif %}
 
-            <div class="subject-content">
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        <ul class="flashes">
-                            {% for category, message in messages %}
-                                <li class="{{ category }}">{{ message }}</li>
-                            {% endfor %}
-                        </ul>
+            {% if active_tool == 'resources' %}
+            <section class="card">
+                <h2 class="card__title">Upload Course Material</h2>
+                <p class="text-muted mb-4">Add slides, PDFs, or other documents for this subject.</p>
+                <form class="upload-form" action="{{ url_for('subject_upload', slug=subject.slug) }}" method="post"
+                    enctype="multipart/form-data">
+                    <div class="form-field">
+                        <input type="file" name="material">
+                        <button class="button" type="submit">Upload</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card">
+                <h2 class="card__title">Course Materials</h2>
+                {% if preview_file %}
+                <div class="material-viewer" aria-label="Previewing {{ preview_file.filename }}">
+                    <div class="material-viewer__header">
+                        <strong>{{ preview_file.filename }}</strong>
+                        <a class="button button--small button--ghost"
+                            href="{{ url_for('subject', slug=subject.slug, tool='resources') }}">Close preview</a>
+                    </div>
+                    {% if preview_extension in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
+                    <img class="material-viewer__image"
+                        src="{{ url_for('subject_open', slug=subject.slug, filepath=preview_file.filename) }}"
+                        alt="Preview of {{ preview_file.filename }}">
+                    {% elif preview_extension in ['mp4', 'webm'] %}
+                    <video class="material-viewer__media" controls
+                        src="{{ url_for('subject_open', slug=subject.slug, filepath=preview_file.filename) }}">Your
+                        browser cannot play this video.</video>
+                    {% else %}
+                    <iframe class="material-viewer__frame"
+                        src="{{ url_for('subject_open', slug=subject.slug, filepath=preview_file.filename) }}"
+                        title="Preview of {{ preview_file.filename }}"></iframe>
                     {% endif %}
-                {% endwith %}
+                </div>
+                {% endif %}
+                {% if files %}
+                <ul class="material-list">
+                    {% for m in shared_files %}
+                    <li class="material-list__item">
+                        <span class="material-list__name">{{ m.filename }}</span>
+                        <span class="material-list__meta">shared by {{ user_name(m.uploader_id) }}</span>
+                        {% set material_extension = m.filename.rsplit('.', 1)[-1].lower() if '.' in m.filename else ''
+                        %}
+                        {% if material_extension in ['pdf', 'txt', 'md', 'markdown', 'csv', 'png', 'jpg', 'jpeg', 'gif',
+                        'webp', 'mp4', 'webm'] %}
+                        <a class="button button--small button--ghost"
+                            href="{{ url_for('subject', slug=subject.slug, tool='resources', view=m.filename) }}">Open</a>
+                        {% endif %}
+                        <a class="button button--small"
+                            href="{{ url_for('subject_download', slug=subject.slug, filepath=m.filename) }}">Download</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No materials uploaded yet. Upload slides or documents above.</p>
+                {% endif %}
+            </section>
+            {% endif %}
 
-                {% if active_tool == 'home' %}
-                    <section class="card">
-                        <h2 class="card__title">Course Overview</h2>
-                        <p>{{ subject.description }}</p>
-                        <ul class="subject-overview">
-                            <li><strong>Instructor:</strong> {{ subject.instructor }}</li>
-                            <li><strong>Term:</strong> {{ subject.term }}</li>
-                            <li><strong>Course code:</strong> {{ subject.code }}</li>
-                        </ul>
-                    </section>
+            {% if active_tool == 'collab' %}
+            <section class="card">
+                <h2 class="card__title">Collaboration</h2>
+                <p class="text-muted mb-4">Work together to share course materials and take quizzes. Members share
+                    everything in this workspace.</p>
 
-                    <section class="card subject-announcements">
-                        <h2 class="card__title">Announcements</h2>
-                        <div class="task">
-                            <span>Welcome to {{ subject.title }}! Review the course overview and upload any shared slides under Resources.</span>
+                {% if is_member %}
+                <div class="collab-status collab-status--member">
+                    <strong>You're a member of this collaboration.</strong>
+                    <form class="inline-form" action="{{ url_for('collab_leave', slug=subject.slug) }}" method="post">
+                        <button class="button button--small button--ghost" type="submit">Leave</button>
+                    </form>
+                </div>
+                {% else %}
+                <div class="collab-status">
+                    <strong>You're not a member yet.</strong>
+                    <form class="inline-form" action="{{ url_for('collab_join', slug=subject.slug) }}" method="post">
+                        <input class="form-input" type="text" name="code" placeholder="Enter collaboration code"
+                            required>
+                        <button class="button" type="submit">Join</button>
+                    </form>
+                </div>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h2 class="card__title">Invite Code</h2>
+                <p class="text-muted">Share this code with classmates to invite them into the collaboration:</p>
+                <div class="invite-glass" style="padding: var(--space-2);">
+                    <div class="invite-code" style="margin-top:0;">{{ invite_code }}</div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2 class="card__title">Members ({{ member_names|length }})</h2>
+                {% if member_names %}
+                <ul class="member-list">
+                    {% for name in member_names %}
+                    <li class="member-list__item">{{ name }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No members yet. Invite classmates using the code above.</p>
+                {% endif %}
+            </section>
+            {% endif %}
+
+            {% if active_tool == 'quizzes' %}
+            <section class="card">
+                <h2 class="card__title">Private PDF Practice</h2>
+                <p class="text-muted mb-4">Upload a PDF, Markdown, or text file with numbered multiple-choice questions.
+                    You will enter the answer key only after your timed attempt.</p>
+                <form class="form" action="{{ url_for('personal_quiz_import', slug=subject.slug) }}" method="post"
+                    enctype="multipart/form-data">
+                    <div class="form-field"><label class="form-label" for="pdf-title">Quiz title</label><input
+                            class="form-input" id="pdf-title" name="title" placeholder="e.g. Week 4 revision"></div>
+                    <div class="form-field"><label class="form-label" for="question-pdf">Questions file</label><input
+                            class="form-input" id="question-pdf" name="question_pdf" type="file"
+                            accept="application/pdf,text/plain,text/markdown,.md,.markdown" required><small
+                            class="text-muted">Use PDF, .txt, or .md</small></div>
+                    <div class="form-field"><label class="form-label" for="pdf-duration">Time limit
+                            (minutes)</label><input class="form-input form-input--small" id="pdf-duration"
+                            name="duration_minutes" type="number" min="1" max="180" value="30" required></div>
+                    <button class="button" type="submit">Import and start practice</button>
+                </form>
+                {% if personal_quizzes %}
+                <ul class="quiz-list mt-4">
+                    {% for personal in personal_quizzes %}
+                    <li class="quiz-list__item">
+                        <div class="quiz-list__info"><strong>{{ personal.title }}</strong><span class="text-muted">{{
+                                personal.questions|length }} questions · {{ personal.duration_minutes }} min{% if
+                                personal.answer_key %} · {{ personal.score }}/{{ personal.questions|length }}{% endif
+                                %}</span></div><a class="button button--small"
+                            href="{{ url_for('personal_quiz_result' if personal.answer_key else 'personal_quiz_take', quiz_id=personal.id) }}">{{
+                            'View result' if personal.answer_key else 'Continue' }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </section>
+            <section class="card">
+                <h2 class="card__title">Create a Quiz</h2>
+                <p class="text-muted mb-4">Build a quiz (up to 10 questions). Classmates can take it with the
+                    auto-generated invite code.</p>
+                <form class="quiz-create" action="{{ url_for('quiz_create', slug=subject.slug) }}" method="post">
+                    <div class="form-field">
+                        <label class="form-label" for="q_title">Quiz title</label>
+                        <input class="form-input" id="q_title" type="text" name="title" required>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="q_desc">Description</label>
+                        <textarea class="form-input" id="q_desc" name="description" rows="2"></textarea>
+                    </div>
+
+                    <div class="quiz-builder" id="quiz-builder">
+                        <div class="quiz-question-block" data-q="0">
+                            <h3 class="quiz-question-title">Question 1</h3>
+                            <div class="form-field">
+                                <label class="form-label">Question text</label>
+                                <input class="form-input" type="text" name="q0_prompt"
+                                    placeholder="e.g. What is photosynthesis?">
+                            </div>
+                            <label class="form-label">Options</label>
+                            <div class="quiz-options">
+                                <div class="form-field"><input class="form-input" type="text" name="q0_opt0"
+                                        placeholder="Option A"></div>
+                                <div class="form-field"><input class="form-input" type="text" name="q0_opt1"
+                                        placeholder="Option B"></div>
+                                <div class="form-field"><input class="form-input" type="text" name="q0_opt2"
+                                        placeholder="Option C"></div>
+                                <div class="form-field"><input class="form-input" type="text" name="q0_opt3"
+                                        placeholder="Option D"></div>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Correct answer (A=0, B=1, C=2, D=3)</label>
+                                <input class="form-input form-input--small" type="number" name="q0_correct" min="0"
+                                    max="3" value="0">
+                            </div>
                         </div>
-                    </section>
-                {% endif %}
+                    </div>
 
-                {% if active_tool == 'resources' %}
-                    <section class="card">
-                        <h2 class="card__title">Upload Course Material</h2>
-                        <p class="text-muted mb-4">Add slides, PDFs, or other documents for this subject.</p>
-                        <form class="upload-form" action="{{ url_for('subject_upload', slug=subject.slug) }}" method="post" enctype="multipart/form-data">
-                            <div class="form-field">
-                                <input type="file" name="material">
-                                <button class="button" type="submit">Upload</button>
-                            </div>
-                        </form>
-                    </section>
+                    <button class="button button--ghost" type="button" id="add-question">Add question</button>
+                    <div class="form-field">
+                        <button class="button" type="submit">Create Quiz</button>
+                    </div>
+                </form>
+            </section>
 
-                    <section class="card">
-                        <h2 class="card__title">Course Materials</h2>
-                        {% if files %}
-                            <ul class="material-list">
-                                {% for m in shared_files %}
-                                    <li class="material-list__item">
-                                        <span class="material-list__name">{{ m.filename }}</span>
-                                        <span class="material-list__meta">shared by {{ user_name(m.uploader_id) }}</span>
-                                        <a class="button button--small" href="{{ url_for('subject_download', slug=subject.slug, filepath=m.filename) }}">Download</a>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p class="text-muted">No materials uploaded yet. Upload slides or documents above.</p>
-                        {% endif %}
-                    </section>
-                {% endif %}
-
-                {% if active_tool == 'collab' %}
-                    <section class="card">
-                        <h2 class="card__title">Collaboration</h2>
-                        <p class="text-muted mb-4">Work together to share course materials and take quizzes. Members share everything in this workspace.</p>
-
-                        {% if is_member %}
-                            <div class="collab-status collab-status--member">
-                                <strong>You're a member of this collaboration.</strong>
-                                <form class="inline-form" action="{{ url_for('collab_leave', slug=subject.slug) }}" method="post">
-                                    <button class="button button--small button--ghost" type="submit">Leave</button>
-                                </form>
-                            </div>
-                        {% else %}
-                            <div class="collab-status">
-                                <strong>You're not a member yet.</strong>
-                                <form class="inline-form" action="{{ url_for('collab_join', slug=subject.slug) }}" method="post">
-                                    <input class="form-input" type="text" name="code" placeholder="Enter collaboration code" required>
-                                    <button class="button" type="submit">Join</button>
-                                </form>
-                            </div>
-                        {% endif %}
-                    </section>
-
-                    <section class="card">
-                        <h2 class="card__title">Invite Code</h2>
-                        <p class="text-muted">Share this code with classmates to invite them into the collaboration:</p>
-                        <div class="invite-glass" style="padding: var(--space-2);">
-                            <div class="invite-code" style="margin-top:0;">{{ invite_code }}</div>
+            <section class="card">
+                <h2 class="card__title">Quizzes</h2>
+                {% if quizzes %}
+                <ul class="quiz-list">
+                    {% for quiz in quizzes %}
+                    <li class="quiz-list__item">
+                        <div class="quiz-list__info">
+                            <strong>{{ quiz.title }}</strong>
+                            <span class="text-muted">{{ quiz.questions|length }} questions · {{ quiz.invite_code
+                                }}</span>
                         </div>
-                    </section>
-
-                    <section class="card">
-                        <h2 class="card__title">Members ({{ member_names|length }})</h2>
-                        {% if member_names %}
-                            <ul class="member-list">
-                                {% for name in member_names %}
-                                    <li class="member-list__item">{{ name }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p class="text-muted">No members yet. Invite classmates using the code above.</p>
-                        {% endif %}
-                    </section>
+                        <a class="button button--small" href="{{ url_for('quiz_take', quiz_id=quiz.id) }}">Take</a>
+                        <a class="button button--small button--ghost"
+                            href="{{ url_for('quiz_results', quiz_id=quiz.id) }}">Results</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No quizzes yet. Create one above to get started.</p>
                 {% endif %}
+            </section>
+            {% endif %}
 
-                {% if active_tool == 'quizzes' %}
-                    <section class="card">
-                        <h2 class="card__title">Private PDF Practice</h2>
-                        <p class="text-muted mb-4">Upload a PDF, Markdown, or text file with numbered multiple-choice questions. You will enter the answer key only after your timed attempt.</p>
-                        <form class="form" action="{{ url_for('personal_quiz_import', slug=subject.slug) }}" method="post" enctype="multipart/form-data">
-                            <div class="form-field"><label class="form-label" for="pdf-title">Quiz title</label><input class="form-input" id="pdf-title" name="title" placeholder="e.g. Week 4 revision"></div>
-                            <div class="form-field"><label class="form-label" for="question-pdf">Questions file</label><input class="form-input" id="question-pdf" name="question_pdf" type="file" accept="application/pdf,text/plain,text/markdown,.md,.markdown" required><small class="text-muted">Use PDF, .txt, or .md</small></div>
-                            <div class="form-field"><label class="form-label" for="pdf-duration">Time limit (minutes)</label><input class="form-input form-input--small" id="pdf-duration" name="duration_minutes" type="number" min="1" max="180" value="30" required></div>
-                            <button class="button" type="submit">Import and start practice</button>
-                        </form>
-                        {% if personal_quizzes %}
-                        <ul class="quiz-list mt-4">
-                            {% for personal in personal_quizzes %}
-                            <li class="quiz-list__item"><div class="quiz-list__info"><strong>{{ personal.title }}</strong><span class="text-muted">{{ personal.questions|length }} questions · {{ personal.duration_minutes }} min{% if personal.answer_key %} · {{ personal.score }}/{{ personal.questions|length }}{% endif %}</span></div><a class="button button--small" href="{{ url_for('personal_quiz_result' if personal.answer_key else 'personal_quiz_take', quiz_id=personal.id) }}">{{ 'View result' if personal.answer_key else 'Continue' }}</a></li>
-                            {% endfor %}
-                        </ul>
-                        {% endif %}
-                    </section>
-                    <section class="card">
-                        <h2 class="card__title">Create a Quiz</h2>
-                        <p class="text-muted mb-4">Build a quiz (up to 10 questions). Classmates can take it with the auto-generated invite code.</p>
-                        <form class="quiz-create" action="{{ url_for('quiz_create', slug=subject.slug) }}" method="post">
-                            <div class="form-field">
-                                <label class="form-label" for="q_title">Quiz title</label>
-                                <input class="form-input" id="q_title" type="text" name="title" required>
-                            </div>
-                            <div class="form-field">
-                                <label class="form-label" for="q_desc">Description</label>
-                                <textarea class="form-input" id="q_desc" name="description" rows="2"></textarea>
-                            </div>
-
-                            <div class="quiz-builder" id="quiz-builder">
-                                <div class="quiz-question-block" data-q="0">
-                                    <h3 class="quiz-question-title">Question 1</h3>
-                                    <div class="form-field">
-                                        <label class="form-label">Question text</label>
-                                        <input class="form-input" type="text" name="q0_prompt" placeholder="e.g. What is photosynthesis?">
-                                    </div>
-                                    <label class="form-label">Options</label>
-                                    <div class="quiz-options">
-                                        <div class="form-field"><input class="form-input" type="text" name="q0_opt0" placeholder="Option A"></div>
-                                        <div class="form-field"><input class="form-input" type="text" name="q0_opt1" placeholder="Option B"></div>
-                                        <div class="form-field"><input class="form-input" type="text" name="q0_opt2" placeholder="Option C"></div>
-                                        <div class="form-field"><input class="form-input" type="text" name="q0_opt3" placeholder="Option D"></div>
-                                    </div>
-                                    <div class="form-field">
-                                        <label class="form-label">Correct answer (A=0, B=1, C=2, D=3)</label>
-                                        <input class="form-input form-input--small" type="number" name="q0_correct" min="0" max="3" value="0">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button class="button button--ghost" type="button" id="add-question">Add question</button>
-                            <div class="form-field">
-                                <button class="button" type="submit">Create Quiz</button>
-                            </div>
-                        </form>
-                    </section>
-
-                    <section class="card">
-                        <h2 class="card__title">Quizzes</h2>
-                        {% if quizzes %}
-                            <ul class="quiz-list">
-                                {% for quiz in quizzes %}
-                                    <li class="quiz-list__item">
-                                        <div class="quiz-list__info">
-                                            <strong>{{ quiz.title }}</strong>
-                                            <span class="text-muted">{{ quiz.questions|length }} questions · {{ quiz.invite_code }}</span>
-                                        </div>
-                                        <a class="button button--small" href="{{ url_for('quiz_take', quiz_id=quiz.id) }}">Take</a>
-                                        <a class="button button--small button--ghost" href="{{ url_for('quiz_results', quiz_id=quiz.id) }}">Results</a>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p class="text-muted">No quizzes yet. Create one above to get started.</p>
-                        {% endif %}
-                    </section>
+            {% if active_tool == 'assignments' %}
+            <section class="card">
+                <h2 class="card__title">Assignments</h2>
+                {% if deadlines %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Type</th>
+                            <th>Due</th>
+                            <th>Weight</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in deadlines %}
+                        <tr>
+                            <td><a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a></td>
+                            <td>{{ d.type }}</td>
+                            <td>{{ d.due_date }}</td>
+                            <td>{{ d.weight }}%</td>
+                            <td>{% if d.status == 'done' %}<span class="badge badge--done">done</span>{% else %}<span
+                                    class="badge badge--open">{{ d.status }}</span>{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted mb-0">No deadlines recorded for this course yet.</p>
                 {% endif %}
-
-                {% if active_tool == 'assignments' %}
-                    <section class="card">
-                        <h2 class="card__title">Assignments</h2>
-                        {% if deadlines %}
-                            <table class="data-table">
-                                <thead>
-                                    <tr><th>Item</th><th>Type</th><th>Due</th><th>Weight</th><th></th></tr>
-                                </thead>
-                                <tbody>
-                                    {% for d in deadlines %}
-                                        <tr>
-                                            <td><a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a></td>
-                                            <td>{{ d.type }}</td>
-                                            <td>{{ d.due_date }}</td>
-                                            <td>{{ d.weight }}%</td>
-                                            <td>{% if d.status == 'done' %}<span class="badge badge--done">done</span>{% else %}<span class="badge badge--open">{{ d.status }}</span>{% endif %}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        {% else %}
-                            <p class="text-muted mb-0">No deadlines recorded for this course yet.</p>
-                        {% endif %}
-                        {% if tasks %}
-                            <ul class="task-list mt-4">
-                                {% for t in tasks %}
-                                    <li class="task task--{{ t.priority }}">
-                                        <span>
-                                            {% if t.status == 'done' %}<s>{{ t.title }}</s>{% else %}{{ t.title }}{% endif %}
-                                            <span class="text-muted"> · {{ t.estimated_minutes }} min{% if t.due_date %} · {{ t.due_date }}{% endif %}</span>
-                                        </span>
-                                        <span class="badge badge--{{ t.priority }}">{{ t.priority }}</span>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p class="text-muted mt-4 mb-0">No tasks recorded for this course yet.</p>
-                        {% endif %}
-                    </section>
+                {% if tasks %}
+                <ul class="task-list mt-4">
+                    {% for t in tasks %}
+                    <li class="task task--{{ t.priority }}">
+                        <span>
+                            {% if t.status == 'done' %}<s>{{ t.title }}</s>{% else %}{{ t.title }}{% endif %}
+                            <span class="text-muted"> · {{ t.estimated_minutes }} min{% if t.due_date %} · {{ t.due_date
+                                }}{% endif %}</span>
+                        </span>
+                        <span class="badge badge--{{ t.priority }}">{{ t.priority }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted mt-4 mb-0">No tasks recorded for this course yet.</p>
                 {% endif %}
+            </section>
+            {% endif %}
 
-                {% if active_tool == 'notes' %}
-                    <section class="card">
-                        <h2 class="card__title">Notes</h2>
-                        <form method="POST" action="{{ url_for('notes_create') }}" class="form">
-                            {% if subject.id %}<input type="hidden" name="course_id" value="{{ subject.id }}">{% endif %}
-                            <input type="hidden" name="back" value="{{ course_url(subject, 'notes') }}">
-                            <div class="form-field"><input type="text" name="title" class="form-input" placeholder="Note title" required></div>
-                            <div class="form-field"><textarea name="body" class="form-input" rows="3" placeholder="What did you learn?"></textarea></div>
-                            <div class="form-field"><input type="text" name="topic" class="form-input" placeholder="Topic (optional)"></div>
-                            <button type="submit" class="button button--primary">Save note</button>
-                        </form>
-                        {% if notes %}
-                            <ul class="task-list mt-4">
-                                {% for n in notes %}
-                                    <li class="task">
-                                        <span>
-                                            <strong>{{ n.title }}</strong>
-                                            {% if n.topic %}<span class="text-muted"> · {{ n.topic }}</span>{% endif %}
-                                            <p class="text-muted mb-0">{{ n.body }}</p>
-                                        </span>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p class="text-muted mt-4 mb-0">No notes yet. Add your first note above.</p>
-                        {% endif %}
-                    </section>
+            {% if active_tool == 'notes' %}
+            <section class="card">
+                <h2 class="card__title">Notes</h2>
+                <form method="POST" action="{{ url_for('notes_create') }}" class="form">
+                    {% if subject.id %}<input type="hidden" name="course_id" value="{{ subject.id }}">{% endif %}
+                    <input type="hidden" name="back" value="{{ course_url(subject, 'notes') }}">
+                    <div class="form-field"><input type="text" name="title" class="form-input" placeholder="Note title"
+                            required></div>
+                    <div class="form-field"><textarea name="body" class="form-input" rows="3"
+                            placeholder="What did you learn?"></textarea></div>
+                    <div class="form-field"><input type="text" name="topic" class="form-input"
+                            placeholder="Topic (optional)"></div>
+                    <button type="submit" class="button button--primary">Save note</button>
+                </form>
+                {% if notes %}
+                <ul class="task-list mt-4">
+                    {% for n in notes %}
+                    <li class="task">
+                        <span>
+                            <strong>{{ n.title }}</strong>
+                            {% if n.topic %}<span class="text-muted"> · {{ n.topic }}</span>{% endif %}
+                            <p class="text-muted mb-0">{{ n.body }}</p>
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted mt-4 mb-0">No notes yet. Add your first note above.</p>
                 {% endif %}
+            </section>
+            {% endif %}
 
-                {% if active_tool == 'focus' %}
-                    <section class="card">
-                        <h2 class="card__title">Focus session</h2>
-                        <p class="text-muted mb-4">Run a timed focus session for this course and record the outcome — low-confidence topics are routed straight into a practice quiz.</p>
-                        <a class="button" href="{{ url_for('session_page', course_id=subject.id) }}">Start focus session</a>
-                    </section>
-                {% endif %}
+            {% if active_tool == 'focus' %}
+            <section class="card">
+                <h2 class="card__title">Focus session</h2>
+                <p class="text-muted mb-4">Run a timed focus session for this course and record the outcome —
+                    low-confidence topics are routed straight into a practice quiz.</p>
+                <a class="button" href="{{ url_for('session_page', course_id=subject.id) }}">Start focus session</a>
+            </section>
+            {% endif %}
 
-                {% if active_tool == 'calendar' %}
-                    <section class="card">
-                        <h2 class="card__title">Class Calendar</h2>
-                        <ul class="task-list">
-                            <li class="task"><span><strong>Mon</strong> — Lecture session</span></li>
-                            <li class="task"><span><strong>Wed</strong> — Tutorial / lab</span></li>
-                            <li class="task"><span><strong>Fri</strong> — Quiz</span></li>
-                        </ul>
-                    </section>
-                {% endif %}
+            {% if active_tool == 'calendar' %}
+            <section class="card">
+                <h2 class="card__title">Class Calendar</h2>
+                <ul class="task-list">
+                    <li class="task"><span><strong>Mon</strong> — Lecture session</span></li>
+                    <li class="task"><span><strong>Wed</strong> — Tutorial / lab</span></li>
+                    <li class="task"><span><strong>Fri</strong> — Quiz</span></li>
+                </ul>
+            </section>
+            {% endif %}
 
-                {% if active_tool == 'grades' %}
-                    <section class="card">
-                        <h2 class="card__title">Grades</h2>
-                        <p class="text-muted">Your grades for this subject will appear here.</p>
-                        <table class="grade-table">
-                            <thead>
-                                <tr><th>Assessment</th><th>Score</th><th>Weight</th></tr>
-                            </thead>
-                            <tbody>
-                                <tr><td>Midterm</td><td>—</td><td>30%</td></tr>
-                                <tr><td>Assignments</td><td>—</td><td>20%</td></tr>
-                                <tr><td>Final exam</td><td>—</td><td>50%</td></tr>
-                            </tbody>
-                        </table>
-                    </section>
-                {% endif %}
-            </div>
-        </main>
-    </div>
+            {% if active_tool == 'grades' %}
+            <section class="card">
+                <h2 class="card__title">Grades</h2>
+                <p class="text-muted">Your grades for this subject will appear here.</p>
+                <table class="grade-table">
+                    <thead>
+                        <tr>
+                            <th>Assessment</th>
+                            <th>Score</th>
+                            <th>Weight</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Midterm</td>
+                            <td>—</td>
+                            <td>30%</td>
+                        </tr>
+                        <tr>
+                            <td>Assignments</td>
+                            <td>—</td>
+                            <td>20%</td>
+                        </tr>
+                        <tr>
+                            <td>Final exam</td>
+                            <td>—</td>
+                            <td>50%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+            {% endif %}
+        </div>
+    </main>
+</div>
 {% endblock %}
 
 {% block scripts %}
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/course-sidebar.js') }}" defer></script>
-    <script>
-        const addQuestionBtn = document.getElementById('add-question');
-        if (addQuestionBtn) {
-            const builder = document.getElementById('quiz-builder');
-            let qCount = builder.querySelectorAll('.quiz-question-block').length;
-            addQuestionBtn.addEventListener('click', () => {
-                const block = document.createElement('div');
-                block.className = 'quiz-question-block';
-                block.dataset.q = qCount;
-                block.innerHTML = `
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/course-sidebar.js') }}" defer></script>
+<script>
+    const addQuestionBtn = document.getElementById('add-question');
+    if (addQuestionBtn) {
+        const builder = document.getElementById('quiz-builder');
+        let qCount = builder.querySelectorAll('.quiz-question-block').length;
+        addQuestionBtn.addEventListener('click', () => {
+            const block = document.createElement('div');
+            block.className = 'quiz-question-block';
+            block.dataset.q = qCount;
+            block.innerHTML = `
                     <h3 class="quiz-question-title">Question ${qCount + 1}</h3>
                     <div class="form-field">
                         <label class="form-label">Question text</label>
@@ -340,9 +426,9 @@
                         <label class="form-label">Correct answer (A=0, B=1, C=2, D=3)</label>
                         <input class="form-input form-input--small" type="number" name="q${qCount}_correct" min="0" max="3" value="0">
                     </div>`;
-                builder.appendChild(block);
-                qCount++;
-            });
-        }
-    </script>
+            builder.appendChild(block);
+            qCount++;
+        });
+    }
+</script>
 {% endblock %}
