@@ -81,6 +81,8 @@ def _clear_login_failures(email, ip):
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
 UPLOADS_DIR = os.path.join(DATABASE_DIR, "uploads")
+PROFILE_UPLOADS_DIR = os.path.join(DATABASE_DIR, "profile_uploads")
+MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024
 
 # Allowed file types for course materials (slides, PDFs, docs, etc.)
 ALLOWED_EXTENSIONS = {
@@ -130,6 +132,7 @@ def inject_ai_launcher():
     return {
         "quick_actions": AI_QUICK_ACTIONS,
         "providers": AI_PROVIDERS,
+        "user_settings": db.get_settings(session["user_id"]) if session.get("user_id") else None,
     }
 
 # Sample subjects shown on the dashboard (Sakai-style course cards).
@@ -375,26 +378,133 @@ def logout():
 @app.get("/settings")
 @login_required
 def settings():
-    """Account & privacy page: data export, deletion, AI audit trail, and notification prefs."""
+    """Render the account settings surface and its persisted preferences."""
     user = current_user()
-    courses = planner.list_courses(user["id"])
-    note_count = len(db.list_notes(user["id"]))
-    session_count = len(db.list_sessions(user["id"]))
-    audit = db.list_audit(user["id"], limit=20)
-    week = _week_context(user["id"])
     return render_template(
         "settings.html",
         user=user,
         active_nav="settings",
-        course_count=len(courses),
-        deadline_count=len(planner.list_deadlines(user["id"])),
-        task_count=len(planner.list_tasks(user["id"])),
-        note_count=note_count,
-        session_count=session_count,
-        audit=audit,
-        notify_digest=bool(user.get("notify_digest", False)),
-        week=week,
+        settings=db.get_settings(user["id"]),
+        workspaces=db.collab_workspaces_for(user["id"]),
     )
+
+
+@app.post("/settings/profile")
+@login_required
+def settings_profile():
+    """Update the editable profile fields."""
+    user = current_user()
+    name = request.form.get("name", "").strip()
+    display_name = request.form.get("display_name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    if not name or not email:
+        flash("Full name and email are required.", "error")
+        return redirect(url_for("settings"))
+    existing = db.get_user_by_email(email)
+    if existing and existing["id"] != user["id"]:
+        flash("That email address is already in use.", "error")
+        return redirect(url_for("settings"))
+    db.update_user(user["id"], {"name": name, "display_name": display_name or None, "email": email})
+    flash("Profile saved.", "success")
+    return redirect(url_for("settings"))
+
+
+@app.post("/settings/preferences")
+@login_required
+def settings_preferences():
+    """Persist the settings panels as one validated patch."""
+    user = current_user()
+    allowed = db.get_settings(user["id"])
+    notifications = {
+        "deadlines": request.form.get("deadlines") == "on",
+        "deadline_days": request.form.get("deadline_days", "3"),
+        "weekly_digest": request.form.get("weekly_digest") == "on",
+        "ai_suggestions": request.form.get("ai_suggestions") == "on",
+        "workspace_activity": request.form.get("workspace_activity") == "on",
+        "channel": request.form.get("channel", "in-app"),
+    }
+    if notifications["deadline_days"] not in {"1", "3", "7"}:
+        notifications["deadline_days"] = allowed["notifications"]["deadline_days"]
+    if notifications["channel"] not in {"email", "push", "in-app"}:
+        notifications["channel"] = "in-app"
+    updates = {}
+    notification_keys = {"deadlines", "weekly_digest", "ai_suggestions", "workspace_activity", "deadline_days", "channel"}
+    if notification_keys.intersection(request.form):
+        updates["notifications"] = notifications
+    if {"weekly_hours", "focus_minutes", "spaced_repetition", "planning_aggressiveness"}.intersection(request.form):
+        try:
+            weekly_hours = max(1, min(80, int(request.form.get("weekly_hours", 4))))
+            focus_minutes = max(5, min(120, int(request.form.get("focus_minutes", 25))))
+        except (TypeError, ValueError):
+            weekly_hours, focus_minutes = 4, 25
+        updates["study"] = {
+            "weekly_hours": weekly_hours,
+            "focus_minutes": focus_minutes,
+            "spaced_repetition": request.form.get("spaced_repetition", "balanced"),
+            "planning_aggressiveness": request.form.get("planning_aggressiveness", "balanced"),
+        }
+    if {"theme", "text_size", "reduce_motion"}.intersection(request.form):
+        updates["appearance"] = {
+            "theme": request.form.get("theme", "system"),
+            "text_size": request.form.get("text_size", "default"),
+            "reduce_motion": request.form.get("reduce_motion") == "on",
+        }
+    if {"ai_activity", "workspace_visibility"}.intersection(request.form):
+        updates["privacy"] = {
+            "ai_activity": request.form.get("ai_activity") == "on",
+            "workspace_visibility": request.form.get("workspace_visibility", "members"),
+        }
+    db.update_settings(user["id"], updates)
+    flash("Settings saved.", "success")
+    return redirect(url_for("settings"))
+
+
+@app.post("/settings/avatar")
+@login_required
+def settings_avatar():
+    """Store a small profile image locally; replace/remove is immediately visible."""
+    user = current_user()
+    uploaded = request.files.get("avatar")
+    remove = request.form.get("remove") == "1"
+    folder = PROFILE_UPLOADS_DIR
+    os.makedirs(folder, exist_ok=True)
+    if remove:
+        db.update_user(user["id"], {"avatar_path": None})
+        flash("Profile photo removed.", "success")
+        return redirect(url_for("settings"))
+    if not uploaded or not uploaded.filename:
+        flash("Choose an image first.", "error")
+        return redirect(url_for("settings"))
+    if uploaded.mimetype not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+        flash("Please choose a JPG, PNG, GIF, or WebP image.", "error")
+        return redirect(url_for("settings"))
+    uploaded.stream.seek(0, os.SEEK_END)
+    size = uploaded.stream.tell()
+    uploaded.stream.seek(0)
+    if size > MAX_PROFILE_IMAGE_BYTES:
+        flash("That image is larger than 5 MB. Please choose a smaller file.", "error")
+        return redirect(url_for("settings"))
+    extension = secure_filename(uploaded.filename).rsplit(".", 1)[-1].lower() if "." in uploaded.filename else {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/gif": "gif",
+        "image/webp": "webp",
+    }[uploaded.mimetype]
+    filename = f"{user['id']}.{extension}"
+    uploaded.save(os.path.join(folder, filename))
+    db.update_user(user["id"], {"avatar_path": filename})
+    flash("Profile photo updated.", "success")
+    return redirect(url_for("settings"))
+
+
+@app.get("/profile/avatar/<path:filename>")
+@login_required
+def profile_avatar(filename):
+    """Serve only the current user's stored avatar."""
+    user = current_user()
+    if filename != user.get("avatar_path"):
+        return ("", 404)
+    return send_from_directory(PROFILE_UPLOADS_DIR, filename)
 
 
 @app.post("/settings/notifications")
@@ -403,7 +513,7 @@ def settings_notifications():
     """Toggle the weekly digest notification preference."""
     user = current_user()
     wanted = request.form.get("notify_digest") == "on"
-    db.set_digest_preference(user["id"], wanted)
+    db.update_settings(user["id"], {"notifications": {"weekly_digest": wanted}})
     db.log_audit(user["id"], "notification_pref", "weekly_digest=on" if wanted else "weekly_digest=off")
     flash("Notification preferences updated.", "success")
     return redirect(url_for("settings"))
@@ -475,6 +585,10 @@ def export_data():
 def delete_account():
     """Permanently delete the account and all associated data."""
     user = current_user()
+    confirmation = request.form.get("confirmation", "").strip()
+    if confirmation not in {user["email"], "DELETE"}:
+        flash("Type your account email or DELETE before removing the account.", "error")
+        return redirect(url_for("settings"))
     db.log_audit(user["id"], "account_delete")
     db.delete_user(user["id"])
     session.clear()

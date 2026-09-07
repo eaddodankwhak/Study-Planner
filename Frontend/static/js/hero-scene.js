@@ -8,6 +8,7 @@
     if (!context) return;
 
     var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    var storedReducedMotion = document.body && document.body.dataset.reduceMotion === "true";
     var compactDevice = window.matchMedia("(max-width: 700px)").matches ||
         (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
         (navigator.deviceMemory && navigator.deviceMemory <= 4);
@@ -49,7 +50,7 @@
 
     function draw(time) {
         context.clearRect(0, 0, width, height);
-        var movement = reducedMotion.matches ? 0 : time;
+        var movement = reducedMotion.matches || storedReducedMotion ? 0 : time;
         var shiftX = pointerX * 10;
         var shiftY = pointerY * 7 - scrollOffset * 0.035;
 
@@ -91,11 +92,11 @@
             context.fill();
         });
 
-        if (!reducedMotion.matches) animationFrame = window.requestAnimationFrame(draw);
+        if (!reducedMotion.matches && !storedReducedMotion) animationFrame = window.requestAnimationFrame(draw);
     }
 
     function pointerMove(event) {
-        if (compactDevice || reducedMotion.matches) return;
+        if (compactDevice || reducedMotion.matches || storedReducedMotion) return;
         pointerX = (event.clientX / window.innerWidth - 0.5) * 2;
         pointerY = (event.clientY / window.innerHeight - 0.5) * 2;
     }

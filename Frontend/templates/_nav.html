@@ -22,14 +22,27 @@
     <div class="profile-menu" data-profile>
         <button class="profile-menu__trigger nav-bar__link" data-profile-trigger aria-label="Open profile menu"
             aria-expanded="false" aria-haspopup="menu">
-            <span class="profile-menu__avatar">{{ user.name[0]|upper if user and user.name else 'S' }}</span>
+            {% if user and user.avatar_path %}
+            <img class="profile-menu__avatar profile-menu__avatar--image"
+                src="{{ url_for('profile_avatar', filename=user.avatar_path) }}"
+                alt="{{ user.display_name or user.name }} profile photo">
+            {% else %}
+            <span class="profile-menu__avatar">{{ (user.display_name or user.name)[0]|upper if user and
+                (user.display_name or user.name) else 'S' }}</span>
+            {% endif %}
         </button>
         <div class="profile-menu__dropdown" data-profile-menu role="menu" hidden>
             <div class="profile-menu__head">
-                <span class="profile-menu__avatar profile-menu__avatar--lg">{{ user.name[0]|upper if user and user.name
-                    else 'S' }}</span>
+                {% if user and user.avatar_path %}
+                <img class="profile-menu__avatar profile-menu__avatar--lg profile-menu__avatar--image"
+                    src="{{ url_for('profile_avatar', filename=user.avatar_path) }}"
+                    alt="{{ user.display_name or user.name }} profile photo">
+                {% else %}
+                <span class="profile-menu__avatar profile-menu__avatar--lg">{{ (user.display_name or user.name)[0]|upper
+                    if user and (user.display_name or user.name) else 'S' }}</span>
+                {% endif %}
                 <div>
-                    <p class="profile-menu__name">{{ user.name if user else 'Student' }}</p>
+                    <p class="profile-menu__name">{{ (user.display_name or user.name) if user else 'Student' }}</p>
                     <p class="profile-menu__email">{{ user.email if user else '' }}</p>
                 </div>
             </div>

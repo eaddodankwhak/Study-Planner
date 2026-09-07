@@ -1,129 +1,404 @@
 {% extends "base.html" %}
 
-{% block title %}Settings — Study Planner{% endblock %}
+{% block title %}Settings - Study Planner{% endblock %}
+
+{% block head %}
+<style>
+    .settings-grid {
+        display: grid;
+        gap: var(--space-6);
+        max-width: 62rem;
+    }
+
+    .settings-panel {
+        margin: 0;
+    }
+
+    .settings-panel__header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-4);
+    }
+
+    .settings-panel__intro {
+        margin: calc(var(--space-2) * -1) 0 var(--space-5);
+        color: var(--color-muted);
+    }
+
+    .settings-form {
+        display: grid;
+        gap: var(--space-4);
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-5);
+        width: 100%;
+        padding: var(--space-3) 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .settings-row:last-child {
+        border-bottom: 0;
+    }
+
+    .settings-row__copy {
+        display: block;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .settings-row__copy strong,
+    .settings-row__copy small {
+        display: block;
+    }
+
+    .settings-row__copy strong {
+        margin-bottom: var(--space-1);
+    }
+
+    .settings-row__copy small {
+        color: var(--color-muted);
+        line-height: 1.45;
+    }
+
+    .settings-row>input[type="checkbox"] {
+        flex: 0 0 auto;
+        margin-top: var(--space-1);
+    }
+
+    .settings-controls {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+    }
+
+    .settings-inline {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-4);
+    }
+
+    .settings-avatar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-5);
+        margin-bottom: var(--space-5);
+    }
+
+    .settings-avatar__actions {
+        display: grid;
+        gap: var(--space-2);
+    }
+
+    .settings-disabled {
+        opacity: 0.72;
+    }
+
+    .settings-danger {
+        border: 2px solid var(--color-error);
+    }
+
+    .settings-danger .card__title {
+        color: var(--color-error);
+    }
+
+    .settings-membership {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-5);
+        padding: var(--space-3) 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .settings-membership strong,
+    .settings-membership small {
+        display: block;
+    }
+
+    @media (max-width: 42rem) {
+        .settings-inline {
+            grid-template-columns: 1fr;
+        }
+
+        .settings-row,
+        .settings-membership {
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .settings-row>input[type="checkbox"] {
+            align-self: flex-start;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block main %}
 <div class="dashboard-heading">
-    <h2>Settings &amp; Privacy</h2>
-    <span class="text-muted">Export your data, review AI activity, or delete your account.</span>
+    <h2>Settings</h2>
+    <span class="text-muted">Control your account, study experience, privacy, and notifications.</span>
 </div>
 
-<div class="stat-grid">
-    <div class="stat">
-        <p class="stat__value">{{ course_count }}</p>
-        <p class="stat__label">Courses</p>
-    </div>
-    <div class="stat">
-        <p class="stat__value">{{ deadline_count }}</p>
-        <p class="stat__label">Deadlines</p>
-    </div>
-    <div class="stat">
-        <p class="stat__value">{{ task_count }}</p>
-        <p class="stat__label">Tasks</p>
-    </div>
-    <div class="stat">
-        <p class="stat__value">{{ session_count }}</p>
-        <p class="stat__label">Focus sessions</p>
-    </div>
-    <div class="stat">
-        <p class="stat__value">{{ note_count }}</p>
-        <p class="stat__label">Notes</p>
-    </div>
-</div>
-
-<div class="subject-content">
-    <section class="card">
-        <h3 class="card__title">Notifications</h3>
-        <p class="text-muted">Choose what Study Planner sends you.</p>
-        <form method="POST" action="{{ url_for('settings_notifications') }}" class="form">
-            <label class="toggle">
-                <input type="checkbox" name="notify_digest" {{ 'checked' if notify_digest else '' }}>
-                <span class="toggle__track"><span class="toggle__thumb"></span></span>
-                <span class="toggle__label">Weekly digest — a summary of your deadlines, tasks, and study load for the
-                    next 7 days.</span>
-            </label>
-            <div class="form-actions" style="justify-content:flex-start;">
-                <button class="button button--primary" type="submit" style="width:auto;">Save preferences</button>
+<div class="settings-grid">
+    <section class="card settings-panel" aria-labelledby="account-heading">
+        <div class="settings-panel__header">
+            <h3 class="card__title" id="account-heading">Account</h3><span class="badge badge--open">Personal</span>
+        </div>
+        <p class="settings-panel__intro">Your profile is shown to classmates and used to personalize your planner.
+        </p>
+        <div class="settings-avatar">
+            {% if user.avatar_path %}<img class="settings-avatar__image"
+                src="{{ url_for('profile_avatar', filename=user.avatar_path) }}" alt="Current profile photo">
+            {% else %}<div class="settings-avatar__image" aria-hidden="true">{{ (user.display_name or
+                user.name)[0]|upper }}</div>{% endif %}
+            <div class="settings-avatar__actions">
+                <form method="post" action="{{ url_for('settings_avatar') }}" enctype="multipart/form-data"
+                    class="settings-controls">
+                    <label class="button button--ghost" for="avatar">Choose photo</label>
+                    <input id="avatar" name="avatar" type="file" accept="image/*" hidden>
+                    <button class="button button--primary" type="submit">Upload photo</button>
+                </form>
+                <small>JPG, PNG, GIF, or WebP. Maximum 5 MB. Crop the image before uploading if needed.</small>
+                {% if user.avatar_path %}<form method="post" action="{{ url_for('settings_avatar') }}"><input
+                        type="hidden" name="remove" value="1"><button class="button button--ghost button--small"
+                        type="submit" data-confirm="Remove your profile photo?">Remove photo</button></form>{% endif
+                %}
+            </div>
+        </div>
+        <form method="post" action="{{ url_for('settings_profile') }}" class="settings-form">
+            <div class="settings-inline">
+                <div class="form-field"><label class="form-label" for="name">Full name</label><input class="form-input"
+                        id="name" name="name" value="{{ user.name }}" required></div>
+                <div class="form-field"><label class="form-label" for="display_name">Display name</label><input
+                        class="form-input" id="display_name" name="display_name" value="{{ user.display_name or '' }}"
+                        placeholder="Shown in menus and groups"></div>
+            </div>
+            <div class="form-field"><label class="form-label" for="email">Email</label><input class="form-input"
+                    id="email" name="email" type="email" value="{{ user.email }}" required><small
+                    class="text-muted">Changing email is saved immediately in this local app; email verification is
+                    not configured yet.</small></div>
+            <div class="form-actions"><button class="button button--primary" type="submit">Save profile</button>
             </div>
         </form>
+        <div class="settings-row settings-disabled">
+            <div class="settings-row__copy"><strong>Change password</strong><small>Requires current-password
+                    confirmation and a secure password flow.</small></div><button class="button button--ghost"
+                type="button" disabled>Coming soon</button>
+        </div>
+    </section>
 
-        {% if notify_digest %}
-        <div class="digest-preview">
-            <div class="stat-grid">
-                <div class="stat">
-                    <p class="stat__value">{{ week.upcoming_deadlines|length }}</p>
-                    <p class="stat__label">Deadlines</p>
-                </div>
-                <div class="stat">
-                    <p class="stat__value">{{ week.upcoming_tasks|length }}</p>
-                    <p class="stat__label">Tasks</p>
-                </div>
-                <div class="stat">
-                    <p class="stat__value">{{ (week.total_minutes // 60) }}h {{ week.total_minutes % 60 }}m</p>
-                    <p class="stat__label">Effort</p>
-                </div>
+    <section class="card settings-panel" aria-labelledby="notifications-heading">
+        <div class="settings-panel__header">
+            <h3 class="card__title" id="notifications-heading">Notifications</h3><span class="text-muted">Saved with
+                this form</span>
+        </div>
+        <p class="settings-panel__intro">Choose which study signals reach you and where they appear.</p>
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form">
+            <input type="hidden" name="notify_digest" value="legacy-compatible">
+            {% for key, label, help in [('deadlines','Deadline reminders','Get advance notice before important due
+            dates.'),('weekly_digest','Weekly digest','A weekly summary of deadlines, tasks, and study
+            load.'),('ai_suggestions','AI tutor suggestions','Helpful prompts based on your study
+            activity.'),('workspace_activity','Group/workspace activity','Updates from your shared workspaces.')] %}
+            <label class="settings-row"><span class="settings-row__copy"><strong>{{ label }}</strong><small>{{ help
+                        }}</small></span><input type="checkbox" name="{{ key }}" {% if settings.notifications[key]
+                    %}checked{% endif %}></label>
+            {% endfor %}
+            <div class="settings-controls"><label for="deadline_days">Deadline timing</label><select class="form-input"
+                    id="deadline_days" name="deadline_days">
+                    <option value="1" {% if settings.notifications.deadline_days=='1' %}selected{% endif %}>1 day
+                        before</option>
+                    <option value="3" {% if settings.notifications.deadline_days=='3' %}selected{% endif %}>3 days
+                        before</option>
+                    <option value="7" {% if settings.notifications.deadline_days=='7' %}selected{% endif %}>7 days
+                        before</option>
+                </select><label for="channel">Default channel</label><select class="form-input" id="channel"
+                    name="channel">
+                    <option value="in-app" {% if settings.notifications.channel=='in-app' %}selected{% endif %}>
+                        In-app</option>
+                    <option value="email" {% if settings.notifications.channel=='email' %}selected{% endif %}>Email
+                    </option>
+                    <option value="push" {% if settings.notifications.channel=='push' %}selected{% endif %}>Push
+                    </option>
+                </select></div>
+            <button class="button button--primary" type="submit">Save notification settings</button>
+        </form>
+    </section>
+
+    <section class="card settings-panel" aria-labelledby="study-heading">
+        <h3 class="card__title" id="study-heading">Study Preferences</h3>
+        <p class="settings-panel__intro">Set the defaults your planner uses when making suggestions.</p>
+        <div class="settings-notice">Adaptive planning suggests; you can always override an individual change before
+            it affects your schedule.</div>
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form">
+            <div class="settings-inline">
+                <div class="form-field"><label class="form-label" for="weekly_hours">Weekly availability
+                        (hours)</label><input class="form-input" id="weekly_hours" name="weekly_hours" type="number"
+                        min="1" max="80" value="{{ settings.study.weekly_hours }}"></div>
+                <div class="form-field"><label class="form-label" for="focus_minutes">Focus session
+                        length</label><select class="form-input" id="focus_minutes" name="focus_minutes">{% for n in
+                        [15,25,45,60,90] %}<option value="{{ n }}" {% if settings.study.focus_minutes==n %}selected{%
+                            endif %}>{{ n }} minutes</option>{% endfor %}</select></div>
             </div>
-            <p class="text-muted mb-2">This week runs through {{ week.week_end }}. Here's how the digest reads:</p>
-            {% if week.upcoming_deadlines or week.upcoming_tasks %}
-            <ul class="digest-preview__list">
-                {% for d in week.upcoming_deadlines %}
-                <li>Deadline · <strong>{{ d.title }}</strong> <span class="badge badge--open">due {{ d.due_date
-                        }}</span></li>
-                {% endfor %}
-                {% for t in week.upcoming_tasks %}
-                <li>Task · {{ t.title }} <span class="badge badge--{{ t.priority }}">{{ t.due_date }}</span></li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p class="text-muted mb-0">No deadlines or tasks due in the next 7 days.</p>
-            {% endif %}
-        </div>
-        {% endif %}
+            <div class="settings-inline">
+                <div class="form-field"><label class="form-label" for="spaced_repetition">Spaced-repetition
+                        intensity</label><select class="form-input" id="spaced_repetition" name="spaced_repetition">
+                        <option value="light">Light</option>
+                        <option value="balanced" {% if settings.study.spaced_repetition=='balanced' %}selected{% endif
+                            %}>Balanced</option>
+                        <option value="intensive">Intensive</option>
+                    </select></div>
+                <div class="form-field"><label class="form-label" for="planning_aggressiveness">Adaptive
+                        planning</label><select class="form-input" id="planning_aggressiveness"
+                        name="planning_aggressiveness">
+                        <option value="gentle">Gentle</option>
+                        <option value="balanced" {% if settings.study.planning_aggressiveness=='balanced' %}selected{%
+                            endif %}>Balanced</option>
+                        <option value="proactive">Proactive</option>
+                    </select></div>
+            </div>
+            <button class="button button--primary" type="submit">Save study preferences</button>
+        </form>
     </section>
 
-    <section class="card">
-        <h3 class="card__title">Your data</h3>
-        <p class="text-muted">Download everything we store about you as a readable JSON file, or permanently remove your
+    <section class="card settings-panel" aria-labelledby="appearance-heading">
+        <h3 class="card__title" id="appearance-heading">Appearance &amp; Accessibility</h3>
+        <p class="settings-panel__intro">Make the interface easier and more comfortable to use.</p>
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form">
+            <div class="settings-inline">
+                <div class="form-field"><label class="form-label" for="theme">Theme</label><select class="form-input"
+                        id="theme" name="theme">
+                        <option value="system" {% if settings.appearance.theme=='system' %}selected{% endif %}>System
+                        </option>
+                        <option value="light" {% if settings.appearance.theme=='light' %}selected{% endif %}>Light
+                        </option>
+                        <option value="dark" {% if settings.appearance.theme=='dark' %}selected{% endif %}>Dark (coming
+                            soon)</option>
+                    </select></div>
+                <div class="form-field"><label class="form-label" for="text_size">Text size</label><select
+                        class="form-input" id="text_size" name="text_size">
+                        <option value="default" {% if settings.appearance.text_size=='default' %}selected{% endif %}>
+                            Default</option>
+                        <option value="large" {% if settings.appearance.text_size=='large' %}selected{% endif %}>Large
+                        </option>
+                        <option value="larger" {% if settings.appearance.text_size=='larger' %}selected{% endif %}>
+                            Larger</option>
+                    </select></div>
+            </div><label class="settings-row"><span class="settings-row__copy"><strong>Reduce
+                        motion</strong><small>Disables non-essential animation, including the landing-page hero
+                        effect.</small></span><input type="checkbox" name="reduce_motion" {% if
+                    settings.appearance.reduce_motion %}checked{% endif %}></label><button
+                class="button button--primary" type="submit">Save accessibility settings</button>
+        </form>
+    </section>
+
+    <section class="card settings-panel" aria-labelledby="privacy-heading">
+        <h3 class="card__title" id="privacy-heading">Privacy &amp; AI Controls</h3>
+        <p class="settings-panel__intro">Decide how your learning data is used. Your choices are stored with your
             account.</p>
-        <div class="form-actions" style="justify-content:flex-start;">
-            <a class="button button--primary" href="{{ url_for('export_data') }}">Export my data</a>
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form"><label
+                class="settings-row"><span class="settings-row__copy"><strong>Allow AI tutor and adaptive planning
+                        to use activity data</strong><small>This includes your study sessions, quiz results, and
+                        planner patterns to make suggestions more relevant.</small></span><input type="checkbox"
+                    name="ai_activity" {% if settings.privacy.ai_activity %}checked{% endif %}></label>
+            <div class="form-field"><label class="form-label" for="workspace_visibility">Workspace data
+                    visibility</label><select class="form-input" id="workspace_visibility" name="workspace_visibility">
+                    <option value="members" {% if settings.privacy.workspace_visibility=='members' %}selected{% endif
+                        %}>Workspace members</option>
+                    <option value="private" {% if settings.privacy.workspace_visibility=='private' %}selected{% endif
+                        %}>Keep my activity private</option>
+                </select></div><button class="button button--primary" type="submit">Save privacy settings</button>
+        </form>
+        <div class="form-actions"><a class="button button--ghost" href="{{ url_for('export_data') }}">Export my
+                data</a></div>
+    </section>
+
+    <section class="card settings-panel" aria-labelledby="security-heading">
+        <h3 class="card__title" id="security-heading">Security</h3>
+        <p class="settings-panel__intro">Protect your account and review access.</p>
+        <div class="settings-row">
+            <div class="settings-row__copy"><strong>Current browser session</strong><small>Active now on this
+                    device.</small></div><a class="button button--ghost" href="{{ url_for('logout') }}">Log out</a>
+        </div>
+        <div class="settings-row settings-disabled">
+            <div class="settings-row__copy"><strong>Other devices</strong><small>Multi-device session tracking is
+                    not configured in this local Flask deployment.</small></div><button class="button button--ghost"
+                type="button" disabled>Unavailable</button>
+        </div>
+        <div class="settings-row settings-disabled">
+            <div class="settings-row__copy"><strong>Two-factor authentication</strong><small>Requires an identity
+                    provider or secure TOTP service.</small></div><button class="button button--ghost" type="button"
+                disabled>Coming soon</button>
         </div>
     </section>
 
-    <section class="card">
-        <h3 class="card__title">AI activity</h3>
-        {% if audit %}
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Action</th>
-                    <th>Detail</th>
-                    <th>When</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for a in audit %}
-                <tr>
-                    <td>{{ a.action }}</td>
-                    <td>{{ a.detail }}</td>
-                    <td>{{ a.created_at }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="text-muted mb-0">No AI activity recorded yet.</p>
-        {% endif %}
+    <section class="card settings-panel" aria-labelledby="groups-heading">
+        <h3 class="card__title" id="groups-heading">Groups &amp; Workspaces</h3>
+        <p class="settings-panel__intro">Review the shared spaces connected to your account.</p>{% if workspaces
+        %}{% for workspace in workspaces %}<div class="settings-membership">
+            <div><strong>{{ workspace.name }}</strong><small class="text-muted">{{ workspace.member_count }} members
+                    · {{ workspace.num_tasks }} tasks</small></div><a class="button button--ghost button--small"
+                href="{{ url_for('collab.workspace_detail', workspace_id=workspace.id) }}">Open workspace</a>
+        </div>{% endfor %}{% else %}<p class="text-muted">You have not joined a group workspace yet.</p>{% endif %}
     </section>
 
-    <section class="card priority-critical">
-        <h3 class="card__title">Delete account</h3>
-        <p class="text-muted">This permanently removes your account, planner data, notes, sessions, and AI history. This
-            cannot be undone.</p>
-        <form method="POST" action="{{ url_for('delete_account') }}" class="form">
-            <button class="button" type="submit"
-                data-confirm="Delete your account and all stored data permanently? This cannot be undone."
-                style="background:#c62828;">Delete my account permanently</button>
+    <section class="card settings-panel settings-danger" aria-labelledby="danger-heading">
+        <h3 class="card__title" id="danger-heading">Danger Zone</h3>
+        <p>This permanently removes your account, planner data, notes, sessions, memberships, and AI history.</p>
+        <form method="post" action="{{ url_for('delete_account') }}" class="settings-form">
+            <div class="form-field"><label class="form-label" for="delete_confirmation">Type your account email or
+                    DELETE to confirm</label><input class="form-input" id="delete_confirmation" name="confirmation"
+                    required autocomplete="off"></div><button class="button" type="submit"
+                style="background:var(--color-error);" disabled data-delete-submit>Delete account
+                permanently</button>
         </form>
     </section>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var avatarInput = document.getElementById('avatar');
+        var avatarPreview = document.querySelector('.settings-avatar__image');
+        if (avatarInput) avatarInput.addEventListener('change', function () {
+            var file = avatarInput.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                avatarInput.value = '';
+                window.alert('Please choose an image smaller than 5 MB.');
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function () { if (avatarPreview && avatarPreview.tagName === 'IMG') avatarPreview.src = reader.result; };
+            reader.readAsDataURL(file);
+        });
+        var avatarForm = avatarInput && avatarInput.closest('form');
+        if (avatarForm) avatarForm.addEventListener('submit', function (event) {
+            var file = avatarInput.files[0];
+            if (!file || !window.createImageBitmap) return;
+            event.preventDefault();
+            createImageBitmap(file).then(function (image) {
+                var side = Math.min(image.width, image.height);
+                var canvas = document.createElement('canvas');
+                canvas.width = 512; canvas.height = 512;
+                canvas.getContext('2d').drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 512, 512);
+                canvas.toBlob(function (blob) {
+                    var cropped = new File([blob], file.name, { type: file.type });
+                    var transfer = new DataTransfer();
+                    transfer.items.add(cropped);
+                    avatarInput.files = transfer.files;
+                    avatarForm.submit();
+                }, file.type, 0.9);
+            });
+        });
+        var input = document.getElementById('delete_confirmation');
+        var submit = document.querySelector('[data-delete-submit]');
+        if (input && submit) input.addEventListener('input', function () { submit.disabled = !['{{ user.email|e }}', 'DELETE'].includes(input.value.trim()); });
+    });
+</script>{% endblock %}

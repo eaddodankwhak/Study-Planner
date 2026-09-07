@@ -1,6 +1,10 @@
 (function () {
     "use strict";
 
+    if (document.body && document.body.dataset.reduceMotion === "true") {
+        document.documentElement.classList.add("reduce-motion");
+    }
+
     var status = document.querySelector("[data-app-status]");
 
     function announce(message) {

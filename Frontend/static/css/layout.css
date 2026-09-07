@@ -137,6 +137,11 @@
   font-size: 1.1rem;
 }
 
+.profile-menu__avatar--image {
+  object-fit: cover;
+  border: 2px solid rgb(255 255 255 / 0.7);
+}
+
 .profile-menu__dropdown {
   position: absolute;
   right: 0;

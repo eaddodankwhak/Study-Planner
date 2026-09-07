@@ -36,8 +36,11 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
+    display_name TEXT,
     email       TEXT NOT NULL UNIQUE,
     password    TEXT NOT NULL,
+    avatar_path TEXT,
+    settings_json TEXT,
     school      TEXT,
     program     TEXT,
     goals       TEXT,
@@ -371,6 +374,12 @@ def _migrate_add_columns(conn):
         conn.execute("ALTER TABLE users ADD COLUMN available_hours REAL DEFAULT 4")
     if "notify_digest" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN notify_digest INTEGER DEFAULT 0")
+    if "display_name" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN display_name TEXT")
+    if "avatar_path" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN avatar_path TEXT")
+    if "settings_json" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN settings_json TEXT")
 
 
 def normalize_course_code(value):
@@ -599,6 +608,62 @@ def set_ai_preferences(user_id, model=None, level=None):
 
 def set_digest_preference(user_id, enabled):
     update_user(user_id, {"notify_digest": 1 if enabled else 0})
+
+
+DEFAULT_SETTINGS = {
+    "notifications": {
+        "deadlines": True,
+        "deadline_days": "3",
+        "weekly_digest": False,
+        "ai_suggestions": True,
+        "workspace_activity": True,
+        "channel": "in-app",
+    },
+    "study": {
+        "weekly_hours": 4,
+        "focus_minutes": 25,
+        "spaced_repetition": "balanced",
+        "planning_aggressiveness": "balanced",
+    },
+    "appearance": {"theme": "system", "text_size": "default", "reduce_motion": False},
+    "privacy": {"ai_activity": True, "workspace_visibility": "members"},
+}
+
+
+def get_settings(user_id):
+    """Return merged settings, preserving defaults for older accounts."""
+    user = get_user(user_id) or {}
+    try:
+        stored = json.loads(user.get("settings_json") or "{}")
+    except (TypeError, ValueError):
+        stored = {}
+
+    def merge(default, value):
+        result = dict(default)
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if isinstance(item, dict) and isinstance(result.get(key), dict):
+                    result[key] = merge(result[key], item)
+                elif key in result:
+                    result[key] = item
+        return result
+
+    settings = merge(DEFAULT_SETTINGS, stored)
+    settings["notifications"]["weekly_digest"] = bool(user.get("notify_digest"))
+    return settings
+
+
+def update_settings(user_id, updates):
+    """Merge a validated settings patch into the user's JSON preferences."""
+    settings = get_settings(user_id)
+    for section, values in updates.items():
+        if section in settings and isinstance(values, dict):
+            settings[section].update({key: value for key, value in values.items() if key in settings[section]})
+    update_user(user_id, {
+        "settings_json": json.dumps(settings),
+        "notify_digest": 1 if settings["notifications"]["weekly_digest"] else 0,
+    })
+    return settings
 
 
 # ------------------------------------------------------------------ collab

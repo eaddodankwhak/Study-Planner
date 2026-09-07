@@ -10,7 +10,9 @@
     <meta name="user-id" content="{{ user.id if user else '' }}">
     {% block head %}{% endblock %}
 </head>
-<body{% block body_tag %}{% endblock %}>
+
+<body data-reduce-motion="{{ 'true' if user_settings and user_settings.appearance.reduce_motion else 'false' }}" {%
+    block body_tag %}{% endblock %}>
     <a class="skip-link" href="#main-content">Skip to main content</a>
     {% block header %}
     <header class="page-header">
@@ -51,6 +53,6 @@
     <script src="{{ url_for('static', filename='js/hci.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/ai_hub.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/ai-launcher.js') }}" defer></script>
-    </body>
+</body>
 
 </html>

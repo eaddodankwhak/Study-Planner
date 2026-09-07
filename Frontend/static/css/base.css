@@ -305,6 +305,14 @@ button:active,
   }
 }
 
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
 /* Flash / alert messages */
 .flashes {
   list-style: none;
