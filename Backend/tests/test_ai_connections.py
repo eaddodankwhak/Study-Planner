@@ -202,8 +202,14 @@ class AIConnectionsSettingsTest(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         html = r.data.decode()
         self.assertIn('id="ai-accounts-heading"', html)
+        expected = {
+            "anthropic": "https://platform.claude.com/settings/keys",
+            "openai": "https://platform.openai.com/api-keys",
+            "google": "https://aistudio.google.com/apikey",
+        }
         for provider, label in (("anthropic", "Claude"), ("openai", "ChatGPT"), ("google", "Gemini")):
             self.assertIn(f'data-ai-connect="{provider}"', html)
+            self.assertIn(f'data-ai-key-url="{expected[provider]}"', html)
             self.assertIn(label, html)
         self.assertIn('id="ai-mock-hint"', html)
 

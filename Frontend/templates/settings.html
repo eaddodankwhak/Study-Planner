@@ -374,9 +374,10 @@
             <h3 class="card__title" id="ai-accounts-heading">AI accounts</h3><span class="badge badge--open">Your own</span>
         </div>
         <p class="settings-panel__intro">Connect your own Claude, ChatGPT, or Gemini account so your AI chats use
-            your API key for that provider. Keys are verified live and stored obfuscated in your local database —
-            they never leave this device.</p>
-        {% for provider, label in [('anthropic','Claude'),('openai','ChatGPT'),('google','Gemini')] %}
+            your API key for that provider. Click <strong>Connect</strong> to open the provider's key page, then paste
+            the key you create there and click <strong>Connect</strong> again to verify it. Keys are stored obfuscated
+            in your local database — they never leave this device.</p>
+        {% for provider, label, key_url in [('anthropic','Claude','https://platform.claude.com/settings/keys'),('openai','ChatGPT','https://platform.openai.com/api-keys'),('google','Gemini','https://aistudio.google.com/apikey')] %}
         {% set conn = ai_connections_by_provider.get(provider) %}
         <div class="settings-membership">
             <div>
@@ -392,16 +393,18 @@
             {% else %}
             <div class="settings-controls">
                 <input class="form-input" type="password" data-ai-key="{{ provider }}" placeholder="Paste {{ label }} API key" autocomplete="off">
-                <button class="button button--primary button--small" type="button" data-ai-connect="{{ provider }}">Connect</button>
+                <button class="button button--primary button--small" type="button" data-ai-connect="{{ provider }}"
+                    data-ai-key-url="{{ key_url }}">Connect</button>
             </div>
             {% endif %}
         </div>
         <p class="text-muted" data-ai-error="{{ provider }}" hidden style="margin-top: calc(var(--space-2) * -1);"></p>
         {% endfor %}
         <div class="settings-row">
-            <div class="settings-row__copy"><strong>How it works</strong><small>Pick a model family in the AI Hub
-                    (Claude, GPT, or Gemini) and your own key for that provider is used automatically — no server key
-                    needed. Disconnect anytime.</small></div>
+            <div class="settings-row__copy"><strong>How it works</strong><small>Click Connect and a new tab opens the
+                    provider's official key page — create a key there, copy it, paste it back here, and connect. Your
+                    key for that model family is then used automatically, with no server key needed. Disconnect
+                    anytime.</small></div>
         </div>
     </section>
 
@@ -576,7 +579,13 @@
                 var input = document.querySelector('[data-ai-key="' + provider + '"]');
                 var apiKey = input ? input.value.trim() : '';
                 if (!apiKey) {
-                    aiShowError(provider, 'Enter an API key first.');
+                    // First click: open the provider's official key page so the
+                    // user can create/copy a key, then guide them back here.
+                    var keyUrl = btn.getAttribute('data-ai-key-url');
+                    if (keyUrl) window.open(keyUrl, '_blank', 'noopener');
+                    if (input) input.focus();
+                    aiShowError(provider, 'Create and copy a ' + btn.textContent.trim() +
+                        ' API key on the page that just opened, paste it above, then click Connect again to verify and save it.');
                     return;
                 }
                 btn.disabled = true;
