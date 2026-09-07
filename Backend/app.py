@@ -305,7 +305,6 @@ def signup_post():
     db.create_user(user_id, name, email, generate_password_hash(password))
 
     session["user_id"] = user_id
-    flash(f"Welcome, {name}! Let's personalize your study planner.", "success")
     return redirect(url_for("onboarding"))
 
 
@@ -567,24 +566,31 @@ def current_user():
 @app.get("/onboarding")
 @login_required
 def onboarding():
-    """Render the onboarding page for new users."""
-    return render_template("onboarding.html", user=current_user())
+    """Render the onboarding wizard; ?step= lets bookmarking/back keep position."""
+    try:
+        step = int(request.args.get("step", "1"))
+    except ValueError:
+        step = 1
+    step = max(1, min(5, step))
+    return render_template("onboarding.html", user=current_user(), current_step=step)
+
+
+# Which step's text field gates advancing to the next step. Availability
+# (step 5) is an optional number and never blocks an advance or completion.
+_STEP_REQUIRED = {1: "school", 2: "program", 3: "courses", 4: "goals"}
 
 
 @app.post("/onboarding")
 @login_required
 def onboarding_post():
-    """Save the new user's school, program, courses, and goals and finish onboarding."""
+    """Wizard-style POST: save a draft, advance/finish, or bail out with a draft kept."""
     user = current_user()
+    user_id = user["id"]
 
     school = request.form.get("school", "").strip()
     program = request.form.get("program", "").strip()
     courses = [c.strip() for c in request.form.get("courses", "").split(",") if c.strip()]
     goals = request.form.get("goals", "").strip()
-
-    if not school or not program or not courses or not goals:
-        flash("Please complete all steps.", "error")
-        return redirect(url_for("onboarding"))
 
     available_hours = request.form.get("available_hours", "4").strip()
     try:
@@ -593,10 +599,33 @@ def onboarding_post():
         available_hours = 4
     available_hours = max(1, min(12, available_hours))
 
-    db.set_user_onboarded(user["id"], school, program, courses, goals, available_hours)
+    # Always persist the draft — "save and finish later" must never lose work.
+    db.save_onboarding_progress(user_id, school, program, courses, goals, available_hours)
 
-    flash("You're all set! Your personalized planner is ready.", "success")
-    return redirect(url_for("home"))
+    action = request.form.get("action", "continue")
+    if action == "finish-later":
+        return redirect(url_for("home"))
+
+    try:
+        step = int(request.form.get("step", "1"))
+    except ValueError:
+        step = 1
+    step = max(1, min(5, step))
+
+    if step >= 5:
+        if not school or not program or not courses or not goals:
+            flash("Let's wrap up — please finish the earlier steps first.", "error")
+            return redirect(url_for("onboarding", step=5))
+        db.set_user_onboarded(user_id, school, program, courses, goals, available_hours)
+        flash("You're all set! Your personalized planner is ready.", "success")
+        return redirect(url_for("home"))
+
+    required = _STEP_REQUIRED[step]
+    if not request.form.get(required, "").strip():
+        flash("That field is required — let's fill it in before moving on.", "error")
+        return redirect(url_for("onboarding", step=step))
+
+    return redirect(url_for("onboarding", step=step + 1))
 
 
 @app.get("/")

@@ -58,6 +58,27 @@ class UsersTest(unittest.TestCase):
         db.update_user(self.uid, {"goals": "graduate"})
         self.assertEqual(db.get_user(self.uid)["goals"], "graduate")
 
+    def test_save_onboarding_progress_keeps_draft_without_onboarding(self):
+        db.create_user(self.uid, "Test User", self.email, "hash")
+        db.save_onboarding_progress(self.uid, "UG", "CS", ["DCIT 204"], "", available_hours=6)
+        user = db.get_user(self.uid)
+        self.assertIs(user["onboarded"], False)
+        self.assertEqual(user["school"], "UG")
+        self.assertEqual(user["program"], "CS")
+        self.assertEqual(user["courses"], ["DCIT 204"])
+        self.assertEqual(user["available_hours"], 6)
+
+        # Running it again overwrites the draft, never completing it.
+        db.save_onboarding_progress(self.uid, "UG", "CS", ["DCIT 204", "STAT 222"], "pass")
+        user = db.get_user(self.uid)
+        self.assertIs(user["onboarded"], False)
+        self.assertEqual(user["courses"], ["DCIT 204", "STAT 222"])
+        self.assertEqual(user["goals"], "pass")
+
+        # Finishing flips the flag on top of the same draft.
+        db.set_user_onboarded(self.uid, "UG", "CS", ["DCIT 204", "STAT 222"], "pass")
+        self.assertTrue(db.get_user(self.uid)["onboarded"])
+
 
 class CollabTest(unittest.TestCase):
     def setUp(self):

@@ -48,6 +48,19 @@ img {
   height: auto;
 }
 
+/* Fieldset/legend reset: never ship a native browser fieldset look — the
+   default border cutting through the legend reads as "unfinished". */
+fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+legend {
+  padding: 0;
+}
+
 input,
 select,
 textarea,
@@ -135,6 +148,18 @@ button:active,
   40% { transform: translateX(4px); }
   60% { transform: translateX(-3px); }
   80% { transform: translateX(3px); }
+}
+
+/* One-time flows (onboarding): step content slides in; the completed
+   step's checkmark pops instead of snapping to filled. */
+@keyframes sp-step-in {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sp-check-pop {
+  0% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: no-preference) {

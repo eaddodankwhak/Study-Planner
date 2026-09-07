@@ -15,140 +15,257 @@
 {% endblock %}
 
 {% block main %}
-        <section class="card onboarding" id="onboarding-card">
-            <h2 class="card__title">Let's personalize your planner</h2>
-            <p class="text-muted mb-4">A few quick steps, and we'll tailor your routine to you.</p>
+    {% set first_name = (user.name if user and user.name else 'Student').split()[0] %}
+    {% set steps = [
+        {'n': 1, 'label': 'School', 'title': 'Welcome, ' ~ first_name ~ ' — let\'s set up your planner', 'desc': 'A few quick steps and we\'ll tailor everything to you.'},
+        {'n': 2, 'label': 'Program', 'title': 'What are you studying?', 'desc': 'Your program decides which subjects, deadlines, and study materials we surface for you.'},
+        {'n': 3, 'label': 'Courses', 'title': 'Set up your courses', 'desc': 'We turn each course into its own portal, so notes, tasks, and quizzes stay in one place.'},
+        {'n': 4, 'label': 'Goals', 'title': 'What do you want to achieve?', 'desc': 'Your goals tell us how ambitious to be when we plan your day.'},
+        {'n': 5, 'label': 'Availability', 'title': 'How much time can you give?', 'desc': 'We use this to build a realistic plan instead of an optimistic one.'}
+    ] %}
+    {% set total_steps = steps|length %}
+    {% set step = steps[current_step - 1] %}
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <ul class="flashes">
-                        {% for category, message in messages %}
-                            <li class="{{ category }}">{{ message }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-            {% endwith %}
-
-            <!-- Step indicator -->
-            <ol class="stepper" id="stepper">
-                <li class="stepper__item is-active" data-step="1">School</li>
-                <li class="stepper__item" data-step="2">Program</li>
-                <li class="stepper__item" data-step="3">Courses</li>
-                <li class="stepper__item" data-step="4">Goals</li>
-                <li class="stepper__item" data-step="5">Availability</li>
+    <section class="card onboarding" id="onboarding-card">
+        <nav class="onboarding-stepper" aria-label="Onboarding progress">
+            <ol class="onboarding-stepper__list">
+                {% for s in steps %}
+                    <li class="onboarding-stepper__item
+                        {{- ' onboarding-stepper__item--done' if s.n < current_step else '' }}
+                        {{- ' onboarding-stepper__item--active' if s.n == current_step else '' }}"
+                        data-step="{{ s.n }}"
+                        {% if s.n == current_step %}aria-current="step"{% endif %}>
+                        <span class="onboarding-stepper__dot" aria-hidden="true">
+                            {% if s.n < current_step %}
+                                <svg class="onboarding-stepper__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            {% else %}
+                                {{ s.n }}
+                            {% endif %}
+                        </span>
+                        <span class="onboarding-stepper__label">{{ s.label }}</span>
+                    </li>
+                {% endfor %}
             </ol>
+            <p class="onboarding-stepper__compact" data-compact>
+                <span class="onboarding-stepper__track" aria-hidden="true">
+                    <span class="onboarding-stepper__fill" data-fill style="width: {{ (current_step / total_steps * 100)|round(0, 'floor') }}%"></span>
+                </span>
+                <span data-compact-text>Step {{ current_step }} of {{ total_steps }}</span>
+            </p>
+        </nav>
 
-            <form id="onboarding-form" class="onboarding__form" action="{{ url_for('onboarding_post') }}" method="post">
+        <header class="onboarding-header">
+            <p class="onboarding-header__eyebrow" data-eyebrow>Step {{ current_step }} of {{ total_steps }}</p>
+            <h1 class="onboarding-header__title" data-title>{{ step.title }}</h1>
+            <p class="onboarding-header__subtitle" data-subtitle>{{ step.desc }}</p>
+        </header>
 
-                <!-- Step 1: School -->
-                <fieldset class="onboard-step" id="step-1">
-                    <legend>Step 1 · Your school</legend>
-                    <p class="text-muted mb-3">Where do you study? We use this to keep things relevant for you.</p>
-                    <div class="form-field">
-                        <label for="school">School / Institution</label>
-                        <input type="text" id="school" name="school" placeholder="e.g. University of Ghana" value="{{ user.school if user and user.school }}" required>
-                    </div>
-                    <div class="onboard-actions">
-                        <button type="button" class="button" data-next="2">Continue →</button>
-                    </div>
-                </fieldset>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
 
-                <!-- Step 2: Program of study -->
-                <fieldset class="onboard-step" id="step-2" hidden>
-                    <legend>Step 2 · Your program of study</legend>
-                    <p class="text-muted mb-3">What degree or program are you pursuing?</p>
-                    <div class="form-field">
-                        <label for="program">Program of study</label>
-                        <input type="text" id="program" name="program" placeholder="e.g. BSc Animal Science" value="{{ user.program if user and user.program }}" required>
-                    </div>
-                    <div class="onboard-actions">
-                        <button type="button" class="button button--ghost" data-back="1">← Back</button>
-                        <button type="button" class="button" data-next="3">Continue →</button>
-                    </div>
-                </fieldset>
+        <form id="onboarding-form" class="onboarding__form" action="{{ url_for('onboarding_post') }}" method="post" novalidate>
+            <input type="hidden" name="step" value="{{ current_step }}">
+            <input type="hidden" name="action" value="continue">
 
-                <!-- Step 3: Courses -->
-                <fieldset class="onboard-step" id="step-3" hidden>
-                    <legend>Step 3 · Your courses</legend>
-                    <p class="text-muted mb-3">Which courses are you taking this term? Separate each with a comma.</p>
-                    <div class="form-field">
-                        <label for="courses">Courses of study</label>
-                        <input type="text" id="courses" name="courses" placeholder="e.g. Genetics, Animal Nutrition, Plant Pathology" value="{{ user.courses|join(', ') if user and user.courses }}" required>
-                    </div>
-                    <div class="onboard-actions">
-                        <button type="button" class="button button--ghost" data-back="2">← Back</button>
-                        <button type="button" class="button" data-next="4">Continue →</button>
-                    </div>
-                </fieldset>
+            <fieldset class="onboard-step" id="step-1" {% if current_step != 1 %}hidden{% endif %}
+                      data-title="{{ steps[0].title }}" data-desc="{{ steps[0].desc }}">
+                <div class="form-field" data-required>
+                    <label class="form-label" for="school">School / Institution</label>
+                    <input class="form-input" type="text" id="school" name="school"
+                           placeholder="e.g. University of Ghana"
+                           value="{{ user.school if user and user.school }}"
+                           autocomplete="organization" required>
+                    <p class="onboarding-card__error" hidden>Please enter your school so we can keep things relevant to you.</p>
+                </div>
+                <div class="onboard-actions">
+                    <button type="button" class="button onboard-actions__continue" data-continue>Continue &rarr;</button>
+                </div>
+            </fieldset>
 
-                <!-- Step 4: Goals -->
-                <fieldset class="onboard-step" id="step-4" hidden>
-                    <legend>Step 4 · Your goals</legend>
-                    <p class="text-muted mb-3">What do you want to achieve? This shapes your study routine.</p>
-                    <div class="form-field">
-                        <label for="goals">Your study goals</label>
-                        <textarea id="goals" name="goals" rows="4" placeholder="e.g. Pass all courses with distinction, master Genetics, and build a consistent daily study habit.">{{ user.goals if user and user.goals }}</textarea>
-                    </div>
-                    <div class="onboard-actions">
-                        <button type="button" class="button button--ghost" data-back="3">← Back</button>
-                        <button type="button" class="button" data-next="5">Continue →</button>
-                    </div>
-                </fieldset>
+            <fieldset class="onboard-step" id="step-2" {% if current_step != 2 %}hidden{% endif %}
+                      data-title="{{ steps[1].title }}" data-desc="{{ steps[1].desc }}">
+                <div class="form-field" data-required>
+                    <label class="form-label" for="program">Program of study</label>
+                    <input class="form-input" type="text" id="program" name="program"
+                           placeholder="e.g. BSc Animal Science"
+                           value="{{ user.program if user and user.program }}"
+                           autocomplete="organization-title" required>
+                    <p class="onboarding-card__error" hidden>Please tell us your program so we can point you at the right materials.</p>
+                </div>
+                <div class="onboard-actions">
+                    <button type="button" class="onboard-actions__back" data-back="1">&larr; Back</button>
+                    <button type="button" class="button onboard-actions__continue" data-continue>Continue &rarr;</button>
+                </div>
+            </fieldset>
 
-                <!-- Step 5: Availability -->
-                <fieldset class="onboard-step" id="step-5" hidden>
-                    <legend>Step 5 · Your availability</legend>
-                    <p class="text-muted mb-3">How many hours can you study per day? We use this to build a realistic, well-balanced plan.</p>
-                    <div class="form-field">
-                        <label for="available_hours">Hours available per day</label>
-                        <input type="number" id="available_hours" name="available_hours" min="1" max="12" step="0.5" value="{{ user.available_hours if user and user.available_hours else 4 }}" required>
-                    </div>
-                    <div class="onboard-actions">
-                        <button type="button" class="button button--ghost" data-back="4">← Back</button>
-                        <button class="button button--primary" type="submit">Finish setup →</button>
-                    </div>
-                </fieldset>
+            <fieldset class="onboard-step" id="step-3" {% if current_step != 3 %}hidden{% endif %}
+                      data-title="{{ steps[2].title }}" data-desc="{{ steps[2].desc }}">
+                <div class="form-field" data-required>
+                    <label class="form-label" for="courses">Courses of study</label>
+                    <input class="form-input" type="text" id="courses" name="courses"
+                           placeholder="e.g. Genetics, Animal Nutrition, Plant Pathology"
+                           value="{{ user.courses|join(', ') if user and user.courses }}"
+                           autocomplete="off" required>
+                    <p class="onboarding-card__error" hidden>Please list at least one course so we can set up your portals.</p>
+                </div>
+                <div class="onboard-actions">
+                    <button type="button" class="onboard-actions__back" data-back="2">&larr; Back</button>
+                    <button type="button" class="button onboard-actions__continue" data-continue>Continue &rarr;</button>
+                </div>
+            </fieldset>
 
-            </form>
-        </section>
-    {% endblock %}
+            <fieldset class="onboard-step" id="step-4" {% if current_step != 4 %}hidden{% endif %}
+                      data-title="{{ steps[3].title }}" data-desc="{{ steps[3].desc }}">
+                <div class="form-field" data-required>
+                    <label class="form-label" for="goals">Your study goals</label>
+                    <textarea class="form-input" id="goals" name="goals" rows="4"
+                              placeholder="e.g. Pass all courses with distinction, master Genetics, and build a consistent daily habit.">{{ user.goals if user and user.goals }}</textarea>
+                    <p class="onboarding-card__error" hidden>Jot down at least one goal so we know what to aim for.</p>
+                </div>
+                <div class="onboard-actions">
+                    <button type="button" class="onboard-actions__back" data-back="3">&larr; Back</button>
+                    <button type="button" class="button onboard-actions__continue" data-continue>Continue &rarr;</button>
+                </div>
+            </fieldset>
+
+            <fieldset class="onboard-step" id="step-5" {% if current_step != 5 %}hidden{% endif %}
+                      data-title="{{ steps[4].title }}" data-desc="{{ steps[4].desc }}">
+                <div class="form-field">
+                    <label class="form-label" for="available_hours">Hours available per day</label>
+                    <input class="form-input" type="number" id="available_hours" name="available_hours"
+                           min="1" max="12" step="0.5"
+                           value="{{ user.available_hours if user and user.available_hours else 4 }}" required>
+                    <p class="onboarding-card__hint">A realistic number you can protect most days — we plan around it.</p>
+                </div>
+                <div class="onboard-actions">
+                    <button type="button" class="onboard-actions__back" data-back="4">&larr; Back</button>
+                    <button type="button" class="button button--primary onboard-actions__continue" data-continue>Finish setup &rarr;</button>
+                </div>
+            </fieldset>
+        </form>
+
+        <p class="onboarding-save">
+            That's a lot of questions at once —
+            <button type="button" class="onboarding-save__button" data-finish-later>save and finish later</button>.
+            We'll remember everything you've told us so far.
+        </p>
+    </section>
+{% endblock %}
 
 {% block scripts %}
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const steps = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'];
-            const stepperItems = document.querySelectorAll('.stepper__item');
+            const form = document.getElementById('onboarding-form');
+            const fieldsets = [...form.querySelectorAll('fieldset.onboard-step')];
+            const stepperItems = document.querySelectorAll('.onboarding-stepper__item');
+            const headerTitle = document.querySelector('[data-title]');
+            const headerSub = document.querySelector('[data-subtitle]');
+            const eyebrow = document.querySelector('[data-eyebrow]');
+            const fill = document.querySelector('[data-fill]');
+            const compactText = document.querySelector('[data-compact-text]');
+            const stepInput = form.querySelector('input[name="step"]');
+            const actionInput = form.querySelector('input[name="action"]');
+            const totalSteps = fieldsets.length;
 
-            function showStep(stepNum) {
-                steps.forEach((id, i) => {
-                    document.getElementById(id).hidden = (i + 1) !== stepNum;
-                });
-                stepperItems.forEach((item) => {
+            const stepNum = (fieldset) => Number(fieldset.id.split('-')[1]);
+            const visibleFieldset = () => fieldsets.find(f => !f.hidden);
+
+            function renderHeader(step) {
+                if (headerTitle) headerTitle.textContent = step.dataset.title;
+                if (headerSub) headerSub.textContent = step.dataset.desc;
+                if (eyebrow) eyebrow.textContent = `Step ${stepNum(step)} of ${totalSteps}`;
+                if (compactText) compactText.textContent = `Step ${stepNum(step)} of ${totalSteps}`;
+                if (fill) fill.style.width = `${Math.floor((stepNum(step) / totalSteps) * 100)}%`;
+            }
+
+            function focusFirstInput(step) {
+                const input = step.querySelector('input[required], textarea[required]');
+                if (input) input.focus();
+            }
+
+            function showStep(stepNo) {
+                fieldsets.forEach(f => { f.hidden = stepNum(f) !== stepNo; });
+                stepperItems.forEach(item => {
                     const n = Number(item.dataset.step);
-                    item.classList.toggle('is-active', n === stepNum);
-                    item.classList.toggle('is-done', n < stepNum);
+                    item.classList.toggle('onboarding-stepper__item--active', n === stepNo);
+                    item.classList.toggle('onboarding-stepper__item--done', n < stepNo);
+                    if (n === stepNo) item.setAttribute('aria-current', 'step');
+                    else item.removeAttribute('aria-current');
+                    if (n < stepNo) item.querySelector('.onboarding-stepper__dot').innerHTML =
+                        '<svg class="onboarding-stepper__check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+                    else item.querySelector('.onboarding-stepper__dot').textContent = String(n);
                 });
+                const target = fieldsets.find(f => stepNum(f) === stepNo);
+                renderHeader(target);
+                focusFirstInput(target);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
 
-            document.querySelectorAll('[data-next]').forEach((btn) => {
+            function markInvalid(fieldset, invalid) {
+                const group = fieldset.querySelector('[data-required]');
+                if (!group) return;
+                group.classList.toggle('is-invalid', invalid);
+                const err = group.querySelector('.onboarding-card__error');
+                if (err) err.hidden = !invalid;
+            }
+
+            form.addEventListener('submit', (e) => {
+                const submitter = e.submitter;
+                const isFinishLater = submitter && submitter.hasAttribute('data-finish-later');
+                const current = visibleFieldset();
+                stepInput.value = String(stepNum(current));
+                actionInput.value = isFinishLater ? 'finish-later' : 'continue';
+                if (isFinishLater) return;
+                const group = current.querySelector('[data-required]');
+                const input = group ? group.querySelector('input, textarea') : null;
+                if (group && input && !input.value.trim()) {
+                    e.preventDefault();
+                    markInvalid(current, true);
+                    input.focus();
+                    return;
+                }
+            });
+
+            form.querySelectorAll('[data-continue]').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const current = Number(btn.closest('fieldset').id.split('-')[1]);
-                    const nextField = document.getElementById(`step-${current}`);
-                    const input = nextField.querySelector('input[required], textarea');
-                    if (input && !input.value.trim()) {
+                    const current = visibleFieldset();
+                    const group = current.querySelector('[data-required]');
+                    const input = group ? group.querySelector('input, textarea') : null;
+                    if (group && input && !input.value.trim()) {
+                        markInvalid(current, true);
                         input.focus();
-                        input.reportValidity();
                         return;
                     }
-                    showStep(Number(btn.dataset.next));
+                    markInvalid(current, false);
+                    form.requestSubmit(btn);
                 });
             });
 
-            document.querySelectorAll('[data-back]').forEach((btn) => {
+            form.querySelectorAll('[data-back]').forEach(btn => {
                 btn.addEventListener('click', () => showStep(Number(btn.dataset.back)));
             });
+
+            form.querySelectorAll('[data-finish-later]').forEach(btn => {
+                btn.addEventListener('click', () => form.requestSubmit(btn));
+            });
+
+            form.querySelectorAll('input, textarea').forEach(field => {
+                field.addEventListener('input', () => {
+                    const group = field.closest('[data-required]');
+                    if (group) markInvalid(fieldsets.find(f => !f.hidden), !field.value.trim());
+                });
+            });
+
+            const initial = visibleFieldset() || fieldsets[0];
+            focusFirstInput(initial);
         });
     </script>
 {% endblock %}

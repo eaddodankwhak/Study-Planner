@@ -420,15 +420,241 @@
   color: var(--color-muted);
 }
 
-/* Onboarding */
+/* Onboarding — the one-time setup flow. Seen once per student, so it earns
+   more craft and motion budget than any daily surface (motion rules: rare /
+   first-time moments may use delight). All animation respects
+   prefers-reduced-motion via the global collapse in base.css. */
 .onboarding {
-  max-width: 32rem;
+  max-width: 35rem;
   margin-inline: auto;
+  padding: var(--space-8) var(--space-6);
+  box-shadow: var(--shadow-md);
 }
 
-.onboarding__form {
+/* --- Step indicator: connects the whole flow into "where am I?" --- */
+.onboarding-stepper__list {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-8);
+}
+
+.onboarding-stepper__list::before {
+  content: "";
+  position: absolute;
+  top: 15px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--color-border);
+  z-index: 0;
+}
+
+.onboarding-stepper__item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 6.5rem;
+  text-align: center;
+}
+
+.onboarding-stepper__dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   display: grid;
-  gap: var(--space-4);
+  place-items: center;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  color: var(--color-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.onboarding-stepper__item--active .onboarding-stepper__dot {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #2b1b00;
+  box-shadow: 0 0 0 4px rgb(240 153 55 / 0.22);
+}
+
+.onboarding-stepper__item--done .onboarding-stepper__dot {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #2b1b00;
+}
+
+.onboarding-stepper__check {
+  animation: sp-check-pop var(--dur-slow) var(--ease-out) both;
+}
+
+.onboarding-stepper__label {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.onboarding-stepper__item--active .onboarding-stepper__label {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* Compact progress callout — replaces the five dots on small screens. */
+.onboarding-stepper__compact {
+  display: none;
+}
+
+/* --- Header: one message, right semantics --- */
+.onboarding-header {
+  margin-bottom: var(--space-6);
+  animation: sp-step-in var(--dur-base) var(--ease-out) both;
+}
+
+.onboarding-header__eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-accent-dark);
+  margin-bottom: var(--space-1);
+}
+
+.onboarding-header__title {
+  font-size: 1.75rem;
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
+  margin-bottom: var(--space-2);
+}
+
+.onboarding-header__subtitle {
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* --- Per-step fields --- */
+.onboard-step:not([hidden]) {
+  animation: sp-step-in var(--dur-base) var(--ease-out) both;
+}
+
+.onboarding .form-field {
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+/* Accent focus ring for onboarding inputs (overrides the default navy
+   outline so the focus colour matches the accent theme). */
+.onboarding .form-input:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgb(240 153 55 / 0.22);
+}
+
+.onboarding-card__error {
+  margin-top: var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--color-error);
+}
+
+.onboarding-card__hint {
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.onboarding .is-invalid .form-input {
+  border-color: var(--color-error);
+}
+
+/* --- Step actions --- */
+.onboard-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.onboard-actions__back {
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.onboard-actions__back:hover {
+  color: var(--color-text);
+}
+
+.onboard-actions__continue:active,
+.onboard-save__button:active {
+  transform: scale(0.97);
+}
+
+/* "Save and finish later" — subtle, always available, keeps progress. */
+.onboarding-save {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.onboarding-save__button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary-light);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.onboarding-save__button:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 40rem) {
+  .onboarding {
+    padding: var(--space-6) var(--space-5);
+  }
+
+  .onboarding-stepper__list {
+    display: none;
+  }
+
+  .onboarding-stepper__compact {
+    display: block;
+    margin-bottom: var(--space-6);
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+  }
+
+  .onboarding-stepper__track {
+    display: block;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--color-border);
+    overflow: hidden;
+    margin-bottom: var(--space-2);
+  }
+
+  .onboarding-stepper__fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-accent);
+    transition: width var(--dur-base) var(--ease-out);
+  }
+
+  .onboarding-header__eyebrow {
+    display: none;
+  }
 }
 
 /* Toggle switch (settings) */

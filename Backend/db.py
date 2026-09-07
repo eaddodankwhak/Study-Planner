@@ -473,6 +473,21 @@ def set_user_onboarded(user_id, school, program, courses, goals, available_hours
     })
 
 
+def save_onboarding_progress(user_id, school, program, courses, goals, available_hours=4):
+    """Persist partial onboarding answers WITHOUT flipping onboarded=1.
+
+    Lets the wizard keep a draft between steps so "save and finish later"
+    never loses work; completion still goes through set_user_onboarded.
+    """
+    update_user(user_id, {
+        "school": school,
+        "program": program,
+        "courses_json": json.dumps(courses),
+        "goals": goals,
+        "available_hours": available_hours,
+    })
+
+
 def set_ai_preferences(user_id, model=None, level=None):
     fields = {}
     if model is not None:

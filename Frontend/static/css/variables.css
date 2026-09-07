@@ -76,6 +76,9 @@
 
   /* elevation hierarchy — resting < hovered/active < modal. Three steps,
      reused everywhere instead of ad-hoc shadows. */
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.08);
+  --shadow-md: 0 4px 12px rgb(15 23 42 / 0.12);
+  --shadow-lg: 0 12px 32px rgb(15 23 42 / 0.18);
 
   /* focus ring — used by every interactive element (replaces outline) */
   --ring-color: rgb(27 106 138 / 0.45);
