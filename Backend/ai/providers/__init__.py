@@ -26,10 +26,14 @@ def _build_providers():
     from .openai import OpenAIProvider
     from .anthropic import AnthropicProvider
     from .google import GoogleProvider
+    from .deepseek import DeepSeekProvider
+    from .copilot import CopilotProvider
 
     _register(OpenAIProvider)
     _register(AnthropicProvider)
     _register(GoogleProvider)
+    _register(DeepSeekProvider)
+    _register(CopilotProvider)
     _register(MockProvider)
 
 

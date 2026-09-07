@@ -31,7 +31,22 @@ ai_api = Blueprint("ai_api", __name__, url_prefix="/api/ai")
 
 #: Providers the "connect your own account" flow accepts, keyed to the
 #: registry's provider ids (see ai/models.py) plus the display label used in UI.
-CONNECTABLE_PROVIDERS = {"anthropic": "Claude", "openai": "ChatGPT", "google": "Gemini"}
+CONNECTABLE_PROVIDERS = {
+    "anthropic": "Claude",
+    "openai": "ChatGPT",
+    "google": "Gemini",
+    "deepseek": "DeepSeek",
+    "copilot": "Copilot",
+}
+
+#: Server-level env key -> provider id used for the /meta serverKeys list.
+_SERVER_KEY_ENVS = (
+    ("openai", "OPENAI_API_KEY"),
+    ("anthropic", "ANTHROPIC_API_KEY"),
+    ("google", "GOOGLE_AI_API_KEY"),
+    ("deepseek", "DEEPSEEK_API_KEY"),
+    ("copilot", "COPILOT_GITHUB_TOKEN"),
+)
 
 UPLOAD_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -113,9 +128,7 @@ def _material_text(material_id, user_id):
 
 def _server_provider_keys_available():
     """True when any real provider key is configured at the server level."""
-    return any(
-        os.getenv(k) for k in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_AI_API_KEY")
-    )
+    return any(os.getenv(env) for _pid, env in _SERVER_KEY_ENVS)
 
 
 def _verify_provider_key(provider, api_key):
@@ -150,13 +163,7 @@ def meta():
     used, limit = _sample_usage()
     connections = db.get_ai_connections(uid)
     connected_providers = {c["provider"] for c in connections}
-    server_keys = [
-        pid for pid, env in (
-            ("openai", "OPENAI_API_KEY"),
-            ("anthropic", "ANTHROPIC_API_KEY"),
-            ("google", "GOOGLE_AI_API_KEY"),
-        ) if os.getenv(env)
-    ]
+    server_keys = [pid for pid, env in _SERVER_KEY_ENVS if os.getenv(env)]
     mock_mode = not _server_provider_keys_available() and not connected_providers
     return jsonify({
         "models": model_registry.models_available(),

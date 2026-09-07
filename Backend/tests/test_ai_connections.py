@@ -206,8 +206,12 @@ class AIConnectionsSettingsTest(unittest.TestCase):
             "anthropic": "https://platform.claude.com/settings/keys",
             "openai": "https://platform.openai.com/api-keys",
             "google": "https://aistudio.google.com/apikey",
+            "deepseek": "https://platform.deepseek.com/api_keys",
+            "copilot": "https://github.com/settings/personal-access-tokens",
         }
-        for provider, label in (("anthropic", "Claude"), ("openai", "ChatGPT"), ("google", "Gemini")):
+        for provider, label in (("anthropic", "Claude"), ("openai", "ChatGPT"),
+                                ("google", "Gemini"), ("deepseek", "DeepSeek"),
+                                ("copilot", "Copilot")):
             self.assertIn(f'data-ai-connect="{provider}"', html)
             self.assertIn(f'data-ai-key-url="{expected[provider]}"', html)
             self.assertIn(label, html)

@@ -8,7 +8,8 @@ BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, BASE)
 
 # Ensure real provider keys are not set for these tests.
-for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_AI_API_KEY"):
+for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_AI_API_KEY",
+            "DEEPSEEK_API_KEY", "COPILOT_GITHUB_TOKEN", "GH_TOKEN"):
     os.environ.pop(key, None)
 
 from ai import limits  # noqa: E402
@@ -18,7 +19,7 @@ from ai.providers import get_provider, provider_available, list_providers, MockP
 
 class ProviderRouterTest(unittest.TestCase):
     def test_mock_when_no_keys(self):
-        for pid in ("openai", "anthropic", "google"):
+        for pid in ("openai", "anthropic", "google", "deepseek", "copilot"):
             p = get_provider(pid)
             self.assertTrue(getattr(p, "is_mock", False), f"{pid} should fall back to mock")
 
@@ -40,6 +41,8 @@ class ProviderRouterTest(unittest.TestCase):
         ids = {p["id"] for p in providers}
         self.assertIn("mock", ids)
         self.assertIn("openai", ids)
+        self.assertIn("deepseek", ids)
+        self.assertIn("copilot", ids)
         for p in providers:
             self.assertIn("isMock", p)
             self.assertIn("available", p)
@@ -98,6 +101,11 @@ class ServiceTest(unittest.TestCase):
     def test_handle_error_mapping(self):
         from ai import limits as limits_mod
         self.assertIn("tomorrow", service.handle_error(limits_mod.RateLimitError("You've used your AI requests for today. Please try again tomorrow.")))
+        # provider HTTP failures surface the real cause, not a generic outage
+        from ai.providers._http import ProviderHTTPError
+        self.assertIn("rejected your API key", service.handle_error(ProviderHTTPError(401, "{}")))
+        self.assertIn("no longer available", service.handle_error(ProviderHTTPError(404, "{}")))
+        self.assertIn("HTTP 503", service.handle_error(ProviderHTTPError(503, "{}")))
         # generic exception -> safe generic message
         self.assertEqual(
             service.handle_error(RuntimeError("boom")),

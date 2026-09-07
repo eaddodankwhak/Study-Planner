@@ -61,7 +61,7 @@ MODELS = [
         "anthropic",
         "Claude",
         "Deep reasoning and clear explanations.",
-        model_api_id=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest"),
+        model_api_id=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
         context_window=200000,
         capabilities=["TEXT", "CODE", "MATH", "PDF", "FILES", "LONG_CONTEXT"],
     ),
@@ -70,7 +70,7 @@ MODELS = [
         "openai",
         "GPT",
         "Versatile general-purpose study assistant.",
-        model_api_id=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model_api_id=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
         context_window=128000,
         capabilities=["TEXT", "CODE", "MATH", "IMAGE", "FILES", "LONG_CONTEXT"],
     ),
@@ -79,9 +79,27 @@ MODELS = [
         "google",
         "Gemini",
         "Useful for multimodal and broad study tasks.",
-        model_api_id=os.getenv("GOOGLE_MODEL", "gemini-1.5-flash"),
+        model_api_id=os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"),
         context_window=1000000,
         capabilities=["TEXT", "CODE", "MATH", "IMAGE", "PDF", "FILES", "LONG_CONTEXT"],
+    ),
+    _model(
+        "deepseek",
+        "deepseek",
+        "DeepSeek",
+        "Fast and affordable reasoning model.",
+        model_api_id=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+        context_window=128000,
+        capabilities=["TEXT", "CODE", "MATH", "LONG_CONTEXT"],
+    ),
+    _model(
+        "copilot",
+        "copilot",
+        "Copilot",
+        "GitHub Copilot assistant.",
+        model_api_id=os.getenv("COPILOT_MODEL", "gpt-5-mini"),
+        context_window=128000,
+        capabilities=["TEXT", "CODE", "MATH"],
     ),
 ]
 
@@ -95,6 +113,10 @@ def enabled_provider_ids():
         ids.add("anthropic")
     if os.getenv("GOOGLE_AI_API_KEY"):
         ids.add("google")
+    if os.getenv("DEEPSEEK_API_KEY"):
+        ids.add("deepseek")
+    if os.getenv("COPILOT_GITHUB_TOKEN"):
+        ids.add("copilot")
     return ids
 
 

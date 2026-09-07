@@ -120,6 +120,8 @@
     claude: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L15.2 8.8 L21 12 L15.2 15.2 L12 21 L8.8 15.2 L3 12 L8.8 8.8 Z"/></svg>',
     gpt: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.2" r="3.6"/><circle cx="18.8" cy="8.1" r="3.6"/><circle cx="18.8" cy="15.9" r="3.6"/><circle cx="12" cy="19.8" r="3.6"/><circle cx="5.2" cy="15.9" r="3.6"/><circle cx="5.2" cy="8.1" r="3.6"/></svg>',
     gemini: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z"/></svg>',
+    deepseek: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5 C6 6.5 9 6.5 11.5 8.5 S17 10.5 19.5 8.5"/><path d="M3.5 15.5 C6 13.5 9 13.5 11.5 15.5 S17 17.5 19.5 15.5"/></svg>',
+    copilot: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2"/><path d="M12 12 L12 3.5 M12 12 L4.6 7.8 M12 12 L19.4 7.8"/></svg>',
   };
 
   function renderModels() {
@@ -569,7 +571,7 @@
 
     if (els.mockHint) {
       var model = findModel(state.model) || {};
-      var keyEnv = { claude: "anthropic", gpt: "openai", gemini: "google" }[model.id];
+      var keyEnv = { claude: "anthropic", gpt: "openai", gemini: "google", deepseek: "deepseek", copilot: "copilot" }[model.id];
       var connected = (state.meta.connections || []).some(function (c) { return c.provider === keyEnv; });
       var serverKeyed = (state.meta.serverKeys || []).indexOf(keyEnv) >= 0;
       els.mockHint.hidden = false;

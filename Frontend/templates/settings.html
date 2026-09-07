@@ -373,11 +373,16 @@
         <div class="settings-panel__header">
             <h3 class="card__title" id="ai-accounts-heading">AI accounts</h3><span class="badge badge--open">Your own</span>
         </div>
-        <p class="settings-panel__intro">Connect your own Claude, ChatGPT, or Gemini account so your AI chats use
-            your API key for that provider. Click <strong>Connect</strong> to open the provider's key page, then paste
-            the key you create there and click <strong>Connect</strong> again to verify it. Keys are stored obfuscated
-            in your local database — they never leave this device.</p>
-        {% for provider, label, key_url in [('anthropic','Claude','https://platform.claude.com/settings/keys'),('openai','ChatGPT','https://platform.openai.com/api-keys'),('google','Gemini','https://aistudio.google.com/apikey')] %}
+        <p class="settings-panel__intro">Connect your own Claude, ChatGPT, Gemini, DeepSeek, or GitHub Copilot
+            account so your AI chats use your own key for that model. Click <strong>Connect</strong> to open the
+            provider's key page, then paste the key you create there and click <strong>Connect</strong> again to verify
+            it. Keys are stored obfuscated in your local database — they never leave this device.</p>
+        {% for provider, label, key_url, key_label in [
+        ('anthropic','Claude','https://platform.claude.com/settings/keys','Claude API key'),
+        ('openai','ChatGPT','https://platform.openai.com/api-keys','ChatGPT (OpenAI) API key'),
+        ('google','Gemini','https://aistudio.google.com/apikey','Gemini API key'),
+        ('deepseek','DeepSeek','https://platform.deepseek.com/api_keys','DeepSeek API key'),
+        ('copilot','Copilot','https://github.com/settings/personal-access-tokens','GitHub token with the Copilot requests permission')] %}
         {% set conn = ai_connections_by_provider.get(provider) %}
         <div class="settings-membership">
             <div>
@@ -392,9 +397,9 @@
             <button class="button button--ghost button--small" type="button" data-ai-disconnect="{{ provider }}">Disconnect</button>
             {% else %}
             <div class="settings-controls">
-                <input class="form-input" type="password" data-ai-key="{{ provider }}" placeholder="Paste {{ label }} API key" autocomplete="off">
+                <input class="form-input" type="password" data-ai-key="{{ provider }}" placeholder="Paste {{ key_label }}" autocomplete="off">
                 <button class="button button--primary button--small" type="button" data-ai-connect="{{ provider }}"
-                    data-ai-key-url="{{ key_url }}">Connect</button>
+                    data-ai-key-url="{{ key_url }}" data-ai-key-label="{{ key_label }}">Connect</button>
             </div>
             {% endif %}
         </div>
@@ -402,9 +407,10 @@
         {% endfor %}
         <div class="settings-row">
             <div class="settings-row__copy"><strong>How it works</strong><small>Click Connect and a new tab opens the
-                    provider's official key page — create a key there, copy it, paste it back here, and connect. Your
-                    key for that model family is then used automatically, with no server key needed. Disconnect
-                    anytime.</small></div>
+                    provider's official key page — create a key there, copy it, paste it back here, and connect.
+                    <em>GitHub Copilot</em> has no API keys: create a fine-grained personal access token with the
+                    <em>Copilot requests</em> permission. Once connected, your chat uses that model family with your key,
+                    no server key needed. Disconnect anytime.</small></div>
         </div>
     </section>
 
@@ -584,8 +590,8 @@
                     var keyUrl = btn.getAttribute('data-ai-key-url');
                     if (keyUrl) window.open(keyUrl, '_blank', 'noopener');
                     if (input) input.focus();
-                    aiShowError(provider, 'Create and copy a ' + btn.textContent.trim() +
-                        ' API key on the page that just opened, paste it above, then click Connect again to verify and save it.');
+                    aiShowError(provider, 'Create ' + (btn.getAttribute('data-ai-key-label') || (btn.textContent.trim() + ' key')) +
+                        ' on the page that just opened, paste it above, then click Connect again to verify and save it.');
                     return;
                 }
                 btn.disabled = true;

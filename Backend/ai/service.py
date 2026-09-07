@@ -11,6 +11,19 @@ from . import models as model_registry
 from . import prompts
 from . import storage
 from .providers import get_provider
+from .providers._http import ProviderHTTPError
+
+#: Map provider HTTP status -> actionable user message. The default "temporarily
+#: unavailable" hides the real cause (e.g. a retired model name or a rejected
+#: key), which is why a connected key could look like it "isn't working".
+_PROVIDER_ERRORS = {
+    400: "The AI provider rejected the request (400). Your key or one of the model settings may be out of date.",
+    401: "The AI provider rejected your API key (401). Reconnect it in AI Settings.",
+    402: "The AI provider needs payment for this key (402). Top up the account and try again.",
+    403: "The AI provider denied access with this key on the selected plan (403). It may need different permissions.",
+    404: "The AI model you chose is no longer available (404). Try a different model.",
+    429: "The AI provider is rate-limiting this key (429). Wait a moment and try again.",
+}
 
 
 def prepare_messages(mode, question, material_text, user, conversation_messages, subject_title=None):
@@ -66,10 +79,14 @@ def stream_reply(request_dict, api_key=None):
 
 
 def handle_error(exc):
-    """Map internal/provider exceptions to a user-safe message."""
+    """Map internal/provider exceptions to a user-safe, actionable message."""
     if isinstance(exc, limits.RateLimitError):
         return str(exc)
     if isinstance(exc, limits.ValidationError):
         return str(exc)
-    # ProviderHTTPError and friends -> generic, safe message.
+    if isinstance(exc, ProviderHTTPError):
+        return _PROVIDER_ERRORS.get(
+            exc.status, f"The AI provider returned HTTP {exc.status}."
+        )
+    # Anything else -> safe generic message.
     return "The AI service is temporarily unavailable. Please try again."

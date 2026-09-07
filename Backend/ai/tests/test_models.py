@@ -17,6 +17,8 @@ class ModelRegistryTest(unittest.TestCase):
         self.assertIn("claude", ids)
         self.assertIn("gpt", ids)
         self.assertIn("gemini", ids)
+        self.assertIn("deepseek", ids)
+        self.assertIn("copilot", ids)
 
     def test_get_model_known(self):
         m = models.get_model("claude")
