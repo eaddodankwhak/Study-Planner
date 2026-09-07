@@ -1,12 +1,21 @@
 /*
- * Base layer: reset and default element styling.
+ * Base layer: reset, default element styling, global motion rules,
+ * shared keyframes, and the skeleton primitive.
  */
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Accessibility: never strip the ring without a replacement. Applies to
+   every keyboard-focused interactive element across all layers. */
+:focus-visible {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: var(--ring-offset);
 }
 
 html {
@@ -47,6 +56,129 @@ button {
   font-size: inherit;
 }
 
+button:disabled,
+[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Pressed feel: every clickable surface scales down at the instant duration.
+   Named properties only, so layout never animates. */
+button:active,
+.button:active,
+.nav-toggle:active,
+.nav-bar__link:active,
+.profile-menu__link:active,
+.ws-tabs__tab:active,
+.subject-tools__link:active,
+.ai-mode-chip:active,
+.ai-suggestion:active,
+.ai-action:active,
+.ai-iconbtn:active,
+.palette__item:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  .button,
+  .nav-toggle,
+  .nav-bar__link,
+  .profile-menu__link,
+  .ws-tabs__tab,
+  .subject-tools__link,
+  .ai-mode-chip,
+  .ai-action,
+  .ai-iconbtn,
+  .palette__item {
+    transition: transform var(--dur-instant) var(--ease-out),
+                background-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion rules.
+   - Never `transition: all`; name the property.
+   - Never `ease-in` (delays the moment the user watches).
+   - Nothing pops from nothing: entrances use opacity + small scale/translate.
+   - High-frequency surfaces (palette, nav toggles) animate little or not at all.
+--------------------------------------------------------------------------- */
+
+/* Shared keyframes (all guarded by prefers-reduced-motion). */
+@keyframes sp-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sp-item-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sp-card-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes sp-pop-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Blocked: a short shake draws the eye to something that needs attention. */
+@keyframes sp-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sp-fade { animation: sp-fade var(--dur-fast) var(--ease-out) both; }
+  .sp-item-in { animation: sp-item-in var(--dur-base) var(--ease-out) both; }
+  .sp-card-in { animation: sp-card-in var(--dur-base) var(--ease-out) both; }
+}
+
+/* ---------------------------------------------------------------------------
+   Skeleton loading — shimmers in place of server-rendered-then-hydrated
+   content (task panels, feeds). Matches eventual layout, reserves space.
+--------------------------------------------------------------------------- */
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: rgb(15 58 82 / 0.1);
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.65), transparent);
+    animation: sp-shimmer 1.4s var(--ease-in-out) infinite;
+  }
+}
+
+@keyframes sp-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* Entire app: honor reduced-motion by collapsing all animation. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Flash / alert messages */
 .flashes {
   list-style: none;
@@ -58,6 +190,10 @@ button {
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-2);
   font-weight: 600;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flashes li { animation: sp-item-in var(--dur-fast) var(--ease-out) both; }
 }
 
 .flashes .success {

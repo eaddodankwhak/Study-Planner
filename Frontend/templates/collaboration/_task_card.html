@@ -87,6 +87,10 @@
     </div>
 
     <div class="task-panel" data-task-panel data-task-id="{{ task.id }}" {% if not open_now %}hidden{% endif %}>
-        <div class="task-panel__loader">Loading…</div>
+        <div class="task-panel__loader" aria-hidden="true">
+            <span class="skeleton" style="height: 0.9rem; width: 60%;"></span>
+            <span class="skeleton" style="height: 0.9rem; width: 85%;"></span>
+            <span class="skeleton" style="height: 0.9rem; width: 45%;"></span>
+        </div>
     </div>
 </article>

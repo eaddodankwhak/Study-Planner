@@ -11,10 +11,31 @@
   color: var(--color-text-inverse);
   cursor: pointer;
   font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button {
+    transition: transform var(--dur-instant) var(--ease-out),
+                background-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+  }
 }
 
 .button:hover {
   background: var(--color-primary);
+  text-decoration: none;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .button--primary {
@@ -34,7 +55,7 @@
 }
 
 .button--accent:hover {
-  background: #e0871f;
+  background: var(--color-accent-dark);
   color: #2b1b00;
 }
 
@@ -152,10 +173,11 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 
 .course-card:hover {
+  /* resting < hovered < modal: hovered sits one step up */
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
@@ -207,6 +229,8 @@
 
 .dashboard-heading h2 {
   margin-bottom: 0;
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
 }
 
 /* Task list */
@@ -251,8 +275,8 @@
 
 .timer__display {
   font-size: 3.2rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
   color: var(--color-primary);
   font-variant-numeric: tabular-nums;
 }
@@ -300,6 +324,12 @@
   align-items: flex-start;
   justify-content: center;
   padding: 20vh var(--space-4) 0;
+}
+
+/* High-frequency surface: near-instant entrance only (never lingered on). */
+@media (prefers-reduced-motion: no-preference) {
+  .palette.is-open .palette__backdrop { animation: sp-fade 90ms var(--ease-out) both; }
+  .palette.is-open .palette__dialog { animation: sp-pop-in 100ms var(--ease-out) both; }
 }
 
 .palette__backdrop {
@@ -423,7 +453,7 @@
   background: var(--color-border);
   position: relative;
   flex-shrink: 0;
-  transition: background 0.2s ease;
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 
 .toggle__thumb {
@@ -435,7 +465,7 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.2s ease;
+  transition: transform var(--dur-fast) var(--ease-out);
 }
 
 .toggle input:checked + .toggle__track {
@@ -498,6 +528,8 @@
 .subject-banner__title {
   margin: var(--space-1) 0 var(--space-1);
   font-size: 1.6rem;
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
 }
 
 .subject-banner__meta {
@@ -691,7 +723,7 @@ textarea.form-input {
   border-radius: var(--radius-sm);
   backdrop-filter: var(--blur-lg);
   box-shadow: var(--glass-shadow);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-monospace);
   font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 2px;
@@ -856,5 +888,32 @@ body.home .course-card {
 .courses .page-main,
 body:not(.home) .page-main .data-table {
   background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile: every tappable surface reaches a ≥44px touch target.
+--------------------------------------------------------------------------- */
+@media (max-width: 40rem) {
+  .button,
+  .button--small,
+  .button--ghost,
+  .button--primary,
+  .btn-copy,
+  .label-chip,
+  .ws-tabs__tab,
+  .nav-toggle,
+  .palette__item,
+  .nav-bar__link,
+  .form-input,
+  .form-input--auto,
+  .form-input--small,
+  select.form-input {
+    min-height: 2.75rem;
+  }
+
+  .ws-tabs__tab,
+  .nav-bar__link {
+    padding-block: var(--space-3);
+  }
 }
 

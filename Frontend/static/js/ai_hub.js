@@ -322,9 +322,21 @@
     }
     var meta = el("div", "ai-msg__meta");
     var modelName = metadata && metadata.model ? metadata.model : state.model;
-    meta.textContent = role === "assistant" ? "AI · " + modelName : "You";
+    if (role === "assistant") {
+      meta.appendChild(aiTag());
+      meta.appendChild(document.createTextNode(modelName));
+    } else {
+      meta.textContent = "You";
+    }
     msg.append(bubbleNode, meta);
     return msg;
+  }
+
+  // Small "AI" pill marking that this content was machine-generated.
+  function aiTag() {
+    var tag = el("span", "ai-msg__tag");
+    tag.textContent = "AI";
+    return tag;
   }
 
   function appendMessage(role, content, metadata) {
@@ -441,7 +453,9 @@
     var typing = el("span", "ai-typing");
     typing.append(el("span"), el("span"), el("span"));
     bubbleNode.appendChild(typing);
-    var meta = el("div", "ai-msg__meta", "AI · " + state.model);
+    var meta = el("div", "ai-msg__meta");
+    meta.appendChild(aiTag());
+    meta.appendChild(document.createTextNode(state.model));
     aiMsg.append(bubbleNode, meta);
     els.chat.appendChild(aiMsg);
     scrollBottom();
@@ -463,7 +477,10 @@
       setStatus("");
       if (full) {
         bubbleNode.innerHTML = renderMarkdown(full);
-        aiMsgNode.querySelector(".ai-msg__meta").textContent = "AI · " + (payload.model || state.model);
+        var m = aiMsgNode.querySelector(".ai-msg__meta");
+        m.textContent = "";
+        m.appendChild(aiTag());
+        m.appendChild(document.createTextNode(payload.model || state.model));
         addActionButtons(aiMsgNode, full);
         loadConversations();
       } else {

@@ -183,9 +183,12 @@
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="text-muted mb-0">
-                        Work with your study group on a shared project — <a href="{{ url_for('collab.workspace_list') }}">create a workspace</a>.
-                    </p>
+                    <div class="empty-state">
+                        <p class="empty-state__body">Work with your study group on a shared project — tasks, chat, and deadlines in one place.</p>
+                        <div class="empty-state__action">
+                            <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_list') }}">Create a workspace</a>
+                        </div>
+                    </div>
                 {% endif %}
             </section>
 

@@ -33,7 +33,11 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .workspace-card { animation: sp-card-in var(--dur-base) var(--ease-out) both; }
 }
 
 .workspace-card:hover {

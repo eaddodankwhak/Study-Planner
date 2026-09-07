@@ -42,7 +42,7 @@
 }
 
 .ai-newchat:hover {
-  background: #e0871f;
+  background: var(--color-accent-dark);
   color: #2b1b00;
 }
 
@@ -87,7 +87,7 @@
   display: flex;
   gap: var(--space-1);
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
 
 .ai-conv-item:hover .ai-conv-actions {
@@ -277,7 +277,7 @@
   font-weight: 600;
   color: var(--color-primary-light);
   cursor: pointer;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 
 .ai-suggestion:hover {
@@ -290,6 +290,10 @@
   display: flex;
   flex-direction: column;
   max-width: 76%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ai-msg { animation: sp-item-in var(--dur-base) var(--ease-out) both; }
 }
 
 .ai-msg--user {
@@ -325,6 +329,32 @@
   font-size: 0.75rem;
   color: var(--color-muted);
   margin-top: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* AI-content marker: a fixed, small pill so AI-generated material is never
+   visually confused with human writing. */
+.ai-msg__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-primary-light);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.ai-msg--assistant .ai-msg__tag {
+  border-color: rgb(240 153 55 / 0.4);
+  background: rgb(240 153 55 / 0.1);
+  color: var(--color-accent);
 }
 
 /* Rich markdown content inside assistant bubbles */
@@ -347,7 +377,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0.1rem 0.3rem;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-monospace);
   font-size: 0.9em;
 }
 

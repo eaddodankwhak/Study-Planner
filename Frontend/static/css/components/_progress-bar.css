@@ -1,4 +1,5 @@
-/* Progress bar used on workspace cards (completion visually + via aria). */
+/* Progress bar used on workspace cards (completion visually + via aria).
+   Width is the only animated property; duration covers milestone moments. */
 
 .progress-bar {
   height: 8px;
@@ -11,5 +12,5 @@
   height: 100%;
   border-radius: 999px;
   background: var(--color-primary-light);
-  transition: width 0.3s ease;
+  transition: width var(--dur-base) var(--ease-out);
 }

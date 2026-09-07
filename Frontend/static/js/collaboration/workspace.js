@@ -142,6 +142,10 @@
                     card.setAttribute("data-status-current", "blocked");
                     setBadge(card, "blocked", reason);
                     refreshCardButtons(card);
+                    // a blocked task deserves a beat of attention
+                    card.classList.remove("is-blocked-flash");
+                    void card.offsetWidth;
+                    card.classList.add("is-blocked-flash");
                 }
                 alert("Task marked blocked. Consider raising an info request on the Requests tab.");
             });
@@ -173,7 +177,6 @@
             return;
         }
         panel.hidden = false;
-        panel.querySelector(".task-panel__loader").textContent = "Loading…";
         fetch(api, { credentials: "same-origin" }).then(function (res) {
             if (!res.ok) throw new Error("load failed");
             return res.text();

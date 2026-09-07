@@ -1,6 +1,8 @@
 /*
- * Utilities layer: small helper classes.
+ * Utilities layer: small helper classes, stat cards, badges, priority,
+ * tables, and the empty-state component.
  */
+
 .text-center { text-align: center; }
 .text-muted { color: var(--color-muted); }
 .mt-1 { margin-top: var(--space-1); }
@@ -32,7 +34,7 @@
   margin-top: var(--space-3);
 }
 
-/* Stat cards */
+/* Stat cards — hero numbers get the display treatment (heavy + tight). */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
@@ -50,9 +52,11 @@
 }
 
 .stat__value {
-  font-size: 1.6rem;
-  font-weight: 700;
+  font-size: 1.75rem;
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
   color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .stat__label {
@@ -72,24 +76,24 @@
   margin-top: var(--space-1);
 }
 
-/* Priority colour tokens (critical / moderate / mastered) */
+/* Priority colour tokens (critical / moderate / mastered) — token-driven. */
 .priority-critical {
-  border: 1px solid #c62828;
+  border: 1px solid var(--priority-critical);
   border-left-width: 4px;
 }
 
 .priority-moderate {
   border: 1px solid var(--color-border);
   border-left-width: 4px;
-  border-left-color: #f09937;
+  border-left-color: var(--priority-moderate);
 }
 
 .priority-mastered {
   border-left-width: 4px;
-  border-left-color: #2e7d32;
+  border-left-color: var(--priority-mastered);
 }
 
-/* Priority badges */
+/* Priority + doodle badges — colors reference the tokens, never raw hex. */
 .badge {
   display: inline-block;
   padding: var(--space-1) var(--space-2);
@@ -101,10 +105,10 @@
 }
 
 .badge--high { background: #fdecea; color: var(--priority-critical); }
-.badge--medium { background: #fff4e0; color: var(--priority-moderate); }
+.badge--medium { background: #fdf1df; color: var(--priority-moderate); }
 .badge--low { background: #e7f4e9; color: var(--priority-mastered); }
 .badge--done { background: #e7f4e9; color: var(--priority-mastered); }
-.badge--open { background: #eaf1ff; color: #0f3a52; }
+.badge--open { background: #eaf1ff; color: var(--color-primary); }
 
 /* Priority left-border list item */
 .task--high { border-left: 4px solid var(--priority-critical); }
@@ -137,10 +141,37 @@
   background: var(--color-bg);
 }
 
-/* Empty state */
+/* Empty state — a designed "moment": icon, headline (display treatment),
+   a one-line explanation, and a clear next action. */
 .empty-state {
   text-align: center;
   color: var(--color-muted);
-  padding: var(--space-8) var(--space-4);
+  padding: var(--space-12) var(--space-6);
+  border-radius: var(--radius);
 }
 
+.empty-state__icon {
+  display: block;
+  font-size: 1.6rem;
+  line-height: 1;
+  opacity: 0.7;
+  margin-bottom: var(--space-3);
+}
+
+.empty-state__title {
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
+  color: var(--color-text);
+  font-size: 1.05rem;
+  margin-bottom: var(--space-1);
+}
+
+.empty-state__body {
+  max-width: 26rem;
+  margin-inline: auto;
+  font-size: 0.9rem;
+}
+
+.empty-state__action {
+  margin-top: var(--space-4);
+}

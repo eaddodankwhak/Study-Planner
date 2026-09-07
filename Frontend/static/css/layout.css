@@ -232,7 +232,7 @@
     padding: var(--space-4);
     gap: var(--space-1);
     transform: translateX(100%);
-    transition: transform 0.25s ease;
+    transition: transform var(--dur-base) var(--ease-drawer);
     overflow-y: auto;
     z-index: 55;
   }
