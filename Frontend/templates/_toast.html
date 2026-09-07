@@ -1,0 +1,13 @@
+<div class="toast-container" data-toast-container aria-label="Notifications">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="toast toast--{{ category if category in ['success', 'error', 'info'] else 'info' }}"
+             data-toast role="{{ 'alert' if category == 'error' else 'status' }}"
+             aria-live="{{ 'assertive' if category == 'error' else 'polite' }}" aria-atomic="true">
+            <span class="toast__icon" aria-hidden="true">{{ '!' if category == 'error' else ('✓' if category == 'success' else 'i') }}</span>
+            <span class="toast__message">{{ message }}</span>
+            <button class="toast__close" type="button" data-toast-close aria-label="Dismiss notification">&times;</button>
+        </div>
+        {% endfor %}
+    {% endwith %}
+</div>

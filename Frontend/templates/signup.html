@@ -9,6 +9,7 @@
 </head>
 
 <body class="auth-page">
+    {% include '_toast.html' %}
     <main class="auth-card">
         <header class="auth-card__banner">
             <h1>Study Planner</h1>
@@ -16,16 +17,6 @@
         </header>
 
         <div class="auth-card__body">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            <ul class="flashes" role="status" aria-live="polite">
-                {% for category, message in messages %}
-                <li class="{{ category }}">{{ message }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-            {% endwith %}
-
             <form action="{{ url_for('signup_post') }}" method="post">
                 <div class="form-field">
                     <label for="name">Full name</label>
@@ -55,6 +46,7 @@
     </main>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
     <script src="{{ url_for('static', filename='js/hci.js') }}"></script>
     <script>
         const toggle = document.getElementById('toggle-pw');

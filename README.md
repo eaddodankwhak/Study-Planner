@@ -182,6 +182,15 @@ Optional `*_MODEL` / `*_BASE_URL` variables override the default model/endpoint 
 provider. Limits are configurable via `AI_MAX_REQUESTS_PER_DAY`, `AI_MAX_QUESTION_CHARS`,
 `AI_MAX_MATERIAL_CHARS`, `AI_MAX_OUTPUT_TOKENS`, and `AI_MAX_FILE_BYTES`.
 
+## Toast notifications
+
+Action feedback uses the shared toast surface in `Frontend/templates/_toast.html`, which
+is mounted by the base layout and authentication pages. Flask routes should use
+`flash("Message", "success")`, `flash("Message", "error")`, or `flash("Message", "info")`
+before redirecting so the next page shows a consistent toast. Browser-side code can use
+the same pattern through `window.StudyPlannerToast.success(message)`,
+`window.StudyPlannerToast.error(message)`, or `window.StudyPlannerToast.info(message)`.
+
 ### Optional material-extraction libraries
 
 Add `PyPDF2`, `python-docx`, and `Pillow` for richer PDF/DOCX/image handling. Without them the
