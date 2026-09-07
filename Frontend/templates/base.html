@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Study Planner{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ai.css') }}">
     <meta name="user-id" content="{{ user.id if user else '' }}">
     {% block head %}{% endblock %}
 </head>
@@ -27,6 +28,22 @@
         </main>
     {% endblock %}
 
+    {# Persistent AI assistant launcher + drawer, shown on every logged-in page.
+       Pages that render the panel themselves (e.g. /ai-hub) override this block
+       to avoid duplicate IDs. #}
+    {% block ai_launcher %}
+    <button id="ai-launcher" class="ai-launcher" aria-label="Open AI assistant" aria-haspopup="dialog">
+        <img src="{{ url_for('static', filename='img/ai-orb.svg') }}" alt="" class="ai-launcher__icon">
+    </button>
+
+    <aside id="ai-drawer" class="ai-drawer" role="dialog" aria-label="AI assistant" aria-hidden="true">
+        {% include 'ai/_panel.html' %}
+    </aside>
+    {% endblock %}
+
     {% block scripts %}{% endblock %}
+
+    <script src="{{ url_for('static', filename='js/ai_hub.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/ai-launcher.js') }}" defer></script>
 </body>
 </html>

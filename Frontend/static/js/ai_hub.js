@@ -1,42 +1,52 @@
 /*
- * AI Learning Hub front-end controller.
- * Talks to the /api/ai/* JSON endpoints (and /api/ai/.../messages?stream=1 for
- * Server-Sent Events). No provider-specific logic lives here.
+ * AI assistant front-end controller (shared).
+ *
+ * Sole client for the /api/ai/* JSON endpoints (SSE for streaming). Runs once
+ * in BOTH contexts: inside the floating drawer on every page, and full-width on
+ * /ai-hub, hydrating the same ai/_panel.html partial. No provider-specific
+ * logic lives here. One component, two layouts.
  */
 (function () {
   "use strict";
 
   var API = "/api/ai";
+  var panel = document.querySelector("[data-ai-panel]");
+  if (!panel) return;
 
   var state = {
     meta: { models: [], modes: [], preferences: { model: "claude", level: "intermediate" }, usage: { used: 0, limit: 0 }, mockMode: true },
     conversations: [],
-    current: null, // conversation object
+    current: null,
     model: "claude",
     mode: "ask",
     streaming: false,
-    material: null, // {id, filename}
+    material: null,
   };
 
   var els = {
+    panel: panel,
     sidebar: document.getElementById("ai-sidebar"),
     convList: document.getElementById("ai-conv-list"),
     modelList: document.getElementById("ai-model-list"),
+    modelTrigger: document.getElementById("ai-model-trigger"),
+    currentModel: document.getElementById("ai-current-model"),
+    mockHint: document.getElementById("ai-mock-hint"),
     modes: document.getElementById("ai-modes"),
     chat: document.getElementById("ai-chat"),
+    emptyState: document.getElementById("ai-empty-state"),
     status: document.getElementById("ai-status"),
     input: document.getElementById("ai-input"),
     send: document.getElementById("ai-send"),
     title: document.getElementById("ai-conv-title"),
     usage: document.getElementById("ai-usage"),
-    currentModel: document.getElementById("ai-current-model"),
     attachBtn: document.getElementById("ai-attach-btn"),
     fileInput: document.getElementById("ai-file-input"),
     attachments: document.getElementById("ai-attachments"),
     clearConv: document.getElementById("ai-clear-conv"),
     newConv: document.getElementById("ai-new-conv"),
-    menuToggle: document.getElementById("ai-menu-toggle"),
   };
+
+  if (!els.chat || !els.input) return;
 
   // ------------------------------------------------------------------ utils
 
@@ -74,74 +84,79 @@
     els.status.className = "ai-status" + (isError ? " ai-status--error" : "");
   }
 
-  // minimal markdown -> trusted HTML for AI (markdown) output. Content is from
-  // the AI provider and rendered deliberately (not escaped) so formatting shows.
   function renderMarkdown(text) {
     var t = escapeHtml(text || "");
-    // code fences
     t = t.replace(/```(\w*)\n([\s\S]*?)```/g, function (m, lang, code) {
       return '<pre><code class="lang-' + escapeHtml(lang) + '">' + code + "</code></pre>";
     });
-    // inline code
-    t = t.replace(/`([^`]+)`/g, function (m, c) {
-      return "<code>" + c + "</code>";
-    });
-    // headings
+    t = t.replace(/`([^`]+)`/g, function (m, c) { return "<code>" + c + "</code>"; });
     t = t.replace(/^### (.*)$/gm, "<h3>$1</h3>");
     t = t.replace(/^## (.*)$/gm, "<h2>$1</h2>");
     t = t.replace(/^# (.*)$/gm, "<h1>$1</h1>");
-    // bold
     t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    // italic
     t = t.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
-    // links
     t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    // bullet lists
     t = t.replace(/^\s*[-*]\s+/gm, "<li>").replace(/(<li>[^<]*\n?)+/g, function (m) {
       return "<ul>" + m.replace(/\n/g, "") + "</ul>";
     });
-    // numbered lists
     t = t.replace(/^\s*\d+\.\s+/gm, "<li>").replace(/(<li>[^<]*\n?)+/g, function (m) {
       return "<ol>" + m.replace(/\n/g, "") + "</ol>";
     });
-    // paragraphs
     t = t.replace(/\n{2,}/g, "</p><p>");
     t = t.replace(/\n/g, "<br>");
-    if (t.indexOf("<p>") === -1 && (t.indexOf("<li>") === -1)) {
-      t = "<p>" + t + "</p>";
-    }
-    // blockquote
+    if (t.indexOf("<p>") === -1 && t.indexOf("<li>") === -1) t = "<p>" + t + "</p>";
     t = t.replace(/<p>(&gt;|&gt;&gt;) ([^<]*)<\/p>/g, "<blockquote>$2</blockquote>");
     return t;
   }
 
-  // ------------------------------------------------------------------ model list
+  // ------------------------------------------------------------- models
+
+  function findModel(id) {
+    return state.meta.models.find(function (m) { return m.id === id; }) || null;
+  }
 
   function renderModels() {
+    // Populate the compact dropdown (replaces the three always-visible cards).
     els.modelList.innerHTML = "";
     state.meta.models.forEach(function (m) {
-      var label = el("label", "ai-model-option" + (m.id === state.model ? " ai-model-option--selected" : ""));
-      var radio = document.createElement("input");
-      radio.type = "radio";
-      radio.name = "ai-model";
-      radio.value = m.id;
-      radio.checked = m.id === state.model;
-      radio.setAttribute("aria-label", m.displayName);
-      radio.addEventListener("change", function () {
-        setModel(m.id);
-      });
+      var li = el("li", "ai-panel__model-option");
+      li.setAttribute("role", "option");
+      li.setAttribute("data-provider", m.id);
+      li.setAttribute("aria-selected", String(m.id === state.model));
       var strong = el("strong", null, m.displayName);
-      var small = el("small", null, m.description);
-      var body = el("div");
-      body.append(strong, small);
-      label.append(radio, body);
-      els.modelList.appendChild(label);
+      var span = el("span", "ai-panel__model-desc", m.description || "");
+      li.append(strong, span);
+      li.addEventListener("click", function () {
+        setModel(m.id);
+        closeModelList();
+      });
+      els.modelList.appendChild(li);
     });
+    els.currentModel.textContent = (findModel(state.model) || {}).displayName || state.model;
   }
+
+  function openModelList() {
+    els.modelList.hidden = false;
+    els.modelTrigger.setAttribute("aria-expanded", "true");
+    els.modelList.focus();
+  }
+
+  function closeModelList() {
+    els.modelList.hidden = true;
+    els.modelTrigger.setAttribute("aria-expanded", "false");
+  }
+
+  // Close the dropdown on outside click / Escape.
+  document.addEventListener("click", function (e) {
+    if (e.target.closest("[data-model-select]")) return;
+    if (!els.modelList.hidden) closeModelList();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !els.modelList.hidden) closeModelList();
+  });
 
   function setModel(id) {
     state.model = id;
-    els.currentModel.textContent = (state.meta.models.find(function (m) { return m.id === id; }) || {}).displayName || id;
     renderModels();
     if (state.current) {
       api("/conversations/" + state.current.id, { method: "PATCH", body: { model: id } }).then(function () {
@@ -151,7 +166,7 @@
     api("/preferences", { method: "PUT", body: { model: id } }).catch(function () {});
   }
 
-  // ------------------------------------------------------------------ modes
+  // ------------------------------------------------------------- modes
 
   function renderModes() {
     els.modes.innerHTML = "";
@@ -160,7 +175,7 @@
       chip.type = "button";
       chip.title = m.description;
       chip.setAttribute("role", "tab");
-      chip.setAttribute("aria-selected", m.id === state.mode);
+      chip.setAttribute("aria-selected", String(m.id === state.mode));
       chip.addEventListener("click", function () { setMode(m.id); });
       els.modes.appendChild(chip);
     });
@@ -172,7 +187,7 @@
     els.input.focus();
   }
 
-  // ------------------------------------------------------------------ conversations
+  // ------------------------------------------------------ conversations
 
   function loadConversations(selectId) {
     return api("/conversations").then(function (d) {
@@ -185,7 +200,10 @@
   function renderConvList(selectId) {
     els.convList.innerHTML = "";
     if (!state.conversations.length) {
-      var empty = el("li", "ai-sidebar__heading", "No conversations yet.");
+      // Designed empty state (not all-caps placeholder text).
+      var empty = el("li", "ai-panel__conv-empty");
+      empty.appendChild(el("p", "ai-panel__conv-empty-title", "No conversations yet"));
+      empty.appendChild(el("p", "ai-panel__conv-empty-body", "Start with a quick action below, or just type a question."));
       els.convList.appendChild(empty);
       return;
     }
@@ -247,7 +265,7 @@
       .then(function () {
         if (state.current && state.current.id === id) {
           state.current = null;
-          els.title.textContent = "AI Learning Hub";
+          els.title.textContent = "AI assistant";
           renderChatFromMessages([]);
         }
         return loadConversations();
@@ -260,56 +278,45 @@
     api("/conversations/" + state.current.id, { method: "DELETE" })
       .then(function () {
         state.current = null;
-        els.title.textContent = "AI Learning Hub";
+        els.title.textContent = "AI assistant";
         renderChatFromMessages([]);
         return loadConversations();
       })
       .catch(function (e) { setStatus(e.message, true); });
   }
 
-  // ------------------------------------------------------------------ chat render
+  // -------------------------------------------------------- chat render
 
   function renderChatFromMessages(messages) {
     els.chat.innerHTML = "";
     if (!messages || !messages.length) {
+      showEmptyState(true);
       renderWelcome();
       return;
     }
+    showEmptyState(false);
     messages.forEach(function (m) {
-      appendMessage(m.role, m.content, m.metadata || {});
+      appendMessage(m.role, m.content, m.metadata || {}, false);
     });
     scrollBottom();
   }
 
-  function renderWelcome() {
-    els.chat.innerHTML = "";
-    var wrap = el("div", "ai-welcome");
-    wrap.appendChild(el("h2", null, "How can I help you study today?"));
-    wrap.appendChild(el("h3", null, "Pick a task below or just start typing."));
+  function showEmptyState(visible) {
+    if (els.emptyState) {
+      els.emptyState.classList.toggle("is-hidden", !visible);
+      if (visible) {
+        // One-time stagger mount for the quick-action cards.
+        els.emptyState.classList.add("is-mounted");
+      }
+    }
+  }
 
-    var grid = el("div", "ai-suggestions");
-    var suggestions = [
-      { label: "Explain a topic", text: "Explain recursion to me like I'm a beginner." },
-      { label: "Summarize notes", text: "Summarize the key points of photosynthesis." },
-      { label: "Solve a question", text: "Solve: integrate x^2 from 0 to 3, step by step." },
-      { label: "Generate a quiz", text: "Create 5 quiz questions about the periodic table." },
-      { label: "Create flashcards", text: "Make flashcards for the key terms in genetics." },
-      { label: "Build a study plan", text: "Make me a 1-week study plan for my statistics exam." },
-      { label: "Prepare for an exam", text: "Help me prepare for my calculus exam next week." },
-      { label: "Ask anything", text: "Can you explain how DNA replication works?" },
-    ];
-    suggestions.forEach(function (s) {
-      var b = el("button", "ai-suggestion", s.label);
-      b.type = "button";
-      b.addEventListener("click", function () {
-        els.input.value = s.text;
-        els.input.focus();
-        autosize();
-      });
-      grid.appendChild(b);
-    });
-    wrap.appendChild(grid);
-    els.chat.appendChild(wrap);
+  function renderWelcome() {
+    // Static server-rendered quick-action grid is the empty state. Focus the
+    // composer only; the cards carry data-init-prompt handled at init.
+    if (state.current) {
+      els.title.textContent = state.current.title;
+    }
   }
 
   function bubble(role, content, metadata, isStreaming) {
@@ -332,81 +339,45 @@
     return msg;
   }
 
-  // Small "AI" pill marking that this content was machine-generated.
   function aiTag() {
     var tag = el("span", "ai-msg__tag");
     tag.textContent = "AI";
     return tag;
   }
 
-  function appendMessage(role, content, metadata) {
-    els.chat.appendChild(bubble(role, content, metadata || {}));
+  function appendMessage(role, content, metadata, withActions) {
+    var msg = bubble(role, content, metadata || {});
+    els.chat.appendChild(msg);
+    if (role === "assistant" && withActions) {
+      addFollowUps(msg);
+    }
     scrollBottom();
   }
 
-  // ------------------------------------------------------------------ actions on replies
-
-  function addActionButtons(msgNode, content) {
-    var actions = el("div", "ai-msg__actions");
-
-    var copy = el("button", "ai-action", "Copy");
-    copy.type = "button";
-    copy.addEventListener("click", function () {
-      navigator.clipboard.writeText(content).then(function () { setStatus("Copied to clipboard."); });
+  // Contextual follow-up suggestions under the latest AI reply. These are the
+  // only pills, and they appear only once a conversation is underway.
+  function addFollowUps(msgNode) {
+    var wrap = el("div", "ai-followups");
+    wrap.appendChild(el("span", "ai-followups__label", "Follow up"));
+    var chips = [
+      { label: "Simplify", mode: "simplify", text: "Rewrite your previous explanation in simpler language." },
+      { label: "Go deeper", mode: "explain", text: "Go deeper on the topic you just explained with more detail and examples." },
+      { label: "Give example", mode: "explain", text: "Give another concrete example of the topic you just discussed." },
+      { label: "Quiz me", mode: "quiz", text: "Create quiz questions on the topic you just discussed." },
+    ];
+    chips.forEach(function (c) {
+      var b = el("button", "ai-action ai-action--followup", c.label);
+      b.type = "button";
+      b.addEventListener("click", function () {
+        setMode(c.mode);
+        sendMessage(c.text);
+      });
+      wrap.appendChild(b);
     });
-
-    var simplify = el("button", "ai-action", "Simplify");
-    simplify.type = "button";
-    simplify.addEventListener("click", function () {
-      setMode("simplify");
-      sendMessage("Rewrite your previous explanation in simpler language.");
-    });
-
-    var deeper = el("button", "ai-action", "Explain deeper");
-    deeper.type = "button";
-    deeper.addEventListener("click", function () {
-      setMode("explain");
-      sendMessage("Go deeper on the topic you just explained with more detail and examples.");
-    });
-
-    var example = el("button", "ai-action", "Give example");
-    example.type = "button";
-    example.addEventListener("click", function () {
-      setMode("explain");
-      sendMessage("Give another concrete example of the topic you just discussed.");
-    });
-
-    var quiz = el("button", "ai-action", "Quiz me");
-    quiz.type = "button";
-    quiz.addEventListener("click", function () {
-      setMode("quiz");
-      sendMessage("Create quiz questions on the topic you just discussed.");
-    });
-
-    var save = el("button", "ai-action", "Save to notes");
-    save.type = "button";
-    save.addEventListener("click", function () {
-      saveToNotes(content);
-    });
-
-    actions.append(copy, save, simplify, deeper, example, quiz);
-    msgNode.appendChild(actions);
+    msgNode.appendChild(wrap);
   }
 
-  function saveToNotes(content) {
-    var blob = new Blob(["AI Learning Hub note\n\n" + content], { type: "text/plain" });
-    var a = document.createElement("a");
-    var url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = "ai-note.md";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setStatus("Note downloaded as ai-note.md. (Paste into your planner to save.)");
-  }
-
-  // ------------------------------------------------------------------ sending
+  // ---------------------------------------------------------------- sending
 
   function autosize() {
     els.input.style.height = "auto";
@@ -418,7 +389,6 @@
     if (!text) return;
     if (state.streaming) return;
     if (!state.current) {
-      // auto-create a conversation on first message
       createConversationAndSend(text);
       return;
     }
@@ -432,6 +402,7 @@
         state.conversations.unshift(state.current);
         renderConvList();
         els.title.textContent = state.current.title;
+        showEmptyState(false);
         doSend(text);
       })
       .catch(function (e) { setStatus(e.message, true); });
@@ -440,14 +411,12 @@
   function doSend(text) {
     els.input.value = "";
     autosize();
+    showEmptyState(false);
 
-    // Append user message locally.
-    appendMessage("user", text, {});
-    // Clear welcome if present.
-    var welcome = els.chat.querySelector(".ai-welcome");
+    appendMessage("user", text, {}, false);
+    var welcome = els.chat.querySelector(".ai-followups");
     if (welcome) welcome.remove();
 
-    // Creating assistant placeholder + typing indicator.
     var aiMsg = el("div", "ai-msg ai-msg--assistant");
     var bubbleNode = el("div", "ai-msg__bubble");
     var typing = el("span", "ai-typing");
@@ -464,11 +433,7 @@
     els.send.disabled = true;
     setStatus("AI is thinking…");
 
-    var body = {
-      message: text,
-      mode: state.mode,
-      model: state.model,
-    };
+    var body = { message: text, mode: state.mode, model: state.model };
     if (state.material) body.materialId = state.material.id;
 
     function finishStream(aiMsgNode, payload, full) {
@@ -481,7 +446,7 @@
         m.textContent = "";
         m.appendChild(aiTag());
         m.appendChild(document.createTextNode(payload.model || state.model));
-        addActionButtons(aiMsgNode, full);
+        addFollowUps(aiMsgNode);
         loadConversations();
       } else {
         aiMsgNode.remove();
@@ -497,7 +462,6 @@
       scrollBottom();
     }
 
-    // Use SSE streaming with fetch.
     fetch(API + "/conversations/" + state.current.id + "/messages?stream=1", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -515,10 +479,7 @@
         function pump() {
           return reader.read().then(function (result) {
             if (result.done) {
-              if (!started) {
-                // No chunks received but stream ended normally -> empty reply.
-                full = "";
-              }
+              if (!started) full = "";
               return finishStream(aiMsg, body, full);
             }
             var chunkText = decoder.decode(result.value, { stream: true });
@@ -531,10 +492,7 @@
                   try {
                     var data = JSON.parse(payload);
                     if (data.type === "chunk" && data.text) {
-                      if (!started) {
-                        started = true;
-                        typing.remove();
-                      }
+                      if (!started) { started = true; typing.remove(); }
                       full += data.text;
                       bubbleNode.innerHTML = renderMarkdown(full);
                       scrollBottom();
@@ -560,11 +518,12 @@
 
   function renderWelcomeIfEmpty() {
     if (!els.chat.querySelectorAll(".ai-msg").length) {
+      showEmptyState(true);
       renderWelcome();
     }
   }
 
-  // ------------------------------------------------------------------ attachments
+  // ------------------------------------------------------------ attachments
 
   function onFileSelected(e) {
     var file = e.target.files && e.target.files[0];
@@ -606,9 +565,26 @@
 
   function renderUsage(m) {
     state.meta = m;
-    els.usage.textContent = "AI requests today: " + m.usage.used + " / " + (m.usage.limit === 0 ? "∞" : m.usage.limit);
-    var mockHint = m.mockMode ? " (demo mode — no API key)" : "";
-    els.currentModel.textContent = (m.models.find(function (x) { return x.id === state.model; }) || {}).displayName || state.model;
+    var used = m.usage.used;
+    var limit = m.usage.limit;
+    var isUnlimited = limit === 0;
+    var pct = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
+    els.usage.innerHTML = "";
+    var label = el("span", "ai-panel__quota-label", "AI requests today: " + used + " of " + (isUnlimited ? "∞" : limit));
+    var bar = el("div", "ai-panel__quota-track");
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", String(isUnlimited ? 1 : limit));
+    bar.setAttribute("aria-valuenow", String(isUnlimited ? 0 : used));
+    var fill = el("div", "ai-panel__quota-fill" + (pct >= 90 ? " ai-panel__quota-fill--warn" : ""));
+    fill.style.width = pct + "%";
+    bar.appendChild(fill);
+    els.usage.append(label, bar);
+
+    if (els.mockHint) {
+      els.mockHint.hidden = !m.mockMode;
+    }
+    els.currentModel.textContent = (findModel(state.model) || {}).displayName || state.model;
   }
 
   // ------------------------------------------------------------------ init
@@ -630,9 +606,23 @@
     els.clearConv.addEventListener("click", clearCurrent);
     els.attachBtn.addEventListener("click", function () { els.fileInput.click(); });
     els.fileInput.addEventListener("change", onFileSelected);
-    if (els.menuToggle) {
-      els.menuToggle.addEventListener("click", function () {
-        els.sidebar.classList.toggle("is-open");
+    if (els.modelTrigger) {
+      els.modelTrigger.addEventListener("click", function () {
+        els.modelList.hidden ? openModelList() : closeModelList();
+      });
+    }
+
+    // Server-rendered quick-action cards: fill the composer and send.
+    if (els.emptyState) {
+      els.emptyState.querySelectorAll("[data-init-prompt]").forEach(function (card) {
+        card.addEventListener("click", function () {
+          var template = card.getAttribute("data-init-prompt") || "";
+          var subject = "";
+          var text = template.replace("{subject}", subject).trim();
+          els.input.value = text;
+          els.input.focus();
+          autosize();
+        });
       });
     }
 
@@ -650,6 +640,13 @@
           openConversation(state.conversations[0].id);
         } else {
           renderWelcome();
+          // Ensure the freshly-server-rendered empty state staggers in even if
+          // no chat runs this session (cards already visible in static markup).
+          if (els.emptyState && !els.emptyState.classList.contains("is-hidden")) {
+            setTimeout(function () {
+              els.emptyState.classList.add("is-mounted");
+            }, 30);
+          }
         }
       })
       .catch(function (e) { setStatus(e.message, true); });

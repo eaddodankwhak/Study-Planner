@@ -103,6 +103,35 @@ app.register_blueprint(ai_pkg.get_ai_blueprint())
 # Register the Collaborative Workspace blueprint.
 app.register_blueprint(collab_pkg.get_collaboration_blueprint())
 
+# ---------------------------------------------------------------------------
+# AI assistant quick-start affordances (shared by the floating launcher drawer
+# and the full /ai-hub page — one server-rendered set, never duplicated).
+# ---------------------------------------------------------------------------
+AI_QUICK_ACTIONS = [
+    {"label": "Explain a topic", "template": "Explain {subject} to me like I'm a beginner."},
+    {"label": "Summarize notes", "template": "Summarize the key points of photosynthesis."},
+    {"label": "Solve a question", "template": "Solve the following step by step: integrate x^2 from 0 to 3."},
+    {"label": "Generate a quiz", "template": "Create 5 quiz questions about the periodic table."},
+    {"label": "Create flashcards", "template": "Make flashcards for the key terms in genetics."},
+    {"label": "Build a study plan", "template": "Make me a 1-week study plan for my statistics exam."},
+]
+
+AI_PROVIDERS = [
+    {"id": "claude", "name": "Claude", "tagline": "Deep reasoning and clear explanations."},
+    {"id": "gpt", "name": "GPT", "tagline": "Versatile general-purpose study assistant."},
+    {"id": "gemini", "name": "Gemini", "tagline": "Great for multimodal and broad study tasks."},
+]
+
+
+@app.context_processor
+def inject_ai_launcher():
+    """Give every rendered page the AI assistant launcher data (quick actions
+    and provider list are the single source of truth shared by drawer and page)."""
+    return {
+        "quick_actions": AI_QUICK_ACTIONS,
+        "providers": AI_PROVIDERS,
+    }
+
 # Sample subjects shown on the dashboard (Sakai-style course cards).
 SUBJECTS = [
     {
@@ -1229,14 +1258,13 @@ def progress():
 @app.get("/ai")
 @login_required
 def ai_hub():
-    """Render the AI Learning Hub."""
-    user = current_user()
-    return render_template(
-        "ai_hub.html",
-        user=user,
-        active_nav="ai",
-        subjects=user_subjects(user),
-    )
+    """Render the AI Learning Hub full-page view.
+
+    Shares the exact same ai/_panel.html partial the floating drawer uses, so
+    the two layouts can never drift apart. The drawer is the primary entry
+    point; this route just lets someone pin the AI to a full browser tab.
+    """
+    return render_template("ai_hub.html", user=current_user())
 
 
 # ---------------------------------------------------------------------------

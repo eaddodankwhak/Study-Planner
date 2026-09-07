@@ -11,7 +11,6 @@
     <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'calendar' else '' }}" href="{{ url_for('calendar') }}" data-nav-item>Calendar</a>
     <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'practice' else '' }}" href="{{ url_for('task') }}" data-nav-item>Practice</a>
     <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'progress' else '' }}" href="{{ url_for('progress') }}" data-nav-item>Progress</a>
-    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'ai' else '' }}" href="{{ url_for('ai_hub') }}" data-nav-item>AI Hub</a>
 
     <div class="profile-menu" data-profile>
         <button class="profile-menu__trigger nav-bar__link" data-profile-trigger>
@@ -40,7 +39,7 @@
 
 <!-- Command palette (Ctrl/Cmd+K) -->
 <div class="palette" data-palette
-     data-routes='[{"label":"Home","crumb":"Dashboard","url":{{ url_for("home")|tojson }}},{"label":"Courses","crumb":"Browse subjects","url":{{ url_for("courses")|tojson }}},{"label":"Calendar","crumb":"Schedule & deadlines","url":{{ url_for("calendar")|tojson }}},{"label":"Practice","crumb":"Tasks & focus","url":{{ url_for("task")|tojson }}},{"label":"Progress","crumb":"Stats & trends","url":{{ url_for("progress")|tojson }}},{"label":"AI Hub","crumb":"Study assistant","url":{{ url_for("ai_hub")|tojson }}},{"label":"Group Workspaces","crumb":"Collaborate","url":{{ url_for("collab.workspace_list")|tojson }}},{"label":"Settings","crumb":"Profile & privacy","url":{{ url_for("settings")|tojson }}},{"label":"Export data","crumb":"Inside Settings","url":{{ url_for("export_data")|tojson }}},{"label":"About","crumb":"Inside Settings","url":{{ url_for("about")|tojson }}}]'>
+     data-routes='[{"label":"Home","crumb":"Dashboard","url":{{ url_for("home")|tojson }}},{"label":"Courses","crumb":"Browse subjects","url":{{ url_for("courses")|tojson }}},{"label":"Calendar","crumb":"Schedule & deadlines","url":{{ url_for("calendar")|tojson }}},{"label":"Practice","crumb":"Tasks & focus","url":{{ url_for("task")|tojson }}},{"label":"Progress","crumb":"Stats & trends","url":{{ url_for("progress")|tojson }}},{"label":"Group Workspaces","crumb":"Collaborate","url":{{ url_for("collab.workspace_list")|tojson }}},{"label":"Settings","crumb":"Profile & privacy","url":{{ url_for("settings")|tojson }}},{"label":"Export data","crumb":"Inside Settings","url":{{ url_for("export_data")|tojson }}},{"label":"About","crumb":"Inside Settings","url":{{ url_for("about")|tojson }}}]'>
     <div class="palette__backdrop" data-palette-close></div>
     <div class="palette__dialog" role="dialog" aria-modal="true" aria-label="Command palette">
         <input class="palette__input" type="text" placeholder="Jump to a page…" data-palette-input autocomplete="off" aria-label="Search pages">

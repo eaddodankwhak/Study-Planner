@@ -1,19 +1,92 @@
 /*
- * AI Learning Hub stylesheet — a premium, Study Planner-native chat UI.
- * Uses the design tokens from variables.css and BEM naming as in components.css.
- * This file is linked by ai_hub.html in addition to styles.css.
+ * AI assistant stylesheet — shared by the floating launcher drawer (every page)
+ * and the full /ai-hub page. Loaded globally from base.html. One component,
+ * two layouts: the drawer anchors to an edge and slides/fades in; /ai-hub fills
+ * the page. Uses the design tokens from variables.css and BEM naming.
  */
 
-/* Layout: full-height hub under the shared app shell header */
-.ai-hub {
+/* ------------------------------------------------------------- launcher */
+
+.ai-launcher {
+  position: fixed;
+  z-index: 900;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
   display: grid;
-  grid-template-columns: 16rem 1fr;
-  height: calc(100vh - 3.5rem);
-  background: var(--color-bg);
+  place-items: center;
+  padding: 0;
+  touch-action: none;
 }
 
-/* Left: conversation history + options */
-.ai-sidebar {
+.ai-launcher:hover {
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.04);
+}
+
+.ai-launcher:active {
+  transform: scale(0.94);
+}
+
+.ai-launcher:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.ai-launcher__icon {
+  width: 2rem;
+  height: 2rem;
+  display: block;
+  pointer-events: none;
+}
+
+/* No idle/looping animation on the launcher — a button seen on every load
+   earns presence, not motion. Hover/press scale above is enough. */
+
+/* -------------------------------------------------------------- drawer */
+
+.ai-drawer {
+  position: fixed;
+  z-index: 950;
+  top: 3.5rem;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(26rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateX(2rem);
+  transition: opacity var(--dur-base) var(--ease-drawer),
+              transform var(--dur-base) var(--ease-drawer),
+              visibility var(--dur-base) var(--ease-drawer);
+}
+
+.ai-drawer--open {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* --------------------------------------------------------------- panel */
+
+.ai-panel {
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+.ai-panel__sidebar {
   background: var(--color-primary-dark);
   color: var(--color-text-inverse);
   display: flex;
@@ -23,22 +96,30 @@
   overflow-y: auto;
 }
 
-.ai-sidebar__heading {
+.ai-panel__heading {
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #9fc0d6;
-  margin-bottom: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
 }
 
-.ai-new {
-  width: 100%;
+.ai-panel__sidebar-footer {
+  margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+  color: #cfe0ec;
+  font-size: 0.85rem;
 }
 
 .ai-newchat {
   background: var(--color-accent);
   color: #2b1b00;
   font-weight: 700;
+  width: 100%;
 }
 
 .ai-newchat:hover {
@@ -50,6 +131,8 @@
   list-style: none;
   display: grid;
   gap: var(--space-1);
+  margin: 0;
+  padding: 0;
 }
 
 .ai-conv-item {
@@ -90,7 +173,8 @@
   transition: opacity var(--dur-fast) var(--ease-out);
 }
 
-.ai-conv-item:hover .ai-conv-actions {
+.ai-conv-item:hover .ai-conv-actions,
+.ai-conv-item:focus-within .ai-conv-actions {
   opacity: 1;
 }
 
@@ -109,97 +193,178 @@
   background: var(--color-primary);
 }
 
-.ai-sidebar__footer {
-  margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-top: var(--space-3);
-  display: grid;
-  gap: var(--space-3);
-  color: #cfe0ec;
-  font-size: 0.85rem;
+.ai-panel__clear {
+  justify-self: start;
 }
 
-/* Model radio list */
-.ai-model-list {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.ai-model-option {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  color: #d7e4ee;
-}
-
-.ai-model-option:hover {
-  background: var(--color-primary);
-}
-
-.ai-model-option--selected {
-  border-color: var(--color-accent);
-  background: var(--color-primary);
-}
-
-.ai-model-option input {
-  margin-top: 0.2rem;
-}
-
-.ai-model-option strong {
+/* Designed empty state for the conversation list (matches the app pattern). */
+.ai-panel__conv-empty {
   display: block;
+  padding: var(--space-4) var(--space-2);
+  color: #cfe0ec;
+}
+
+.ai-panel__conv-empty-title {
+  font-weight: var(--font-display-weight);
+  letter-spacing: var(--font-display-tracking);
+  margin: 0 0 var(--space-1);
+  color: #e6eef4;
   font-size: 0.95rem;
 }
 
-.ai-model-option small {
+.ai-panel__conv-empty-body {
+  margin: 0;
+  font-size: 0.85rem;
   color: #9fc0d6;
   line-height: 1.4;
 }
 
-/* Right: chat column */
-.ai-main {
+/* Quota: a thin progress bar, clearly a status (not an action). */
+.ai-panel__quota {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ai-panel__quota-label {
+  font-size: 0.85rem;
+}
+
+.ai-panel__quota-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.ai-panel__quota-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+.ai-panel__quota-fill--warn {
+  background: var(--color-blocked);
+}
+
+/* ----------------------------------------------------------- panel main */
+
+.ai-panel__main {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  background: var(--color-surface);
 }
 
-.ai-header {
+.ai-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-4);
   flex-wrap: wrap;
-  padding: var(--space-3) var(--space-6);
-  background: var(--color-surface);
+  padding: var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--color-border);
 }
 
-.ai-header__title {
+.ai-panel__title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
 }
 
-.ai-tools {
+.ai-panel__toolbar {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  flex-wrap: wrap;
 }
 
-.ai-tool {
-  font-size: 0.85rem;
+/* Compact model selector (replaces the three permanent provider cards). */
+.ai-panel__model-select {
+  position: relative;
+}
+
+.ai-panel__model-label {
+  font-size: 0.75rem;
   color: var(--color-muted);
+  margin-right: var(--space-1);
 }
 
-.ai-select {
-  padding: var(--space-1) var(--space-2);
+.ai-panel__model-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-primary-light);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  padding: var(--space-1) var(--space-2);
   font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.ai-panel__model-trigger:hover {
+  background: var(--color-primary-light);
+  color: var(--color-text-inverse);
+  border-color: transparent;
+}
+
+.ai-panel__chevron {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.ai-panel__model-trigger[aria-expanded="true"] .ai-panel__chevron {
+  transform: rotate(180deg);
+}
+
+.ai-panel__model-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  min-width: 15rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  display: grid;
+  gap: var(--space-1);
+  z-index: 10;
+}
+
+.ai-panel__model-option {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.ai-panel__model-option:hover,
+.ai-panel__model-option[aria-selected="true"] {
+  background: var(--color-bg);
+}
+
+.ai-panel__model-option strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.ai-panel__model-desc {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  margin-top: 0.1rem;
+}
+
+.ai-panel__mock {
+  font-size: 0.72rem;
+  color: var(--color-accent);
+  border: 1px solid rgb(240 153 55 / 0.4);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 /* Mode chips */
@@ -208,7 +373,6 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-6);
-  background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -236,6 +400,14 @@
 }
 
 /* Chat window */
+.ai-panel__stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .ai-chat {
   flex: 1;
   overflow-y: auto;
@@ -243,57 +415,99 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-height: 0;
 }
 
-.ai-welcome {
-  text-align: center;
-  max-width: 40rem;
-  margin: auto;
-  padding: var(--space-6);
+/* -----------------------------------------------------------------
+ * Empty state — the quick-action card grid. Left-aligned, modest scale,
+ * vertically centered within the available panel height. This is the ONLY
+ * quick-action set in the empty state (no redundant pill row).
+ * ----------------------------------------------------------------- */
+.ai-panel-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  background: var(--color-surface);
+  z-index: 5;
 }
 
-.ai-welcome h2 {
-  font-size: 1.5rem;
+.ai-panel-empty.is-hidden {
+  display: none;
 }
 
-.ai-welcome h3 {
-  font-size: 1.05rem;
+.ai-panel-empty__inner {
+  width: 100%;
+  padding: var(--space-8) var(--space-6);
+}
+
+.ai-panel__prompt {
+  font-size: 1.5rem; /* ~text-2xl, not a marketing hero */
+  letter-spacing: var(--font-display-tracking);
+  font-weight: var(--font-display-weight);
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.ai-panel__hint {
   color: var(--color-muted);
-  margin-bottom: var(--space-4);
+  margin: 0 0 var(--space-6);
+  font-size: 0.95rem;
+  text-align: left;
 }
 
-.ai-suggestions {
+.ai-panel__quick-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: var(--space-2);
-  margin-top: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: var(--space-3);
 }
 
-.ai-suggestion {
+/* Stagger-in on first empty-state render (a "rare" moment -> a transition is
+   earned). Reduced-motion users get none. */
+@media (prefers-reduced-motion: no-preference) {
+  .ai-panel-empty.is-mounted .ai-panel__quick-card {
+    animation: ai-card-in var(--dur-base) var(--ease-out) both;
+  }
+  .ai-panel-empty.is-mounted .ai-panel__quick-card:nth-child(2) { animation-delay: 40ms; }
+  .ai-panel-empty.is-mounted .ai-panel__quick-card:nth-child(3) { animation-delay: 80ms; }
+  .ai-panel-empty.is-mounted .ai-panel__quick-card:nth-child(4) { animation-delay: 120ms; }
+  .ai-panel-empty.is-mounted .ai-panel__quick-card:nth-child(5) { animation-delay: 160ms; }
+  .ai-panel-empty.is-mounted .ai-panel__quick-card:nth-child(6) { animation-delay: 200ms; }
+}
+
+@keyframes ai-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-panel__quick-card {
+  text-align: left;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: var(--space-3);
+  padding: var(--space-4);
   font-weight: 600;
   color: var(--color-primary-light);
   cursor: pointer;
-  transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
-}
-
-.ai-suggestion:hover {
+  font-family: inherit;
+  font-size: 0.95rem;
   box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
+  transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 
-/* Messages */
+.ai-panel__quick-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+  border-color: var(--color-primary-light);
+}
+
+/* ------------------------------- messages */
+
 .ai-msg {
   display: flex;
   flex-direction: column;
   max-width: 76%;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .ai-msg { animation: sp-item-in var(--dur-base) var(--ease-out) both; }
 }
 
 .ai-msg--user {
@@ -334,8 +548,6 @@
   gap: 0.35rem;
 }
 
-/* AI-content marker: a fixed, small pill so AI-generated material is never
-   visually confused with human writing. */
 .ai-msg__tag {
   display: inline-flex;
   align-items: center;
@@ -357,7 +569,6 @@
   color: var(--color-accent);
 }
 
-/* Rich markdown content inside assistant bubbles */
 .ai-msg__bubble h1, .ai-msg__bubble h2, .ai-msg__bubble h3 {
   margin: var(--space-3) 0 var(--space-2);
   font-size: 1.05rem;
@@ -368,9 +579,7 @@
   margin: var(--space-2) 0 var(--space-2) var(--space-6);
 }
 
-.ai-msg__bubble p {
-  margin: var(--space-2) 0;
-}
+.ai-msg__bubble p { margin: var(--space-2) 0; }
 
 .ai-msg__bubble code {
   background: var(--color-bg);
@@ -404,23 +613,19 @@
   color: var(--color-muted);
 }
 
-.ai-msg__bubble table {
-  border-collapse: collapse;
-  margin: var(--space-2) 0;
-  width: 100%;
-}
-
-.ai-msg__bubble table th, .ai-msg__bubble table td {
-  border: 1px solid var(--color-border);
-  padding: var(--space-1) var(--space-2);
-}
-
-/* Message action buttons */
-.ai-msg__actions {
+/* Contextual follow-up suggestions — the only pills, below the latest reply. */
+.ai-followups {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-1);
   margin-top: var(--space-2);
+}
+
+.ai-followups__label {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-right: var(--space-1);
 }
 
 .ai-action {
@@ -434,40 +639,16 @@
   font-weight: 600;
 }
 
-.ai-action:hover {
+.ai-action:hover,
+.ai-action--followup:hover {
   background: var(--color-primary-light);
   color: var(--color-text-inverse);
   border-color: transparent;
 }
 
-/* Typing indicator */
-.ai-typing {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-  padding: var(--space-1) 0;
-}
-
-.ai-typing span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-primary-light);
-  animation: ai-bounce 1.2s infinite ease-in-out;
-}
-
-.ai-typing span:nth-child(2) { animation-delay: 0.15s; }
-.ai-typing span:nth-child(3) { animation-delay: 0.3s; }
-
-@keyframes ai-bounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-  40% { transform: translateY(-6px); opacity: 1; }
-}
-
 /* Composer */
 .ai-composer {
   border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
   padding: var(--space-3) var(--space-6);
   display: grid;
   gap: var(--space-2);
@@ -541,6 +722,45 @@
   color: var(--color-text-inverse);
 }
 
+.ai-attach-btn:focus-visible,
+.ai-action:focus-visible,
+.ai-mode-chip:focus-visible,
+.ai-panel__quick-card:focus-visible,
+.ai-send:focus-visible,
+.ai-conv-link:focus-visible,
+.ai-iconbtn:focus-visible,
+.ai-panel__model-trigger:focus-visible,
+.ai-panel__model-option:focus-visible,
+.ai-launcher:focus-visible,
+.ai-newchat:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Typing indicator */
+.ai-typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: var(--space-1) 0;
+}
+
+.ai-typing span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  animation: ai-bounce 1.2s infinite ease-in-out;
+}
+
+.ai-typing span:nth-child(2) { animation-delay: 0.15s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes ai-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
+
 /* Status / error line */
 .ai-status {
   font-size: 0.85rem;
@@ -552,29 +772,24 @@
   color: var(--color-error);
 }
 
-/* Mobile responsive */
+/* ---------------------------------------------------------- responsive */
+
 @media (max-width: 48rem) {
-  .ai-hub {
+  .ai-drawer {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    border-radius: 0;
+    transform: translateY(1rem);
+  }
+
+  .ai-panel {
     grid-template-columns: 1fr;
-    height: auto;
-    min-height: calc(100vh - 3.5rem);
   }
 
-  .ai-sidebar {
+  .ai-panel__sidebar {
     display: none;
-  }
-
-  .ai-sidebar.is-open {
-    display: flex;
-  }
-
-  .ai-hub-mobile-nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-3) var(--space-4);
-    background: var(--color-primary);
-    color: var(--color-text-inverse);
   }
 
   .ai-msg {
@@ -585,31 +800,10 @@
     padding: var(--space-4);
   }
 
-  .ai-header, .ai-modes, .ai-composer {
+  .ai-panel__header,
+  .ai-modes,
+  .ai-composer {
     padding-left: var(--space-4);
     padding-right: var(--space-4);
   }
-}
-
-/* Small helper for the mobile drawer toggle (hidden on desktop) */
-.ai-hub-mobile-nav {
-  display: none;
-}
-
-@media (min-width: 48.01rem) {
-  .ai-hub-mobile-nav {
-    display: none;
-  }
-}
-
-/* Accessibility: visible focus */
-.ai-iconbtn:focus-visible,
-.ai-action:focus-visible,
-.ai-mode-chip:focus-visible,
-.ai-suggestion:focus-visible,
-.ai-send:focus-visible,
-.ai-attach-btn:focus-visible,
-.ai-conv-link:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
 }
