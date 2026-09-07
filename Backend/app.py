@@ -1220,9 +1220,8 @@ def about():
 @app.get("/task")
 @login_required
 def task():
-    """Render the Task page."""
-    user = current_user()
-    return render_template("task.html", user=user, active_nav="practice", tasks=planner.list_tasks(user["id"]), courses=planner.list_courses(user["id"]))
+    """Practice (tasks + focus) now lives on the merged Schedule page."""
+    return redirect(url_for("schedule"))
 
 
 @app.post("/task")
@@ -1246,7 +1245,7 @@ def task_add():
         priority=request.form.get("priority", "medium"),
     )
     flash("Task added.", "success")
-    return redirect(url_for("task"))
+    return redirect(url_for("schedule"))
 
 
 @app.post("/task/<task_id>/toggle")
@@ -1255,7 +1254,7 @@ def task_toggle(task_id):
     """Flip a task between todo and done."""
     user = current_user()
     planner.toggle_task(user["id"], task_id)
-    back = request.form.get("next") or url_for("task")
+    back = request.form.get("next") or url_for("schedule")
     return redirect(back)
 
 
@@ -1322,9 +1321,8 @@ def course_detail(course_id):
 @app.get("/calendar")
 @login_required
 def calendar():
-    """Render the academic calendar page."""
-    user = current_user()
-    return render_template("calendar.html", user=user, active_nav="calendar", events=planner.list_events(user["id"]), courses=planner.list_courses(user["id"]))
+    """Calendar now lives on the merged Schedule page."""
+    return redirect(url_for("schedule"))
 
 
 @app.post("/calendar")
@@ -1346,7 +1344,7 @@ def calendar_add():
         weekday=request.form.get("weekday", ""),
     )
     flash("Event added.", "success")
-    return redirect(url_for("calendar"))
+    return redirect(url_for("schedule"))
 
 
 @app.post("/calendar/<event_id>/delete")
@@ -1356,7 +1354,29 @@ def calendar_delete(event_id):
     user = current_user()
     planner.delete_event(user["id"], event_id)
     flash("Event removed.", "success")
-    return redirect(url_for("calendar"))
+    return redirect(url_for("schedule"))
+
+
+# ---------------------------------------------------------------------------
+# Schedule (merged Calendar + Practice)
+# ---------------------------------------------------------------------------
+
+@app.get("/schedule")
+@login_required
+def schedule():
+    """Render the Schedule page: calendar events, deadlines, tasks, and a focus CTA on one page."""
+    user = current_user()
+    return render_template(
+        "schedule.html",
+        user=user,
+        active_nav="schedule",
+        events=planner.list_events(user["id"]),
+        deadlines=planner.list_deadlines(user["id"]),
+        tasks=planner.list_tasks(user["id"]),
+        courses=planner.list_courses(user["id"]),
+        courses_by_id={c["id"]: c for c in planner.list_courses(user["id"])},
+        open_tasks=sum(1 for t in planner.list_tasks(user["id"]) if t["status"] != "done"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1368,7 +1388,7 @@ def calendar_delete(event_id):
 def deadlines():
     """Render the deadline & assessment manager."""
     user = current_user()
-    return render_template("deadlines.html", user=user, active_nav="practice", deadlines=planner.list_deadlines(user["id"]), courses=planner.list_courses(user["id"]), courses_by_id={c["id"]: c for c in planner.list_courses(user["id"])})
+    return render_template("deadlines.html", user=user, active_nav="schedule", deadlines=planner.list_deadlines(user["id"]), courses=planner.list_courses(user["id"]), courses_by_id={c["id"]: c for c in planner.list_courses(user["id"])})
 
 
 @app.post("/deadlines")
@@ -1405,7 +1425,7 @@ def deadline_detail(deadline_id):
     return render_template(
         "deadline_detail.html",
         user=user,
-        active_nav="practice",
+        active_nav="schedule",
         deadline=deadline,
         course=course,
         steps=steps,
@@ -1515,7 +1535,7 @@ def session_page():
     return render_template(
         "session.html",
         user=user,
-        active_nav="practice",
+        active_nav="schedule",
         task=task,
         course=course,
         courses=courses,

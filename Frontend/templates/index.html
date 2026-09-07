@@ -50,7 +50,7 @@
 <section class="card mb-4 priority-critical home-plan-card">
     <div class="dashboard-heading">
         <h3 class="card__title mb-0">Today's Plan ({{ checkpoints.today }})</h3>
-        <a class="button button--ghost button--small" href="{{ url_for('task') }}">Manage tasks</a>
+        <a class="button button--ghost button--small" href="{{ url_for('schedule') }}">Manage tasks</a>
     </div>
 
     {% if checkpoints.overdue_tasks %}
@@ -143,7 +143,7 @@
     <section class="card">
         <div class="dashboard-heading">
             <h3 class="card__title mb-0">Open Tasks</h3>
-            <a class="button button--ghost button--small" href="{{ url_for('task') }}">Manage</a>
+            <a class="button button--ghost button--small" href="{{ url_for('schedule') }}">Manage</a>
         </div>
         {% set open_tasks = tasks|selectattr('status', 'ne', 'done')|list %}
         {% if open_tasks %}

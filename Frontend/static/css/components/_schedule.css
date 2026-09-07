@@ -1,0 +1,53 @@
+/* Schedule page — merged Calendar + Practice (one tab, one page). */
+body:has(.schedule-grid) .schedule-focus-card {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+    color: #fff;
+    border: 0;
+    box-shadow: var(--shadow-md);
+}
+
+.schedule-focus-card .card__title {
+    color: #fff;
+}
+
+.schedule-focus-card .text-muted {
+    color: rgb(255 255 255 / 0.82);
+}
+
+.schedule-focus-card__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.schedule-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+}
+
+.schedule-grid__main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+}
+
+.schedule-grid__side {
+    min-width: 0;
+    position: sticky;
+    top: var(--space-4);
+}
+
+@media (max-width: 860px) {
+    .schedule-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .schedule-grid__side {
+        position: static;
+    }
+}

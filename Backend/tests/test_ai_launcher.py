@@ -80,7 +80,7 @@ class AILauncherTest(unittest.TestCase):
         db._execute("DELETE FROM users WHERE id = ?", (self.UID,))
 
     def test_launcher_and_drawer_render_on_every_page(self):
-        for path in ("/dashboard", "/courses", "/calendar", "/task", "/notes"):
+        for path in ("/dashboard", "/courses", "/schedule", "/notes"):
             r = self.client.get(path)
             self.assertEqual(r.status_code, 200, path)
             html = r.data.decode()
@@ -172,7 +172,7 @@ class AIContainmentTest(unittest.TestCase):
     # ---------------------------------------------------------- markup
 
     def test_backdrop_present_hidden_on_pages_absent_on_full_page(self):
-        for path in ("/dashboard", "/courses", "/calendar", "/task", "/notes"):
+        for path in ("/dashboard", "/courses", "/schedule", "/notes"):
             html = self.client.get(path).data.decode()
             # Present, but hidden by default on every page wearing base.html.
             self.assertIn('id="ai-drawer-backdrop"', html, path)

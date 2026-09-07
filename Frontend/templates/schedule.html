@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule — Study Planner{% endblock %}
+{% block main %}
+        <div class="dashboard-heading">
+            <div>
+                <h2>Schedule</h2>
+                <p class="text-muted mb-0">Calendar, deadlines, and focus — all in one place.</p>
+            </div>
+            <div class="form-actions" style="justify-content:flex-end;gap:var(--space-2);">
+                <a class="button button--ghost button--small" href="{{ url_for('calendar_export') }}">Export .ics</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <section class="card schedule-focus-card">
+            <div class="schedule-focus-card__inner">
+                <div>
+                    <h3 class="card__title mb-1">Ready to focus?</h3>
+                    <p class="text-muted mb-0">{{ open_tasks }} open task{{ 's' if open_tasks != 1 }} waiting. A
+                        focus session turns "later" into done.</p>
+                </div>
+                <a class="button button--primary" href="{{ url_for('session_page') }}">Start a focus session</a>
+            </div>
+        </section>
+
+        <div class="schedule-grid">
+            <div class="schedule-grid__main">
+                <section class="card mb-4">
+                    <h3 class="card__title">Upcoming Events</h3>
+                    <form action="{{ url_for('calendar_add') }}" method="post">
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label" for="ev_title">Title</label>
+                                <input class="form-input" id="ev_title" name="title"
+                                    placeholder="e.g. DCIT 204 Lecture" required>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="ev_type">Type</label>
+                                <select class="form-input" id="ev_type" name="type">
+                                    <option value="lecture">Lecture</option>
+                                    <option value="tutorial">Tutorial</option>
+                                    <option value="lab">Lab</option>
+                                    <option value="exam">Exam</option>
+                                    <option value="meeting">Meeting</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="ev_course_id">Course</label>
+                                <select class="form-input" id="ev_course_id" name="course_id">
+                                    <option value="">— None —</option>
+                                    {% for course in courses %}
+                                    <option value="{{ course.id }}">{{ course.code }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="ev_start">Date &amp; time</label>
+                                <input class="form-input" id="ev_start" name="start" type="datetime-local" required>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="ev_duration_minutes">Duration (min)</label>
+                                <input class="form-input" id="ev_duration_minutes" name="duration_minutes"
+                                    type="number" min="5" value="60">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="ev_recurrence">Repeat</label>
+                                <select class="form-input" id="ev_recurrence" name="recurrence">
+                                    <option value="none">Does not repeat</option>
+                                    <option value="weekly">Every week</option>
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="ev_weekday">Day of week (if repeats weekly)</label>
+                                <select class="form-input" id="ev_weekday" name="weekday">
+                                    <option value="Monday">Monday</option>
+                                    <option value="Tuesday">Tuesday</option>
+                                    <option value="Wednesday">Wednesday</option>
+                                    <option value="Thursday">Thursday</option>
+                                    <option value="Friday">Friday</option>
+                                    <option value="Saturday">Saturday</option>
+                                    <option value="Sunday">Sunday</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="button" type="submit">Add Event</button>
+                        </div>
+                    </form>
+
+                    {% if events %}
+                    <h4 class="card__title mt-4">All Events</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Type</th>
+                                <th>Course</th>
+                                <th>Date</th>
+                                <th>Duration</th>
+                                <th>Repeat</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                            <tr>
+                                <td>{{ event.title }}</td>
+                                <td>{{ event.type }}</td>
+                                <td>{% set course = courses_by_id.get(event.course_id) %}{{ course.code if course else '—' }}</td>
+                                <td>{{ event.start }}</td>
+                                <td>{{ event.duration_minutes }} min</td>
+                                <td>{% if event.recurrence == 'weekly' %}Weekly ({{ event.weekday }}){% else %}—{% endif %}</td>
+                                <td>
+                                    <form action="{{ url_for('calendar_delete', event_id=event.id) }}" method="post"
+                                        class="mb-0">
+                                        <button class="button button--ghost button--small" type="submit"
+                                            data-confirm="Delete this calendar event? This action cannot be undone.">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="empty-state">
+                        <p class="mb-0">No events yet. Add your first lecture or session above.</p>
+                    </div>
+                    {% endif %}
+                </section>
+
+                <section class="card mb-4">
+                    <h3 class="card__title">Tasks</h3>
+                    <form action="{{ url_for('task_add') }}" method="post">
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label" for="tk_title">Title</label>
+                                <input class="form-input" id="tk_title" name="title"
+                                    placeholder="e.g. Review Bayes theorem" required>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="tk_course_id">Course</label>
+                                <select class="form-input" id="tk_course_id" name="course_id">
+                                    <option value="">— None —</option>
+                                    {% for course in courses %}
+                                    <option value="{{ course.id }}">{{ course.code }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="tk_due_date">Due date</label>
+                                <input class="form-input" id="tk_due_date" name="due_date" type="date">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="tk_estimated_minutes">Effort (min)</label>
+                                <input class="form-input" id="tk_estimated_minutes" name="estimated_minutes"
+                                    type="number" min="5" step="5" value="60">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="tk_priority">Priority</label>
+                                <select class="form-input" id="tk_priority" name="priority">
+                                    <option value="high">High</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="button" type="submit">Add Task</button>
+                        </div>
+                    </form>
+
+                    {% if tasks %}
+                    <h4 class="card__title mt-4">All Tasks</h4>
+                    <ul class="task-list">
+                        {% for t in tasks %}
+                        <li class="task task--{{ t.priority }}">
+                            <form action="{{ url_for('task_toggle', task_id=t.id) }}" method="post" class="mb-0">
+                                <input type="hidden" name="next" value="{{ url_for('schedule') }}">
+                                <button class="button button--ghost button--small" type="submit"
+                                    aria-label="Toggle task">
+                                    {{ '✓' if t.status == 'done' else '○' }}
+                                </button>
+                            </form>
+                            <span>
+                                {% if t.status == 'done' %}<s>{{ t.title }}</s>{% else %}{{ t.title }}{% endif %}
+                                <span class="text-muted"> · {{ t.estimated_minutes }} min{% if t.due_date %} · {{ t.due_date }}{% endif %}</span>
+                            </span>
+                            <span class="task__actions">
+                                <a class="button button--ghost button--small"
+                                    href="{{ url_for('session_page', task_id=t.id) }}">Focus</a>
+                                <span class="badge badge--{{ t.priority }}">{{ t.priority }}</span>
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="empty-state">
+                        <p class="mb-0">No tasks yet. Add your first study or lead-up task above.</p>
+                    </div>
+                    {% endif %}
+                </section>
+            </div>
+
+            <div class="schedule-grid__side">
+                <section class="card">
+                    <h3 class="card__title">Deadlines &amp; Assessments</h3>
+                    <form action="{{ url_for('deadlines_add') }}" method="post">
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label" for="dl_title">Title</label>
+                                <input class="form-input" id="dl_title" name="title"
+                                    placeholder="e.g. Assignment 2" required>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="dl_course_id">Course</label>
+                                <select class="form-input" id="dl_course_id" name="course_id" required>
+                                    <option value="">— Select course —</option>
+                                    {% for course in courses %}
+                                    <option value="{{ course.id }}">{{ course.code }} — {{ course.title }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="dl_type">Type</label>
+                                <select class="form-input" id="dl_type" name="type">
+                                    <option value="assignment">Assignment</option>
+                                    <option value="quiz">Quiz</option>
+                                    <option value="midterm">Midterm</option>
+                                    <option value="final">Final</option>
+                                    <option value="project">Project</option>
+                                    <option value="presentation">Presentation</option>
+                                    <option value="report">Report</option>
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="dl_due_date">Due date</label>
+                                <input class="form-input" id="dl_due_date" name="due_date" type="date" required>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="dl_weight">Weight (%)</label>
+                                <input class="form-input" id="dl_weight" name="weight" type="number" min="0"
+                                    max="100" value="0">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="dl_estimated_hours">Estimated effort (hours)</label>
+                                <input class="form-input" id="dl_estimated_hours" name="estimated_hours" type="number"
+                                    min="0" step="0.5" value="4">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="button" type="submit">Add Deadline</button>
+                        </div>
+                    </form>
+
+                    {% if deadlines %}
+                    <h4 class="card__title mt-4">All Deadlines</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Item</th><th>Course</th><th>Type</th><th>Due</th><th>Weight</th><th>Effort</th><th>Status</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            {% for d in deadlines %}
+                            {% set course = courses_by_id.get(d.course_id) %}
+                            <tr>
+                                <td><a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a></td>
+                                <td>{{ course.code if course else '—' }}</td>
+                                <td>{{ d.type }}</td>
+                                <td>{{ d.due_date }}</td>
+                                <td>{{ d.weight }}%</td>
+                                <td>{{ d.estimated_hours }}h</td>
+                                <td>
+                                    {% if d.status == 'done' %}
+                                    <span class="badge badge--done">done</span>
+                                    {% else %}
+                                    <span class="badge badge--open">open</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if d.status != 'done' %}
+                                    <form action="{{ url_for('deadline_complete', deadline_id=d.id) }}" method="post"
+                                        class="mb-0">
+                                        <button class="button button--ghost button--small" type="submit">Mark done</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="empty-state">
+                        <p class="mb-0">No deadlines yet. Add your first assessment above, then break it into
+                            lead-up steps.</p>
+                    </div>
+                    {% endif %}
+                </section>
+            </div>
+        </div>
+    {% endblock %}
