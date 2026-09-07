@@ -17,11 +17,11 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
+import courses
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
 PLANNER_FILE = os.path.join(DATABASE_DIR, "planner.json")
-
-COURSE_COLORS = ["navy", "teal", "orange", "green", "purple", "red"]
 
 DEADLINE_TYPES = [
     "assignment",
@@ -76,35 +76,22 @@ def _user_data(data, user_id):
 # ---------------------------------------------------------------------------
 
 def list_courses(user_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    return list(ud.get("courses", {}).values())
+    """This user's courses, straight from the shared courses table.
+
+    Courses moved out of planner.json into Backend/courses.py: the dashboard,
+    /courses, and onboarding all read the one table, so the views stay in
+    agreement. planner.json still owns events, deadlines, and tasks.
+    """
+    return courses.get_user_courses(user_id)
 
 
 def get_course(user_id, course_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    return ud.get("courses", {}).get(course_id)
+    return courses.get_course(user_id, course_id)
 
 
 def create_course(user_id, **fields):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    courses = ud.setdefault("courses", {})
-    course_id = uuid.uuid4().hex
-    color = fields.get("color") or COURSE_COLORS[len(courses) % len(COURSE_COLORS)]
-    courses[course_id] = {
-        "id": course_id,
-        "code": fields.get("code", "").strip(),
-        "title": fields.get("title", "").strip(),
-        "lecturer": fields.get("lecturer", "").strip(),
-        "credits": int(fields.get("credits") or 0),
-        "description": fields.get("description", "").strip(),
-        "schedule": fields.get("schedule", "").strip(),
-        "color": color,
-    }
-    save_all(data)
-    return courses[course_id]
+    """Legacy create-call now goes through the shared upsert path."""
+    return courses.upsert_course(user_id, fields.get("code", ""), **fields)
 
 
 # ---------------------------------------------------------------------------

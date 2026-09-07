@@ -28,6 +28,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import collab
+import courses as courses_mod
 import db
 import planner
 import stats
@@ -161,63 +162,56 @@ SUBJECTS = [
 ]
 
 
-def subject_slug(title):
-    """Turn a course title into a stable URL slug."""
-    slug = "".join(c if c.isalnum() else "-" for c in title.lower()).strip("-")
+def subject_slug(value):
+    """Turn a course code or title into a stable URL slug."""
+    slug = "".join(c if c.isalnum() else "-" for c in str(value).lower()).strip("-")
     return slug or "course"
 
 
-def custom_subject(title, position):
-    """Build a subject dict for a user-entered course title."""
+def custom_subject(row):
+    """Build a Sakai-style subject dict from a row of the shared courses table.
+
+    The row's real data only — no invented identifiers like "CRS 100".
+    """
+    code = row.get("course_code") or row.get("code") or ""
     return {
-        "slug": subject_slug(title),
-        "code": f"CRS {100 + position:03d}",
-        "title": title,
-        "color": ("navy", "teal", "green", "purple", "orange", "red")[position % 6],
-        "instructor": "To be assigned",
-        "term": "Fall 2026",
-        "description": f"Custom course: {title}",
+        "id": row.get("id"),
+        "slug": subject_slug(code),
+        "code": code,
+        "title": row.get("title") or "To be assigned",
+        "color": row.get("color") or courses_mod.auto_color(code),
+        "instructor": row.get("lecturer") or "To be assigned",
+        "term": row.get("term") or "Fall 2026",
+        "description": row.get("description") or f"Course {code}",
     }
 
 
 def user_subjects(user):
-    """Return the subject cards for a user's onboarded courses.
+    """Return the subject cards for a user's dashboard.
 
-    Preloaded subjects are matched by title; anything else becomes a custom
-    course entry. Falls back to the full preloaded set when the user has no
-    courses saved.
+    Reads the shared courses table — exactly the rows the /courses page lists —
+    so dashboard cards and the /courses grid are the same data, rendered from
+    the same query, and cannot drift apart again.
     """
-    course_names = [c.strip() for c in (user or {}).get("courses", []) if c.strip()]
-
-    if not course_names:
-        return list(SUBJECTS)
-
-    subjects = []
-    for position, title in enumerate(course_names):
-        matching = next(
-            (s for s in SUBJECTS if s["title"].lower() == title.lower()), None
-        )
-        if matching:
-            subjects.append(matching)
-        else:
-            subjects.append(custom_subject(title, position))
-    return subjects
+    return [
+        custom_subject(row)
+        for row in courses_mod.get_user_courses((user or {}).get("id"))
+    ]
 
 
 def get_subject(slug):
     """Return the subject dict for a slug, or None.
 
-    Resolves both the preloaded SUBJECTS list and any custom courses that
-    users entered during onboarding (rebuilt from the users database each call
-    so newly-added courses become available immediately).
+    Resolves both the preloaded SUBJECTS list and any course rows from the
+    shared courses table (rebuilt each call so newly-added courses become
+    available immediately).
     """
     for s in SUBJECTS:
         if s["slug"] == slug:
             return s
-    for user in load_users().values():
-        for position, title in enumerate(user.get("courses", [])):
-            if subject_slug(title) == slug:
-                return custom_subject(title, position)
+    for row in courses_mod.all_courses():
+        if subject_slug(row["course_code"]) == slug:
+            return custom_subject(row)
     return None
 
 
@@ -601,6 +595,12 @@ def onboarding_post():
 
     # Always persist the draft — "save and finish later" must never lose work.
     db.save_onboarding_progress(user_id, school, program, courses, goals, available_hours)
+
+    # Every Step 3 code becomes a real row in the shared courses table (a stub
+    # with no title -> the dashboard shows "To be assigned", which the /courses
+    # form completes later). Re-joining is a no-op thanks to the upsert.
+    for code in courses:
+        courses_mod.upsert_course(user_id, code)
 
     action = request.form.get("action", "continue")
     if action == "finish-later":

@@ -48,6 +48,28 @@ CREATE TABLE IF NOT EXISTS users (
     ai_level    TEXT
 );
 
+-- Courses are the single source of truth shared by the dashboard "My Subjects"
+-- cards, the /courses CRUD page, and onboarding. id stays a TEXT uuid so the
+-- planner's events/deadlines/tasks and db notes/sessions can keep linking to a
+-- course without an id-space migration. UNIQUE(user_id, course_code) stops the
+-- "onboarding stub duplicated by the Add Course form" bug at the schema level.
+CREATE TABLE IF NOT EXISTS courses (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id),
+    course_code TEXT NOT NULL,
+    title       TEXT,
+    lecturer    TEXT,
+    credits     INTEGER DEFAULT 0,
+    schedule    TEXT,
+    description TEXT,
+    color       TEXT,
+    term        TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, course_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_courses_user ON courses (user_id);
+
 CREATE TABLE IF NOT EXISTS memberships (
     slug    TEXT,
     user_id TEXT,
@@ -336,6 +358,7 @@ def init_db():
     try:
         conn.executescript(_SCHEMA)
         _migrate_add_columns(conn)
+        _migrate_legacy_courses(conn)
         conn.commit()
     finally:
         conn.close()
@@ -348,6 +371,83 @@ def _migrate_add_columns(conn):
         conn.execute("ALTER TABLE users ADD COLUMN available_hours REAL DEFAULT 4")
     if "notify_digest" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN notify_digest INTEGER DEFAULT 0")
+
+
+def normalize_course_code(value):
+    """'dcit  204' -> 'DCIT 204': strip, collapse whitespace, uppercase.
+
+    The single place course codes are normalized — every write goes through
+    it so the stored value (and everything that renders it) is consistent.
+    """
+    if not value:
+        return ""
+    return " ".join((value.strip() or "").split()).upper()
+
+
+def _migrate_legacy_courses(conn):
+    """One-time move of the two legacy course stores into the courses table.
+
+    Runs on every boot through INSERT OR IGNORE, so it is idempotent:
+
+      1. planner.json courses keep their legacy uuid ids — this preserves the
+         course_id links held by planner events/deadlines/tasks.
+      2. onboarding codes in users.courses_json become stub rows (no title), so
+         a not-yet-completed course shows "To be assigned" and can be completed
+         later by the /courses form (upsert, never a duplicate).
+
+    The stub ids are deterministic (uuid5 of the user+code) so a re-run cannot
+    spawn a second row. Full courses added going forward use random uuids.
+    """
+    try:
+        import planner as _planner
+        doc = _planner.load_all()
+    except Exception:
+        doc = {}
+    if isinstance(doc, dict):
+        for user_id, block in doc.items():
+            if not isinstance(block, dict):
+                continue
+            for cid, c in (block.get("courses") or {}).items():
+                if not isinstance(c, dict):
+                    continue
+                try:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO courses "
+                        "(id, user_id, course_code, title, lecturer, credits, "
+                        "description, schedule, color, term) "
+                        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        (
+                            str(cid),
+                            str(user_id),
+                            normalize_course_code(c.get("code") or ""),
+                            (c.get("title") or "").strip() or None,
+                            (c.get("lecturer") or "").strip() or None,
+                            int(c.get("credits") or 0),
+                            (c.get("description") or "").strip() or None,
+                            (c.get("schedule") or "").strip() or None,
+                            (c.get("color") or "").strip() or None,
+                            (c.get("term") or "").strip() or None,
+                        ),
+                    )
+                except sqlite3.IntegrityError:
+                    # Legacy rows can reference users that no longer exist.
+                    continue
+
+    for row in conn.execute("SELECT id, courses_json FROM users").fetchall():
+        try:
+            codes = json.loads(row["courses_json"] or "[]")
+        except (TypeError, ValueError):
+            codes = []
+        for code in codes:
+            code = normalize_course_code(code)
+            if not code:
+                continue
+            stub_id = uuid.uuid5(uuid.NAMESPACE_URL, f"{row['id']}:{code}").hex
+            conn.execute(
+                "INSERT OR IGNORE INTO courses (id, user_id, course_code) "
+                "VALUES (?,?,?)",
+                (stub_id, row["id"], code),
+            )
 
 
 def _conn_context():

@@ -53,6 +53,7 @@ class OnboardingWizardTest(unittest.TestCase):
 
     def setUp(self):
         self.uid = "onboarding-test-user"
+        db._execute("DELETE FROM courses WHERE user_id = ?", (self.uid,))
         db._execute("DELETE FROM users WHERE id = ?", (self.uid,))
         db.create_user(self.uid, "Sam Test", "onboard@example.com", "hash")
         app.config["TESTING"] = True
@@ -62,6 +63,8 @@ class OnboardingWizardTest(unittest.TestCase):
             s["user_name"] = "Sam Test"
 
     def tearDown(self):
+        # The wizard now writes courses rows; clear them before the user (FK).
+        db._execute("DELETE FROM courses WHERE user_id = ?", (self.uid,))
         db._execute("DELETE FROM users WHERE id = ?", (self.uid,))
 
     def post_step(self, step, school="", program="", courses="", goals="", hours="4", action="continue"):
