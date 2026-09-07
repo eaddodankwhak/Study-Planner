@@ -18,7 +18,10 @@
     {% block header %}
     <header class="page-header">
         <div class="container page-header__inner">
-            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <a class="page-header__brand" href="{{ url_for('home') }}" aria-label="Study Planner home">
+                <span class="page-header__mark" aria-hidden="true">S</span>
+                <span>Study<span class="page-header__brand-light">Planner</span></span>
+            </a>
             <div class="page-header__user">
                 <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
                 {% include '_nav.html' %}

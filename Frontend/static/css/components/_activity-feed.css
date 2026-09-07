@@ -30,7 +30,7 @@
   background: var(--color-primary-light);
 }
 
-.activity-item__actor { font-weight: 700; color: var(--color-primary); }
+.activity-item__actor { font-weight: var(--font-weight-bold); color: var(--color-primary); }
 
 .activity-item__verb { color: var(--color-text); }
 

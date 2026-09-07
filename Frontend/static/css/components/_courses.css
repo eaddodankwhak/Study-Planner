@@ -98,7 +98,7 @@
 
 .courses-page .course-card__code {
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   opacity: 0.9;
@@ -106,7 +106,7 @@
 
 .courses-page .course-card__title {
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   line-height: 1.3;
   margin-top: var(--space-1);
 }
@@ -227,7 +227,7 @@ body.modal-open {
 
 .course-form .field label {
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   color: var(--color-muted);
 }
 
@@ -294,7 +294,7 @@ body.modal-open {
   border-radius: 999px;
   color: var(--color-text-inverse);
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   border-color: transparent;
   background: conic-gradient(from 0deg, #0f3a52, #0f5f6f, #b3551e, #2e6d32, #5b3a86, #8f2f2f, #0f3a52);
 }
@@ -307,7 +307,7 @@ body.modal-open {
 .course-form__preview-label {
   margin: 0 0 var(--space-2);
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-muted);

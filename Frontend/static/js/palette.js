@@ -30,6 +30,10 @@
         palette.classList.remove("is-open");
     }
 
+    document.querySelectorAll("[data-palette-trigger]").forEach(function (trigger) {
+        trigger.addEventListener("click", open);
+    });
+
     // Show suggested pages when there is no query; otherwise filter.
     function matches(r, query) {
         if (!query) return true;

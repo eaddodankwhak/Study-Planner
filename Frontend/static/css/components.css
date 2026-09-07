@@ -10,7 +10,7 @@
   background: var(--color-primary-light);
   color: var(--color-text-inverse);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -70,7 +70,7 @@
   color: var(--color-text-inverse);
   background: var(--color-primary);
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-bold);
 }
 
 .toast--success .toast__icon {
@@ -260,7 +260,7 @@
 }
 
 .form-field label {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   font-size: 0.9rem;
 }
 
@@ -321,7 +321,7 @@
   min-height: 110px;
   padding: var(--space-4);
   color: var(--color-text-inverse);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .course-card__code {
@@ -453,7 +453,7 @@
   border: 1px solid var(--color-border);
   border-radius: 999px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .confidence__label:hover {
@@ -554,7 +554,7 @@
 }
 
 .palette__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .palette__crumb {
@@ -626,7 +626,7 @@
   background: var(--color-surface);
   border: 2px solid var(--color-border);
   color: var(--color-muted);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   font-size: 0.9rem;
 }
 
@@ -654,7 +654,7 @@
 
 .onboarding-stepper__item--active .onboarding-stepper__label {
   color: var(--color-text);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 /* Compact progress callout — replaces the five dots on small screens. */
@@ -670,7 +670,7 @@
 
 .onboarding-header__eyebrow {
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--color-accent-dark);
@@ -738,7 +738,7 @@
   padding: var(--space-2) 0;
   color: var(--color-muted);
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .onboard-actions__back:hover {
@@ -765,7 +765,7 @@
   border: none;
   padding: 0;
   color: var(--color-primary-light);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
 
@@ -857,7 +857,7 @@
 }
 
 .toggle__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 /* Weekly digest preview (inside Settings) */
@@ -900,7 +900,7 @@
 .subject-banner__code {
   font-size: 0.85rem;
   opacity: 0.85;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -935,7 +935,7 @@
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-sm);
   color: var(--color-muted);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   text-decoration: none;
 }
 
@@ -996,7 +996,7 @@
 }
 
 .material-list__name {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   word-break: break-all;
 }
 
@@ -1016,7 +1016,7 @@
 
 .grade-table th {
   color: var(--color-muted);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   font-size: 0.9rem;
 }
 
@@ -1046,7 +1046,7 @@
 }
 
 .form-label {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   font-size: 0.9rem;
 }
 
@@ -1105,7 +1105,7 @@ textarea.form-input {
   box-shadow: var(--glass-shadow);
   font-family: var(--font-monospace);
   font-size: 1.6rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   letter-spacing: 2px;
   color: var(--color-primary-dark);
 }
@@ -1205,7 +1205,7 @@ textarea.form-input {
 }
 
 .quiz-question legend {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   margin-bottom: var(--space-2);
 }
 
@@ -1225,7 +1225,7 @@ textarea.form-input {
 .row--you {
   background: var(--color-primary-light);
   color: var(--color-text-inverse);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1286,7 +1286,7 @@ body.home .home-hero {
   background: var(--color-accent);
   color: #2b1b00;
   font-size: 1.35rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-bold);
   object-fit: cover;
 }
 
@@ -1294,7 +1294,7 @@ body.home .home-hero {
   margin: 0 0 var(--space-1);
   color: #bde8e4;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -1335,7 +1335,7 @@ body.home .stat {
   color: var(--color-primary);
   background: rgb(27 106 138 / 0.14);
   font-size: 1.2rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-bold);
 }
 
 .stat__ring {
@@ -1406,13 +1406,13 @@ body.home .empty-state__icon {
   border-radius: 50%;
   color: var(--color-success);
   background: #e7f4e9;
-  font-weight: 800;
+  font-weight: var(--font-weight-bold);
 }
 
 body.home .empty-state__title {
   margin: 0 0 var(--space-1);
   color: var(--color-text);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 body.home .empty-state__body {
