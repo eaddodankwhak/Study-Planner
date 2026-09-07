@@ -169,31 +169,6 @@
 
     <section class="card">
         <div class="dashboard-heading">
-            <h3 class="card__title mb-0">My Courses</h3>
-            <a class="button button--ghost button--small" href="{{ url_for('courses') }}">Manage</a>
-        </div>
-        {% if courses %}
-        <ul class="task-list">
-            {% for course in courses %}
-            <li class="task">
-                <a href="{{ course_url(course) }}">
-                    <strong>{{ course.code }}</strong> — {{ course.title }}
-                </a>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <div class="empty-state">
-            <span class="empty-state__icon" aria-hidden="true">▦</span>
-            <p class="empty-state__title">Your course list is waiting</p>
-            <p class="empty-state__body"><a href="{{ url_for('courses') }}">Add a course</a> to begin building your
-                plan.</p>
-        </div>
-        {% endif %}
-    </section>
-
-    <section class="card">
-        <div class="dashboard-heading">
             <h3 class="card__title mb-0">Group Workspaces</h3>
             <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_list') }}">Manage</a>
         </div>
@@ -225,6 +200,7 @@
     <section class="card">
         <div class="dashboard-heading">
             <h3 class="card__title mb-0">My Subjects</h3>
+            <a class="button button--ghost button--small" href="{{ url_for('courses') }}">Manage</a>
             <p class="text-muted mb-0">Your courses arranged just like a school portal.</p>
         </div>
         <div class="course-grid">
