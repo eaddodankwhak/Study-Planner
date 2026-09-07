@@ -4,12 +4,13 @@ Covers the prompt's invariants:
 - The floating launcher + drawer render on every logged-in page via base.html.
 - Exactly one quick-action set exists in the empty state (the card grid), no
   redundant pill row, no radio provider cards.
-- The provider picker is a compact dropdown (listbox), not three cards.
+- The provider picker is a compact icon toolbar group (one icon per model),
+  not a dropdown listbox and not three cards.
 - /ai-hub renders the SAME ai/_panel.html partial full-width (no second drawer,
   no launcher on that page), so the two layouts cannot drift apart.
 - The drawer isolation/containment contract: fixed, never wider than the
   viewport, no ad-hoc z-index, one drawer body with sidebar + main columns,
-  anchored model dropdown, page locked while open, launcher hidden when open.
+  inline model toggle group, page locked while open, launcher hidden when open.
 """
 
 import os
@@ -99,17 +100,18 @@ class AILauncherTest(unittest.TestCase):
         self.assertNotIn("ai-suggestion", html)
         self.assertNotIn("Pick a task below", html)
 
-    def test_provider_picker_is_a_dropdown_not_cards(self):
+    def test_provider_picker_is_an_inline_icon_toolbar_not_a_dropdown(self):
         r = self.client.get("/dashboard")
         html = r.data.decode()
-        # Compact trigger + listbox (collapsed by default, hydrated by JS from
-        # /api/ai/meta), not 3 always-visible radio cards.
-        self.assertIn('id="ai-model-trigger"', html)
-        self.assertIn('role="listbox"', html)
+        # Compact icon-only toggle group hydrated by JS from /api/ai/meta, not
+        # a collapsed listbox and not 3 always-visible radio cards.
         self.assertIn('id="ai-model-list"', html)
-        self.assertIn('id="ai-current-model">Claude<', html)
-        self.assertNotIn('role="radiogroup"', html)
+        self.assertIn('class="ai-panel__model-toggle"', html)
+        self.assertIn('role="group"', html)
+        self.assertNotIn('role="listbox"', html)
+        self.assertNotIn('id="ai-model-trigger"', html)
         self.assertNotIn("ai-model-option", html)
+        self.assertNotIn('role="radiogroup"', html)
 
     def test_quota_is_a_status_separate_from_clear_action(self):
         r = self.client.get("/dashboard")
@@ -146,7 +148,7 @@ class AILauncherTest(unittest.TestCase):
         html = r.data.decode()
         self.assertIn("How can I help you study today?", html)
         self.assertIn("Pick a starting point, or just start typing.", html)
-        self.assertIn('aria-haspopup="listbox"', html)
+        self.assertIn('aria-label="Model"', html)
         # No all-caps placeholder conversation empty text server-side.
         self.assertNotIn("NO CONVERSATIONS YET", html)
 
@@ -256,16 +258,17 @@ class AIContainmentTest(unittest.TestCase):
         stage = _css_rule(self.ai_css, ".ai-panel__stage {")
         self.assertIn("min-width: 0", stage)
 
-    def test_model_dropdown_is_anchored_and_capped(self):
-        # Absolute dropdown needs a positioned ancestor; without it the browser
-        # anchors to the page, causing overlap + horizontal blowout.
-        select = _css_rule(self.ai_css, ".ai-panel__model-select {")
-        self.assertIn("position: relative", select)
-        rule = _css_rule(self.ai_css, ".ai-panel__model-list {")
-        self.assertIn("position: absolute", rule)
-        self.assertIn("z-index: var(--z-dropdown)", rule)
-        # Capped so it can never overflow even on a narrow drawer/viewport.
-        self.assertIn("calc(100vw - 32px)", rule)
+    def test_model_toggle_is_an_inline_toolbar_group(self):
+        # Compact icon buttons, not an anchored overlay: inline-flex, no
+        # absolute positioning, no dropdown layering, hairline dividers.
+        toggle = _css_rule(self.ai_css, ".ai-panel__model-toggle {")
+        self.assertIn("display: inline-flex", toggle)
+        self.assertNotIn("position: absolute", toggle)
+        self.assertNotIn("z-index", toggle)
+        btn = _css_rule(self.ai_css, ".ai-panel__model-toggle-btn {")
+        self.assertIn("width: 26px", btn)
+        divider = _css_rule(self.ai_css, ".ai-panel__model-toggle-btn + .ai-panel__model-toggle-btn {")
+        self.assertIn("border-left: 1px solid var(--color-border)", divider)
 
     def test_open_drawer_locks_page_and_hides_launcher(self):
         # Background must not scroll while the drawer is open.

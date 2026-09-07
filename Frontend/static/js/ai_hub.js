@@ -28,8 +28,6 @@
     sidebar: document.getElementById("ai-sidebar"),
     convList: document.getElementById("ai-conv-list"),
     modelList: document.getElementById("ai-model-list"),
-    modelTrigger: document.getElementById("ai-model-trigger"),
-    currentModel: document.getElementById("ai-current-model"),
     mockHint: document.getElementById("ai-mock-hint"),
     modes: document.getElementById("ai-modes"),
     chat: document.getElementById("ai-chat"),
@@ -115,65 +113,37 @@
     return state.meta.models.find(function (m) { return m.id === id; }) || null;
   }
 
+  // Minimal brand-ish glyphs, one per model family. Small stroke icons in a
+  // 24px viewBox so the whole toggle group reads as a VS Code-style toolbar
+  // cluster: no text, no descriptions, just an icon + tooltip per model.
+  var MODEL_ICONS = {
+    claude: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L15.2 8.8 L21 12 L15.2 15.2 L12 21 L8.8 15.2 L3 12 L8.8 8.8 Z"/></svg>',
+    gpt: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.2" r="3.6"/><circle cx="18.8" cy="8.1" r="3.6"/><circle cx="18.8" cy="15.9" r="3.6"/><circle cx="12" cy="19.8" r="3.6"/><circle cx="5.2" cy="15.9" r="3.6"/><circle cx="5.2" cy="8.1" r="3.6"/></svg>',
+    gemini: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z"/></svg>',
+  };
+
   function renderModels() {
-    // Populate the compact dropdown (replaces the three always-visible cards).
+    // Hydrate the compact icon toolbar from /api/ai/meta models.
     els.modelList.innerHTML = "";
     state.meta.models.forEach(function (m) {
-      var li = el("li", "ai-panel__model-option");
-      li.setAttribute("role", "option");
-      li.setAttribute("tabindex", "0");
-      li.setAttribute("data-provider", m.id);
-      li.setAttribute("aria-selected", String(m.id === state.model));
-      var strong = el("strong", null, m.displayName);
-      var span = el("span", "ai-panel__model-desc", m.description || "");
-      li.append(strong, span);
-      li.addEventListener("click", function () {
+      var active = m.id === state.model;
+      var btn = el("button", "ai-panel__model-toggle-btn" + (active ? " is-active" : ""));
+      btn.type = "button";
+      btn.setAttribute("data-provider", m.id);
+      btn.setAttribute("aria-pressed", String(active));
+      btn.setAttribute("aria-label", m.displayName || m.id);
+      btn.title = (m.displayName || m.id) + (active ? " (active model)" : "");
+      btn.innerHTML = MODEL_ICONS[m.id] || MODEL_ICONS.gemini;
+      btn.addEventListener("click", function () {
         setModel(m.id);
       });
-      li.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setModel(m.id);
-        }
-      });
-      els.modelList.appendChild(li);
+      els.modelList.appendChild(btn);
     });
-    els.currentModel.textContent = (findModel(state.model) || {}).displayName || state.model;
   }
-
-  function openModelList() {
-    els.modelList.hidden = false;
-    els.modelTrigger.setAttribute("aria-expanded", "true");
-    els.modelList.focus();
-  }
-
-  function closeModelList() {
-    els.modelList.hidden = true;
-    els.modelTrigger.setAttribute("aria-expanded", "false");
-  }
-
-  // Close the dropdown on outside click / Escape.
-  document.addEventListener("click", function (e) {
-    if (e.target.closest("[data-model-select]")) return;
-    if (!els.modelList.hidden) closeModelList();
-  });
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !els.modelList.hidden) {
-      closeModelList();
-      // The launcher's own Escape handler (loaded after this) would otherwise
-      // also close the drawer this same tick. Dropping a dropdown is one step
-      // at a time: Escape closes the dropdown first; the next Escape closes
-      // the drawer.
-      e.stopImmediatePropagation();
-    }
-  });
 
   function setModel(id) {
     state.model = id;
     renderModels();
-    // Keep selection state and menu visibility in one transition. This also
-    // closes the menu when a model is changed by keyboard or future callers.
-    closeModelList();
     if (state.current) {
       api("/conversations/" + state.current.id, { method: "PATCH", body: { model: id } }).then(function () {
         state.current.model = id;
@@ -606,7 +576,6 @@
       els.mockHint.textContent = connected ? "connected to your account"
         : serverKeyed ? "server-provided" : "connect your account";
     }
-    els.currentModel.textContent = (findModel(state.model) || {}).displayName || state.model;
   }
 
   // ------------------------------------------------------------------ init
@@ -628,11 +597,6 @@
     els.clearConv.addEventListener("click", clearCurrent);
     els.attachBtn.addEventListener("click", function () { els.fileInput.click(); });
     els.fileInput.addEventListener("change", onFileSelected);
-    if (els.modelTrigger) {
-      els.modelTrigger.addEventListener("click", function () {
-        els.modelList.hidden ? openModelList() : closeModelList();
-      });
-    }
 
     // Server-rendered quick-action cards: fill the composer and send.
     if (els.emptyState) {

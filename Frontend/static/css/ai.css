@@ -311,84 +311,50 @@ body.ai-drawer-open .ai-launcher {
   gap: var(--space-3);
 }
 
-/* Compact model selector (replaces the three permanent provider cards). */
-.ai-panel__model-select {
-  position: relative;
-}
-
-.ai-panel__model-label {
-  font-size: 0.75rem;
-  color: var(--color-muted);
-  margin-right: var(--space-1);
-}
-
-.ai-panel__model-trigger {
+/* Icon-only model toggle group — VS Code title-bar style: a recessed cluster
+   of small square buttons with hairline dividers. No dropdown, no description
+   text, no cards — the whole control sits inline in the header toolbar. */
+.ai-panel__model-toggle {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  border: 1px solid var(--color-border);
+  padding: 2px;
   background: var(--color-bg);
-  color: var(--color-primary-light);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
-  font-weight: var(--font-weight-medium);
-  font-size: 0.85rem;
+}
+
+.ai-panel__model-icons {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ai-panel__model-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 1px);
+  background: transparent;
+  color: var(--color-muted);
   cursor: pointer;
 }
 
-.ai-panel__model-trigger:hover {
+.ai-panel__model-toggle-btn + .ai-panel__model-toggle-btn {
+  border-left: 1px solid var(--color-border);
+}
+
+.ai-panel__model-toggle-btn:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.ai-panel__model-toggle-btn.is-active,
+.ai-panel__model-toggle-btn:active {
   background: var(--color-primary-light);
   color: var(--color-text-inverse);
-  border-color: transparent;
-}
-
-.ai-panel__chevron {
-  transition: transform var(--dur-fast) var(--ease-out);
-}
-
-.ai-panel__model-trigger[aria-expanded="true"] .ai-panel__chevron {
-  transform: rotate(180deg);
-}
-
-.ai-panel__model-list {
-  position: absolute;
-  right: 0;
-  top: calc(100% + var(--space-1));
-  width: min(320px, calc(100vw - 32px));
-  min-width: 15rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
-  list-style: none;
-  margin: 0;
-  padding: var(--space-2);
-  display: grid;
-  gap: var(--space-1);
-  z-index: var(--z-dropdown);
-}
-
-.ai-panel__model-option {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.ai-panel__model-option:hover,
-.ai-panel__model-option[aria-selected="true"] {
-  background: var(--color-bg);
-}
-
-.ai-panel__model-option strong {
-  display: block;
-  font-size: 0.9rem;
-}
-
-.ai-panel__model-desc {
-  display: block;
-  font-size: 0.78rem;
-  color: var(--color-muted);
-  margin-top: 0.1rem;
 }
 
 .ai-panel__mock {
@@ -765,8 +731,7 @@ body.ai-drawer-open .ai-launcher {
 .ai-send:focus-visible,
 .ai-conv-link:focus-visible,
 .ai-iconbtn:focus-visible,
-.ai-panel__model-trigger:focus-visible,
-.ai-panel__model-option:focus-visible,
+.ai-panel__model-toggle-btn:focus-visible,
 .ai-launcher:focus-visible,
 .ai-newchat:focus-visible {
   outline: 2px solid var(--color-accent);
