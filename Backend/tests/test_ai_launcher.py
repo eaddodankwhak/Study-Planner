@@ -7,9 +7,13 @@ Covers the prompt's invariants:
 - The provider picker is a compact dropdown (listbox), not three cards.
 - /ai-hub renders the SAME ai/_panel.html partial full-width (no second drawer,
   no launcher on that page), so the two layouts cannot drift apart.
+- The drawer isolation/containment contract: fixed, never wider than the
+  viewport, no ad-hoc z-index, one drawer body with sidebar + main columns,
+  anchored model dropdown, page locked while open, launcher hidden when open.
 """
 
 import os
+import re
 import sys
 import unittest
 
@@ -19,6 +23,34 @@ if BASE not in sys.path:
 
 import db
 from app import app
+
+CSS_DIR = os.path.normpath(os.path.join(BASE, "..", "Frontend", "static", "css"))
+
+
+def _read_css(name):
+    with open(os.path.join(CSS_DIR, name), encoding="utf-8") as f:
+        return f.read()
+
+
+def _css_rule(css, selector):
+    """Return the text of the first top-level rule whose selector line starts
+    with `selector`, or "" if not found. Handles brace depth so nested
+    @media blocks don't confuse the scan for later rules."""
+    idx = css.find(selector)
+    if idx == -1:
+        return ""
+    lb = css.find("{", idx)
+    if lb == -1:
+        return ""
+    depth = 0
+    for j in range(lb, len(css)):
+        if css[j] == "{":
+            depth += 1
+        elif css[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return css[idx:j + 1]
+    return ""
 
 
 def _new_user(uid, name):
@@ -99,6 +131,7 @@ class AILauncherTest(unittest.TestCase):
         # No launcher/drawer on the full-page view (avoids duplicate IDs).
         self.assertNotIn('id="ai-launcher"', html)
         self.assertNotIn('id="ai-drawer"', html)
+        self.assertNotIn("ai-drawer-backdrop", html)
 
     def test_nav_has_no_ai_tab(self):
         # "Pick one entry point": the nav tab is retired in favour of the
@@ -116,6 +149,137 @@ class AILauncherTest(unittest.TestCase):
         self.assertIn('aria-haspopup="listbox"', html)
         # No all-caps placeholder conversation empty text server-side.
         self.assertNotIn("NO CONVERSATIONS YET", html)
+
+
+class AIContainmentTest(unittest.TestCase):
+    """Regression checks for the drawer isolation/containment contract."""
+
+    UID = "ai-containment-test-user"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ai_css = _read_css("ai.css")
+        cls.variables_css = _read_css("variables.css")
+
+    def setUp(self):
+        _new_user(self.UID, "Containment Test")
+        self.client = _client(self.UID, "Containment Test")
+
+    def tearDown(self):
+        db._execute("DELETE FROM courses WHERE user_id = ?", (self.UID,))
+        db._execute("DELETE FROM users WHERE id = ?", (self.UID,))
+
+    # ---------------------------------------------------------- markup
+
+    def test_backdrop_present_hidden_on_pages_absent_on_full_page(self):
+        for path in ("/dashboard", "/courses", "/calendar", "/task", "/notes"):
+            html = self.client.get(path).data.decode()
+            # Present, but hidden by default on every page wearing base.html.
+            self.assertIn('id="ai-drawer-backdrop"', html, path)
+            self.assertIn('class="ai-drawer-backdrop" hidden', html, path)
+            self.assertIn('class="ai-drawer"', html, path)
+        html = self.client.get("/ai").data.decode()
+        self.assertNotIn("ai-drawer-backdrop", html)
+
+    def test_drawer_is_one_container_with_internal_columns(self):
+        html = self.client.get("/dashboard").data.decode()
+        # The drawer element encloses the shared panel as a single two-column
+        # body (sidebar + main as internal columns), not two sibling boxes.
+        start = html.index('<aside id="ai-drawer"')
+        end = html.index('id="ai-drawer-backdrop"')
+        block = html[start:end]
+        self.assertIn("ai-panel__sidebar", block)
+        self.assertIn("ai-panel__main", block)
+        # One single .ai-panel grid body inside the drawer.
+        self.assertEqual(block.count("data-ai-panel"), 1)
+        # A sidebar/main structure nested under the .ai-panel grid, so the two
+        # columns are children of one container.
+        self.assertLess(block.index("ai-panel__sidebar"), block.index("ai-panel__main"))
+
+    # ------------------------------------------------------------ css
+
+    def test_z_index_scale_tokens_exist(self):
+        for token in (
+            "--z-content",
+            "--z-launcher",
+            "--z-drawer-backdrop",
+            "--z-drawer",
+            "--z-dropdown",
+        ):
+            self.assertIn(token + ":", self.variables_css, token)
+        # Scale is monotonic: content < launcher < backdrop < drawer < dropdown.
+        values = {
+            "--z-content": 1,
+            "--z-launcher": 40,
+            "--z-drawer-backdrop": 45,
+            "--z-drawer": 50,
+            "--z-dropdown": 60,
+        }
+        ordered = [values["--z-content"]] + sorted(
+            (v for k, v in values.items() if k != "--z-content")
+        )
+        self.assertEqual(ordered, [1, 40, 45, 50, 60])
+
+    def test_ai_css_uses_only_scale_tokens_for_z_index(self):
+        for m in re.finditer(r"z-index:\s*([^;}]+);", self.ai_css):
+            value = m.group(1).strip()
+            self.assertTrue(
+                value.startswith("var(--z-"),
+                "ad-hoc z-index in ai.css: %s" % value,
+            )
+
+    def test_drawer_css_is_fully_contained(self):
+        rule = _css_rule(self.ai_css, ".ai-drawer {")
+        for needle in (
+            "position: fixed",
+            "top: 0",
+            "right: 0",
+            "height: 100vh",
+            "width: min(720px, 100vw)",
+            "max-width: 100vw",
+            "overflow-x: hidden",
+            "z-index: var(--z-drawer)",
+            "transform: translateX(100%)",
+        ):
+            self.assertIn(needle, rule, needle)
+        open_rule = _css_rule(self.ai_css, ".ai-drawer--open {")
+        self.assertIn("transform: translateX(0)", open_rule)
+
+    def test_drawer_panel_is_two_columns_inside_one_body(self):
+        # Sidebar + main are columns of the single .ai-panel grid inside the
+        # drawer; main carries min-width:0 so long content can't blow out.
+        rule = _css_rule(self.ai_css, ".ai-drawer .ai-panel {")
+        self.assertIn("grid-template-columns: 280px 1fr", rule)
+        self.assertIn("height: 100%", rule)
+        main = _css_rule(self.ai_css, ".ai-panel__main {")
+        self.assertIn("min-width: 0", main)
+        stage = _css_rule(self.ai_css, ".ai-panel__stage {")
+        self.assertIn("min-width: 0", stage)
+
+    def test_model_dropdown_is_anchored_and_capped(self):
+        # Absolute dropdown needs a positioned ancestor; without it the browser
+        # anchors to the page, causing overlap + horizontal blowout.
+        select = _css_rule(self.ai_css, ".ai-panel__model-select {")
+        self.assertIn("position: relative", select)
+        rule = _css_rule(self.ai_css, ".ai-panel__model-list {")
+        self.assertIn("position: absolute", rule)
+        self.assertIn("z-index: var(--z-dropdown)", rule)
+        # Capped so it can never overflow even on a narrow drawer/viewport.
+        self.assertIn("calc(100vw - 32px)", rule)
+
+    def test_open_drawer_locks_page_and_hides_launcher(self):
+        # Background must not scroll while the drawer is open.
+        body = _css_rule(self.ai_css, "body.ai-drawer-open {")
+        self.assertIn("overflow: hidden", body)
+        # The launcher must never visually overlap the open drawer.
+        hide = _css_rule(self.ai_css, "body.ai-drawer-open .ai-launcher")
+        self.assertIn("visibility: hidden", hide)
+        # Launcher sits below backdrop below drawer in the stacking scale.
+        launcher = _css_rule(self.ai_css, ".ai-launcher {")
+        self.assertIn("z-index: var(--z-launcher)", launcher)
+        backdrop = _css_rule(self.ai_css, ".ai-drawer-backdrop {")
+        self.assertIn("z-index: var(--z-drawer-backdrop)", backdrop)
+        self.assertIn("position: fixed", backdrop)
 
 
 if __name__ == "__main__":

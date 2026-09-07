@@ -152,7 +152,14 @@
     if (!els.modelList.hidden) closeModelList();
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !els.modelList.hidden) closeModelList();
+    if (e.key === "Escape" && !els.modelList.hidden) {
+      closeModelList();
+      // The launcher's own Escape handler (loaded after this) would otherwise
+      // also close the drawer this same tick. Dropping a dropdown is one step
+      // at a time: Escape closes the dropdown first; the next Escape closes
+      // the drawer.
+      e.stopImmediatePropagation();
+    }
   });
 
   function setModel(id) {

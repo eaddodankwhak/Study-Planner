@@ -52,6 +52,12 @@
     drawer.setAttribute("aria-hidden", String(!next));
     drawer.classList.toggle("ai-drawer--open", next);
     launcher.setAttribute("aria-expanded", String(next));
+    // Lock the page behind the drawer (stops background scroll) and show the
+    // backdrop in lockstep with the open state. body.ai-drawer-open also hides
+    // the launcher via CSS so it can never peek out from behind the panel.
+    document.body.classList.toggle("ai-drawer-open", next);
+    var backdrop = document.getElementById("ai-drawer-backdrop");
+    if (backdrop) backdrop.hidden = !next;
     if (next) {
       var input = drawer.querySelector("input, textarea, button");
       if (input) input.focus();
@@ -104,6 +110,14 @@
       toggleDrawer();
     }
   });
+
+  // Clicking the backdrop closes the drawer.
+  var backdrop = document.getElementById("ai-drawer-backdrop");
+  if (backdrop) {
+    backdrop.addEventListener("click", function () {
+      toggleDrawer(false);
+    });
+  }
 
   // Keyboard: Ctrl/Cmd+J opens/closes the assistant from anywhere.
   document.addEventListener("keydown", function (e) {

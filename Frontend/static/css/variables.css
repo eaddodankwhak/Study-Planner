@@ -97,4 +97,14 @@
 
   /* layout */
   --sidebar-width: 16rem;
+
+  /* z-index scale — the ONLY stacking layers the app uses. Every positioned
+     element in the AI drawer/launcher family references one of these; never
+     ad-hoc z-index values. content < launcher < drawer-backdrop < drawer <
+     dropdown (a dropdown always floats above the panel it opens from). */
+  --z-content: 1;
+  --z-launcher: 40;
+  --z-drawer-backdrop: 45;
+  --z-drawer: 50;
+  --z-dropdown: 60;
 }
