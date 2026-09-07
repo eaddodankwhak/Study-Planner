@@ -124,10 +124,10 @@
                 {% if active_tool == 'quizzes' %}
                     <section class="card">
                         <h2 class="card__title">Private PDF Practice</h2>
-                        <p class="text-muted mb-4">Upload a text-based PDF with numbered multiple-choice questions. You will enter the answer key only after your timed attempt.</p>
+                        <p class="text-muted mb-4">Upload a PDF, Markdown, or text file with numbered multiple-choice questions. You will enter the answer key only after your timed attempt.</p>
                         <form class="form" action="{{ url_for('personal_quiz_import', slug=subject.slug) }}" method="post" enctype="multipart/form-data">
                             <div class="form-field"><label class="form-label" for="pdf-title">Quiz title</label><input class="form-input" id="pdf-title" name="title" placeholder="e.g. Week 4 revision"></div>
-                            <div class="form-field"><label class="form-label" for="question-pdf">Question PDF</label><input class="form-input" id="question-pdf" name="question_pdf" type="file" accept="application/pdf" required></div>
+                            <div class="form-field"><label class="form-label" for="question-pdf">Questions file</label><input class="form-input" id="question-pdf" name="question_pdf" type="file" accept="application/pdf,text/plain,text/markdown,.md,.markdown" required><small class="text-muted">Use PDF, .txt, or .md</small></div>
                             <div class="form-field"><label class="form-label" for="pdf-duration">Time limit (minutes)</label><input class="form-input form-input--small" id="pdf-duration" name="duration_minutes" type="number" min="1" max="180" value="30" required></div>
                             <button class="button" type="submit">Import and start practice</button>
                         </form>

@@ -274,6 +274,61 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def parse_multiple_choice_text(text):
+    """Extract numbered A-D question blocks from plain text or Markdown.
+
+    Notepad/Markdown exports often bold the question heading (``**9. ...**``)
+    or use lowercase option markers (``a)``). Normalize those presentation
+    details before applying the shared block parser.
+    """
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    lines = []
+    for raw_line in normalized.split("\n"):
+        line = re.sub(r"[*_]+", "", raw_line).strip()
+        if line:
+            # Accept compact authoring such as "A) one B) two" by turning
+            # each option marker into its own logical line before parsing.
+            lines.extend(part.strip() for part in re.split(r"\s+(?=[A-Da-d][.)]\s+)", line) if part.strip())
+
+    questions = []
+    current = None
+
+    for line in lines:
+        question_match = re.match(r"^(?:\(?\d{1,3}\)?[.)]?)(?:\s+)(.*)$", line)
+        if question_match:
+            if current and current["prompt"] and len(current["options"]) >= 2:
+                questions.append(current)
+            current = {"prompt": " ".join(question_match.group(1).split()), "options": []}
+            continue
+
+        option_match = re.match(r"^([A-Da-d])[.)]\s*(.*)$", line)
+        if current and option_match:
+            text = " ".join(option_match.group(2).split())
+            current["options"].append({"label": option_match.group(1).upper(), "text": text})
+            continue
+
+        if current:
+            if not current["options"]:
+                current["prompt"] = " ".join((current["prompt"] + " " + line).split())
+            else:
+                last_option = current["options"][-1]
+                last_option["text"] = " ".join((last_option["text"] + " " + line).split())
+            continue
+
+    if current and current["prompt"] and len(current["options"]) >= 2:
+        questions.append(current)
+
+    questions = [
+        {"prompt": question["prompt"], "options": question["options"]}
+        for question in questions
+        if question["prompt"] and len(question["options"]) >= 2 and all(option["text"] for option in question["options"])
+    ]
+
+    if not questions:
+        raise ValueError("No multiple-choice questions were found. Format questions as 1. ... followed by A. ... B. ...")
+    return questions
+
+
 def parse_multiple_choice_pdf(content):
     """Extract common numbered A-D question blocks from a text-based PDF."""
     try:
@@ -287,19 +342,7 @@ def parse_multiple_choice_pdf(content):
     except Exception as exc:
         raise ValueError("This PDF could not be read. Use a text-based PDF rather than a scan.") from exc
 
-    questions = []
-    blocks = re.findall(r"(?ms)^\s*\d{1,3}[.)]\s*(.+?)(?=^\s*\d{1,3}[.)]|\Z)", text)
-    for block in blocks:
-        option_matches = list(re.finditer(r"(?mi)^\s*([A-D])[.)]\s*(.+?)(?=^\s*[A-D][.)]|\Z)", block))
-        if len(option_matches) < 2:
-            continue
-        prompt = block[:option_matches[0].start()].strip()
-        options = [{"label": match.group(1).upper(), "text": " ".join(match.group(2).split())} for match in option_matches]
-        if prompt and all(option["text"] for option in options):
-            questions.append({"prompt": " ".join(prompt.split()), "options": options})
-    if not questions:
-        raise ValueError("No multiple-choice questions were found. Format questions as 1. ... followed by A. ... B. ...")
-    return questions
+    return parse_multiple_choice_text(text)
 
 
 def load_users():
@@ -949,15 +992,19 @@ def personal_quiz_import(slug):
         flash("Course not found.", "error")
         return redirect(url_for("home"))
     uploaded = request.files.get("question_pdf")
-    if not uploaded or not uploaded.filename or not uploaded.filename.lower().endswith(".pdf"):
-        flash("Choose a PDF containing numbered multiple-choice questions.", "error")
+    if not uploaded or not uploaded.filename:
+        flash("Choose a PDF, Markdown, or text file containing numbered multiple-choice questions.", "error")
+        return redirect(url_for("subject", slug=slug, tool="quizzes"))
+    extension = uploaded.filename.rsplit(".", 1)[-1].lower() if "." in uploaded.filename else ""
+    if extension not in {"pdf", "md", "txt", "markdown"}:
+        flash("Use a PDF, Markdown, or text file.", "error")
         return redirect(url_for("subject", slug=slug, tool="quizzes"))
     content = uploaded.read()
     if len(content) > 12 * 1024 * 1024:
         flash("Keep the PDF below 12 MB.", "error")
         return redirect(url_for("subject", slug=slug, tool="quizzes"))
     try:
-        questions = parse_multiple_choice_pdf(content)
+        questions = parse_multiple_choice_pdf(content) if extension == "pdf" else parse_multiple_choice_text(content.decode("utf-8-sig"))
         duration = max(1, min(int(request.form.get("duration_minutes") or 30), 180))
     except ValueError as exc:
         flash(str(exc), "error")
