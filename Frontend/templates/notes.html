@@ -1,24 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notes — Study Planner</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-</head>
-<body>
-    <header class="page-header">
-        <div class="container page-header__inner">
-            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
-            <div class="page-header__user">
-                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
-                {% include '_nav.html' %}
+{% extends "base.html" %}
 
-            </div>
-        </div>
-    </header>
-
-    <main class="container page-main">
+{% block title %}Notes — Study Planner{% endblock %}
+{% block main %}
         <div class="dashboard-heading">
             <h2>Notes</h2>
             <span class="text-muted">Capture and review what you learn, per course.</span>
@@ -74,6 +57,4 @@
                 <p class="text-muted mb-0">No notes yet. Add your first note above.</p>
             {% endif %}
         </section>
-    </main>
-</body>
-</html>
+    {% endblock %}

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Study Planner{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <meta name="user-id" content="{{ user.id if user else '' }}">
+    {% block head %}{% endblock %}
+</head>
+<body{% block body_tag %}{% endblock %}>
+    {% block header %}
+        <header class="page-header">
+            <div class="container page-header__inner">
+                <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+                <div class="page-header__user">
+                    <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                    {% include '_nav.html' %}
+                </div>
+            </div>
+        </header>
+    {% endblock %}
+
+    {% block content %}
+        <main class="container page-main"{% block main_attr %}{% endblock %}>
+            {% block main %}{% endblock %}
+        </main>
+    {% endblock %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

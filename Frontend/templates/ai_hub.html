@@ -1,24 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Learning Hub — Study Planner</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+{% extends "base.html" %}
+
+{% block title %}AI Learning Hub — Study Planner{% endblock %}
+
+{% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ai.css') }}">
-</head>
-<body>
-    <header class="page-header">
-        <div class="container page-header__inner">
-            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
-            <div class="page-header__user">
-                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
-                {% include '_nav.html' %}
+{% endblock %}
 
-            </div>
-        </div>
-    </header>
-
+{% block content %}
     <!-- Mobile-only toggle for the sidebar drawer -->
     <div class="ai-hub-mobile-nav">
         <strong>AI Learning Hub</strong>
@@ -74,12 +62,13 @@
             </div>
         </main>
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         // Seed data available to the frontend chat controller.
         window.AI_META = {};
         window.AI_SUBJECTS = {{ subjects | map(attribute='title') | list | tojson }};
     </script>
     <script src="{{ url_for('static', filename='js/ai_hub.js') }}"></script>
-</body>
-</html>
+{% endblock %}

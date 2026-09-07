@@ -1,12 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Get Started — Study Planner</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block title %}Get Started — Study Planner{% endblock %}
+
+{% block header %}
     <header class="page-header">
         <div class="container page-header__inner">
             <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
@@ -16,8 +12,9 @@
             </div>
         </div>
     </header>
+{% endblock %}
 
-    <main class="container page-main">
+{% block main %}
         <section class="card onboarding" id="onboarding-card">
             <h2 class="card__title">Let's personalize your planner</h2>
             <p class="text-muted mb-4">A few quick steps, and we'll tailor your routine to you.</p>
@@ -114,8 +111,9 @@
 
             </form>
         </section>
-    </main>
+    {% endblock %}
 
+{% block scripts %}
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -153,5 +151,4 @@
             });
         });
     </script>
-</body>
-</html>
+{% endblock %}

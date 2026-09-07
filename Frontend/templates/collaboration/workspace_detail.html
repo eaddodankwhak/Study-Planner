@@ -1,24 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ workspace.name }} — Study Planner</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <meta name="user-id" content="{{ user.id if user else '' }}">
-</head>
-<body class="ws-detail">
-    <header class="page-header">
-        <div class="container page-header__inner">
-            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
-            <div class="page-header__user">
-                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
-                {% include '_nav.html' %}
-            </div>
-        </div>
-    </header>
+{% extends "base.html" %}
 
-    <main class="container page-main" data-workspace-id="{{ workspace.id }}">
+{% block title %}{{ workspace.name }} — Study Planner{% endblock %}
+
+{% block body_tag %} class="ws-detail"{% endblock %}
+{% block main_attr %} data-workspace-id="{{ workspace.id }}"{% endblock %}
+{% block main %}
         <nav class="breadcrumb" aria-label="Breadcrumb">
             <a href="{{ url_for('collab.workspace_list') }}">Workspaces</a>
             <span>/</span>
@@ -501,9 +487,9 @@
             </div>
         </section>
         {% endif %}
-    </main>
+    {% endblock %}
 
-    <script src="{{ url_for('static', filename='js/collaboration/workspace.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/collaboration/task-detail.js') }}" defer></script>
-</body>
-</html>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/collaboration/workspace.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/collaboration/task-detail.js') }}" defer></script>
+{% endblock %}
