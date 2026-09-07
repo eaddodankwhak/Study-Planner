@@ -1,5 +1,5 @@
 <article class="course-card course-card--{{ course.color }}">
-    <a class="course-card__link" href="{{ url_for('course_detail', course_id=course.id) }}">
+    <a class="course-card__link" href="{{ course_url(course) }}">
         <span class="course-card__code">{{ course.code }}</span>
         <span class="course-card__title">{{ course.title }}</span>
     </a>

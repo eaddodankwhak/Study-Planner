@@ -100,6 +100,10 @@ app = Flask(
 # Secret key for session cookies. In production, move this to an env variable.
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "study-planner-dev-secret")
 
+# Every course/subject link anywhere goes through courses.course_url, exposed
+# to templates as a global so call sites can't drift into inline url_for.
+app.jinja_env.globals["course_url"] = courses_mod.course_url
+
 # Register the AI Learning Hub API blueprint.
 app.register_blueprint(ai_pkg.get_ai_blueprint())
 
@@ -197,8 +201,7 @@ SUBJECTS = [
 
 def subject_slug(value):
     """Turn a course code or title into a stable URL slug."""
-    slug = "".join(c if c.isalnum() else "-" for c in str(value).lower()).strip("-")
-    return slug or "course"
+    return courses_mod.course_slug(value)
 
 
 def custom_subject(row):
@@ -902,19 +905,44 @@ def _home_checkpoints(user, deadline_list, task_list):
 @login_required
 def subject(slug):
     """Render a Sakai-style page for a single subject."""
+    user = current_user()
     subject_info = get_subject(slug)
+    # Prefer the current user's own course row for this slug over any other
+    # user's row (or the preloaded samples) — the sidebar lists user_subjects,
+    # so the banner, deadlines, tasks and notes must all point at the SAME
+    # row the student actually owns. Shared workspaces (collab) still resolve
+    # by slug when the visitor owns no matching course.
+    if user:
+        for row in courses_mod.get_user_courses(user["id"]):
+            if courses_mod.course_slug(row["code"]) == slug:
+                subject_info = custom_subject(row)
+                break
     if not subject_info:
         flash("Subject not found.", "error")
         return redirect(url_for("home"))
 
     tool = request.args.get("tool", "home")
-    if tool not in ("home", "resources", "assignments", "calendar", "grades", "collab", "quizzes"):
+    if tool not in ("home", "resources", "assignments", "notes", "focus",
+                    "calendar", "grades", "collab", "quizzes"):
         tool = "home"
 
     users = load_users()
-    user = current_user()
     is_member = collab.is_member(slug, user["id"]) if user else False
     shared_files = collab.get_materials(slug)
+
+    # Course-scoped planner/db data (only meaningful for rows backed by the
+    # courses table, which carry a uuid id; the preloaded sample subjects have
+    # none, so their workspace shows empty lists rather than all the user's).
+    course_id = subject_info.get("id")
+    course_deadlines = (
+        [d for d in planner.list_deadlines(user["id"]) if d.get("course_id") == course_id]
+        if course_id else []
+    )
+    course_tasks = (
+        [t for t in planner.list_tasks(user["id"]) if t.get("course_id") == course_id]
+        if course_id else []
+    )
+    course_notes = db.list_notes(user["id"], course_id=course_id) if course_id else []
 
     return render_template(
         "subject.html",
@@ -931,6 +959,9 @@ def subject(slug):
         user_name=user_name,
         quizzes=collab.list_quizzes(slug),
         personal_quizzes=db.list_personal_quizzes(user["id"], slug),
+        deadlines=course_deadlines,
+        tasks=course_tasks,
+        notes=course_notes,
     )
 
 
@@ -1339,26 +1370,17 @@ def courses_add():
 @app.get("/courses/<course_id>")
 @login_required
 def course_detail(course_id):
-    """Render a single course's detail page."""
+    """Legacy tabbed course page — retired.
+
+    Permanent redirect to the canonical /subject/<slug> workspace so old links
+    and bookmarks keep resolving. All new UI links through courses.course_url.
+    """
     user = current_user()
     course = planner.get_course(user["id"], course_id)
     if not course:
         flash("Course not found.", "error")
         return redirect(url_for("courses"))
-    deadline_list = planner.list_deadlines(user["id"])
-    course_deadlines = [d for d in deadline_list if d.get("course_id") == course_id]
-    course_tasks = [t for t in planner.list_tasks(user["id"]) if t.get("course_id") == course_id]
-    course_notes = db.list_notes(user["id"], course_id=course_id)
-    return render_template(
-        "course_detail.html",
-        user=user,
-        active_nav="courses",
-        course=course,
-        deadlines=course_deadlines,
-        tasks=course_tasks,
-        notes=course_notes,
-        subject_slug=subject_slug(course["code"]),
-    )
+    return redirect(courses_mod.course_url(course), code=301)
 
 
 # ---------------------------------------------------------------------------

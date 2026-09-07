@@ -12,6 +12,8 @@ an id-space migration.
 
 import uuid
 
+from flask import url_for
+
 import db
 
 COURSE_COLORS = ["navy", "teal", "orange", "green", "purple", "red"]
@@ -26,6 +28,28 @@ def auto_color(course_code):
     """
     n = sum(ord(ch) for ch in course_code)
     return COURSE_COLORS[n % len(COURSE_COLORS)]
+
+
+def course_slug(value):
+    """Turn a course code or title into a stable URL slug."""
+    slug = "".join(c if c.isalnum() else "-" for c in str(value).lower()).strip("-")
+    return slug or "course"
+
+
+def course_url(course, tool="home"):
+    """The one link builder for a course's workspace page.
+
+    Every course/subject link goes through this — templates and routes never
+    hand-build ``url_for('subject', ...)`` for a course again. Accepts any
+    course dict from ``get_user_courses``/``get_course`` (has ``code``) or a
+    subject dict from ``user_subjects``/``get_subject`` (has a prebuilt
+    ``slug``); the slug always resolves to the very row being linked.
+    """
+    if isinstance(course, dict):
+        slug = course.get("slug") or course_slug(course.get("code") or "")
+    else:
+        slug = course_slug(getattr(course, "code", "") or "")
+    return url_for("subject", slug=slug, tool=tool)
 
 
 def _to_dict(row):

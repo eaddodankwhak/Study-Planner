@@ -82,8 +82,8 @@ Study-planner/
 │       ├── welcome.html       # Public landing splash
 │       ├── index.html         # Dashboard (subject cards + planning panel)
 │       ├── onboarding.html    # Onboarding wizard
-│       ├── courses.html, calendar.html, deadlines.html, task.html, progress.html
-│       ├── course_detail.html, deadline_detail.html
+│       ├── courses.html, deadlines.html, progress.html, schedule.html
+│       ├── deadline_detail.html
 │       ├── subject.html       # Per-subject Sakai-style page
 │       ├── about.html         # Modern about / mission page
 │       ├── ai_hub.html        # AI Learning Hub chat UI
