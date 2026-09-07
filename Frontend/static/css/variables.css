@@ -101,10 +101,12 @@
   /* z-index scale — the ONLY stacking layers the app uses. Every positioned
      element in the AI drawer/launcher family references one of these; never
      ad-hoc z-index values. content < launcher < drawer-backdrop < drawer <
-     dropdown (a dropdown always floats above the panel it opens from). */
+     dropdown < modal (a dropdown always floats above the panel it opens
+     from; a modal is a full-screen overlay a step above everything). */
   --z-content: 1;
   --z-launcher: 40;
   --z-drawer-backdrop: 45;
   --z-drawer: 50;
   --z-dropdown: 60;
+  --z-modal: 70;
 }

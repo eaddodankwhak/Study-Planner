@@ -1,0 +1,13 @@
+<article class="course-card course-card--{{ course.color }}">
+    <a class="course-card__link" href="{{ url_for('course_detail', course_id=course.id) }}">
+        <span class="course-card__code">{{ course.code }}</span>
+        <span class="course-card__title">{{ course.title }}</span>
+    </a>
+    {% set meta = [] %}
+    {% if course.credits %}{% set _ = meta.append(course.credits ~ ' credits') %}{% endif %}
+    {% if course.lecturer and course.lecturer != 'To be assigned' %}{% set _ = meta.append(course.lecturer) %}{% endif %}
+    {% if course.schedule %}{% set _ = meta.append(course.schedule) %}{% endif %}
+    {% if meta %}
+        <div class="course-card__meta">{{ meta | join(' · ') }}</div>
+    {% endif %}
+</article>

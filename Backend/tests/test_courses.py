@@ -187,6 +187,20 @@ class CoursesRoutesTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["code"], "DCIT 204")
 
+    def test_courses_post_accepts_template_course_code_field(self):
+        r = self.client.post(
+            "/courses",
+            data={
+                "course_code": "math 101",
+                "title": "Calculus", "lecturer": "", "credits": "3",
+                "description": "", "schedule": "", "color": "",
+            },
+        )
+        self.assertEqual(r.status_code, 302)
+        rows = courses.get_user_courses(self.uid)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["code"], "MATH 101")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1048,7 +1048,7 @@ def courses_add():
     user = current_user()
     planner.create_course(
         user["id"],
-        code=request.form.get("code", ""),
+        code=request.form.get("course_code", request.form.get("code", "")),
         title=request.form.get("title", ""),
         lecturer=request.form.get("lecturer", ""),
         credits=request.form.get("credits", 0),

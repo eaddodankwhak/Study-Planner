@@ -1,0 +1,57 @@
+<h2 class="course-form__heading" id="add-course-title">Add a course</h2>
+<form class="course-form" action="{{ url_for('courses_add') }}" method="post">
+    <div class="course-form__grid">
+        <div class="field">
+            <label for="course_code">Course code</label>
+            <input id="course_code" name="course_code" placeholder="e.g. DCIT 204" autocomplete="off" required>
+        </div>
+        <div class="field">
+            <label for="title">Course title</label>
+            <input id="title" name="title" placeholder="e.g. Data Structures &amp; Algorithms">
+        </div>
+        <div class="field">
+            <label for="lecturer">Lecturer</label>
+            <input id="lecturer" name="lecturer" placeholder="e.g. Dr. Mensah">
+        </div>
+        <div class="field field--narrow">
+            <label for="credits">Credits</label>
+            <input id="credits" name="credits" type="number" min="0" max="12" value="3">
+        </div>
+        <div class="field">
+            <label for="schedule">Class schedule</label>
+            <input id="schedule" name="schedule" placeholder="e.g. Mon &amp; Wed 10:00">
+        </div>
+    </div>
+
+    <div class="field">
+        <label id="card-colour-label">Card colour</label>
+        <input type="hidden" name="color" id="course-color" value="">
+        <div class="color-swatch-picker" role="radiogroup" aria-labelledby="card-colour-label">
+            <button type="button" class="color-swatch color-swatch--auto" data-color="" aria-checked="true" role="radio">Auto</button>
+            <button type="button" class="color-swatch" style="--swatch: #0f3a52" data-color="navy" aria-checked="false" role="radio" aria-label="Navy"></button>
+            <button type="button" class="color-swatch" style="--swatch: #0f5f6f" data-color="teal" aria-checked="false" role="radio" aria-label="Teal"></button>
+            <button type="button" class="color-swatch" style="--swatch: #b3551e" data-color="orange" aria-checked="false" role="radio" aria-label="Orange"></button>
+            <button type="button" class="color-swatch" style="--swatch: #2e6d32" data-color="green" aria-checked="false" role="radio" aria-label="Green"></button>
+            <button type="button" class="color-swatch" style="--swatch: #5b3a86" data-color="purple" aria-checked="false" role="radio" aria-label="Purple"></button>
+            <button type="button" class="color-swatch" style="--swatch: #8f2f2f" data-color="red" aria-checked="false" role="radio" aria-label="Red"></button>
+        </div>
+    </div>
+
+    <div class="field">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="3" placeholder="What's this course about?"></textarea>
+    </div>
+
+    <div class="course-form__footer">
+        <button type="button" class="button button--ghost" id="cancel-add-course">Cancel</button>
+        <button type="submit" class="button button--primary">Add course</button>
+    </div>
+</form>
+
+<aside class="course-form__preview">
+    <p class="course-form__preview-label">Preview</p>
+    <div class="course-card course-card--preview" id="course-preview-card" style="--card-color: var(--color-accent)">
+        <span class="course-card__code" id="preview-code">DCIT 204</span>
+        <span class="course-card__title" id="preview-title">To be assigned</span>
+    </div>
+</aside>
