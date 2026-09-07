@@ -2,36 +2,48 @@
      and the command palette. Set `active_nav` in the template context to one
      of: home, courses, calendar, practice, progress, ai. -->
 <button class="nav-toggle" data-nav-toggle aria-label="Open menu" aria-expanded="false">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 6h18M3 12h18M3 18h18" />
+    </svg>
 </button>
 
 <nav class="nav-bar" data-nav-bar>
-    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'home' else '' }}" href="{{ url_for('home') }}" data-nav-item>Home</a>
-    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'courses' else '' }}" href="{{ url_for('courses') }}" data-nav-item>Courses</a>
-    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'calendar' else '' }}" href="{{ url_for('calendar') }}" data-nav-item>Calendar</a>
-    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'practice' else '' }}" href="{{ url_for('task') }}" data-nav-item>Practice</a>
-    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'progress' else '' }}" href="{{ url_for('progress') }}" data-nav-item>Progress</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'home' else '' }}" href="{{ url_for('home') }}"
+        data-nav-item>Home</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'courses' else '' }}"
+        href="{{ url_for('courses') }}" data-nav-item>Courses</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'calendar' else '' }}"
+        href="{{ url_for('calendar') }}" data-nav-item>Calendar</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'practice' else '' }}"
+        href="{{ url_for('task') }}" data-nav-item>Practice</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'progress' else '' }}"
+        href="{{ url_for('progress') }}" data-nav-item>Progress</a>
 
     <div class="profile-menu" data-profile>
-        <button class="profile-menu__trigger nav-bar__link" data-profile-trigger>
+        <button class="profile-menu__trigger nav-bar__link" data-profile-trigger aria-label="Open profile menu"
+            aria-expanded="false" aria-haspopup="menu">
             <span class="profile-menu__avatar">{{ user.name[0]|upper if user and user.name else 'S' }}</span>
         </button>
-        <div class="profile-menu__dropdown" data-profile-menu hidden>
+        <div class="profile-menu__dropdown" data-profile-menu role="menu" hidden>
             <div class="profile-menu__head">
-                <span class="profile-menu__avatar profile-menu__avatar--lg">{{ user.name[0]|upper if user and user.name else 'S' }}</span>
+                <span class="profile-menu__avatar profile-menu__avatar--lg">{{ user.name[0]|upper if user and user.name
+                    else 'S' }}</span>
                 <div>
                     <p class="profile-menu__name">{{ user.name if user else 'Student' }}</p>
                     <p class="profile-menu__email">{{ user.email if user else '' }}</p>
                 </div>
             </div>
             <div class="profile-menu__links">
-                <a class="profile-menu__link" href="{{ url_for('collab.workspace_list') }}">Group Workspaces</a>
-                <a class="profile-menu__link{{ ' is-active' if active_nav == 'settings' else '' }}" href="{{ url_for('settings') }}">Settings</a>
-                <a class="profile-menu__link" href="{{ url_for('export_data') }}">Export my data</a>
-                <a class="profile-menu__link" href="{{ url_for('about') }}">About</a>
+                <a class="profile-menu__link" role="menuitem" href="{{ url_for('collab.workspace_list') }}">Group
+                    Workspaces</a>
+                <a class="profile-menu__link{{ ' is-active' if active_nav == 'settings' else '' }}" role="menuitem"
+                    href="{{ url_for('settings') }}">Settings</a>
+                <a class="profile-menu__link" role="menuitem" href="{{ url_for('export_data') }}">Export my data</a>
+                <a class="profile-menu__link" role="menuitem" href="{{ url_for('about') }}">About</a>
             </div>
             <div class="profile-menu__foot">
-                <a class="profile-menu__link profile-menu__link--danger" href="{{ url_for('logout') }}">Log out</a>
+                <a class="profile-menu__link profile-menu__link--danger" role="menuitem"
+                    href="{{ url_for('logout') }}">Log out</a>
             </div>
         </div>
     </div>
@@ -39,10 +51,11 @@
 
 <!-- Command palette (Ctrl/Cmd+K) -->
 <div class="palette" data-palette
-     data-routes='[{"label":"Home","crumb":"Dashboard","url":{{ url_for("home")|tojson }}},{"label":"Courses","crumb":"Browse subjects","url":{{ url_for("courses")|tojson }}},{"label":"Calendar","crumb":"Schedule & deadlines","url":{{ url_for("calendar")|tojson }}},{"label":"Practice","crumb":"Tasks & focus","url":{{ url_for("task")|tojson }}},{"label":"Progress","crumb":"Stats & trends","url":{{ url_for("progress")|tojson }}},{"label":"Group Workspaces","crumb":"Collaborate","url":{{ url_for("collab.workspace_list")|tojson }}},{"label":"Settings","crumb":"Profile & privacy","url":{{ url_for("settings")|tojson }}},{"label":"Export data","crumb":"Inside Settings","url":{{ url_for("export_data")|tojson }}},{"label":"About","crumb":"Inside Settings","url":{{ url_for("about")|tojson }}}]'>
+    data-routes='[{"label":"Home","crumb":"Dashboard","url":{{ url_for("home")|tojson }}},{"label":"Courses","crumb":"Browse subjects","url":{{ url_for("courses")|tojson }}},{"label":"Calendar","crumb":"Schedule & deadlines","url":{{ url_for("calendar")|tojson }}},{"label":"Practice","crumb":"Tasks & focus","url":{{ url_for("task")|tojson }}},{"label":"Progress","crumb":"Stats & trends","url":{{ url_for("progress")|tojson }}},{"label":"Group Workspaces","crumb":"Collaborate","url":{{ url_for("collab.workspace_list")|tojson }}},{"label":"Settings","crumb":"Profile & privacy","url":{{ url_for("settings")|tojson }}},{"label":"Export data","crumb":"Inside Settings","url":{{ url_for("export_data")|tojson }}},{"label":"About","crumb":"Inside Settings","url":{{ url_for("about")|tojson }}}]'>
     <div class="palette__backdrop" data-palette-close></div>
     <div class="palette__dialog" role="dialog" aria-modal="true" aria-label="Command palette">
-        <input class="palette__input" type="text" placeholder="Jump to a page…" data-palette-input autocomplete="off" aria-label="Search pages">
+        <input class="palette__input" type="text" placeholder="Jump to a page…" data-palette-input autocomplete="off"
+            aria-label="Search pages">
         <div class="palette__hint" data-palette-hint>Type to filter · ↑↓ to navigate · ↵ to open · Esc to close</div>
         <ul class="palette__list" data-palette-list></ul>
     </div>

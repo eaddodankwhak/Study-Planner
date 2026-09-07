@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,27 +11,30 @@
     {% block head %}{% endblock %}
 </head>
 <body{% block body_tag %}{% endblock %}>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     {% block header %}
-        <header class="page-header">
-            <div class="container page-header__inner">
-                <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
-                <div class="page-header__user">
-                    <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
-                    {% include '_nav.html' %}
-                </div>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                {% include '_nav.html' %}
             </div>
-        </header>
+        </div>
+    </header>
     {% endblock %}
 
     {% block content %}
-        <main class="container page-main"{% block main_attr %}{% endblock %}>
-            {% block main %}{% endblock %}
-        </main>
+    <main id="main-content" class="container page-main" {% block main_attr %}{% endblock %}>
+        {% block main %}{% endblock %}
+    </main>
     {% endblock %}
 
+    <div class="app-status" data-app-status role="status" aria-live="polite" aria-atomic="true"></div>
+
     {# Persistent AI assistant launcher + drawer, shown on every logged-in page.
-       Pages that render the panel themselves (e.g. /ai-hub) override this block
-       to avoid duplicate IDs. #}
+    Pages that render the panel themselves (e.g. /ai-hub) override this block
+    to avoid duplicate IDs. #}
     {% block ai_launcher %}
     <button id="ai-launcher" class="ai-launcher" aria-label="Open AI assistant" aria-haspopup="dialog">
         <img src="{{ url_for('static', filename='img/ai-orb.svg') }}" alt="" class="ai-launcher__icon">
@@ -44,7 +48,9 @@
 
     {% block scripts %}{% endblock %}
 
+    <script src="{{ url_for('static', filename='js/hci.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/ai_hub.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/ai-launcher.js') }}" defer></script>
-</body>
+    </body>
+
 </html>

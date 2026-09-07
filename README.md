@@ -90,7 +90,8 @@ Study-planner/
 │       └── login.html, signup.html, quiz*.html
 ├── docs/
 │   ├── learning-roadmap.md    # Suggested staged learning plan
-│   └── css-architecture.md    # Front-end styling structure recommendation
+│   ├── css-architecture.md    # Front-end styling structure recommendation
+│   └── hci-design-rules.md    # HCI design and review checklist
 ├── run.bat                    # Windows launcher (run from the project root)
 ├── .gitignore
 └── README.md
@@ -207,3 +208,5 @@ cd Backend
 6. **Polish:** add validation, search, filters, analytics, and deployment.
 
 See [the learning roadmap](docs/learning-roadmap.md) for suggested milestones and challenges.
+
+For screen and flow design reviews, use the [HCI design rules](docs/hci-design-rules.md).

@@ -18,6 +18,32 @@
   outline-offset: var(--ring-offset);
 }
 
+.skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-inverse);
+  background: var(--color-primary-dark);
+  border-radius: var(--radius-sm);
+  transform: translateY(-150%);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.app-status {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 html {
   font-size: 100%;
 }
@@ -29,7 +55,12 @@ body {
   line-height: 1.6;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin-bottom: var(--space-4);
   line-height: 1.25;
 }
@@ -93,6 +124,7 @@ button:active,
 }
 
 @media (prefers-reduced-motion: no-preference) {
+
   button,
   .button,
   .nav-toggle,
@@ -105,10 +137,10 @@ button:active,
   .ai-iconbtn,
   .palette__item {
     transition: transform var(--dur-instant) var(--ease-out),
-                background-color var(--dur-fast) var(--ease-out),
-                color var(--dur-fast) var(--ease-out),
-                box-shadow var(--dur-fast) var(--ease-out),
-                border-color var(--dur-fast) var(--ease-out);
+      background-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
   }
 }
 
@@ -122,50 +154,114 @@ button:active,
 
 /* Shared keyframes (all guarded by prefers-reduced-motion). */
 @keyframes sp-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes sp-item-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes sp-card-in {
-  from { opacity: 0; transform: scale(0.97); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes sp-pop-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Blocked: a short shake draws the eye to something that needs attention. */
 @keyframes sp-shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(3px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-4px);
+  }
+
+  40% {
+    transform: translateX(4px);
+  }
+
+  60% {
+    transform: translateX(-3px);
+  }
+
+  80% {
+    transform: translateX(3px);
+  }
 }
 
 /* One-time flows (onboarding): step content slides in; the completed
    step's checkmark pops instead of snapping to filled. */
 @keyframes sp-step-in {
-  0% { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes sp-check-pop {
-  0% { opacity: 0; transform: scale(0.8); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .sp-fade { animation: sp-fade var(--dur-fast) var(--ease-out) both; }
-  .sp-item-in { animation: sp-item-in var(--dur-base) var(--ease-out) both; }
-  .sp-card-in { animation: sp-card-in var(--dur-base) var(--ease-out) both; }
+  .sp-fade {
+    animation: sp-fade var(--dur-fast) var(--ease-out) both;
+  }
+
+  .sp-item-in {
+    animation: sp-item-in var(--dur-base) var(--ease-out) both;
+  }
+
+  .sp-card-in {
+    animation: sp-card-in var(--dur-base) var(--ease-out) both;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -192,12 +288,17 @@ button:active,
 }
 
 @keyframes sp-shimmer {
-  100% { transform: translateX(100%); }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 /* Entire app: honor reduced-motion by collapsing all animation. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -218,7 +319,9 @@ button:active,
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .flashes li { animation: sp-item-in var(--dur-fast) var(--ease-out) both; }
+  .flashes li {
+    animation: sp-item-in var(--dur-fast) var(--ease-out) both;
+  }
 }
 
 .flashes .success {

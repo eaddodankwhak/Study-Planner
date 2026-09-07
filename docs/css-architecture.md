@@ -137,6 +137,7 @@ Layout blocks (header, nav, `app-shell`/sidebar, `.container`, `.page-main`) liv
 - [ ] Confirm `styles.css` is linked on any page you add styles to.
 - [ ] Scope one-off page styles under a page class.
 - [ ] Before committing, do a quick visual check on desktop + a narrow (mobile) viewport.
+- [ ] Review the screen against the [HCI design rules](hci-design-rules.md), especially feedback, recoverability, accessibility, and consistency.
 
 This structure keeps the styling consistent across the growing set of pages (dashboard,
 courses, calendar, deadlines, tasks, progress, AI hub, about) and scales comfortably as

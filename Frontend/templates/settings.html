@@ -2,92 +2,128 @@
 
 {% block title %}Settings — Study Planner{% endblock %}
 {% block main %}
-        <div class="dashboard-heading">
-            <h2>Settings &amp; Privacy</h2>
-            <span class="text-muted">Export your data, review AI activity, or delete your account.</span>
-        </div>
+<div class="dashboard-heading">
+    <h2>Settings &amp; Privacy</h2>
+    <span class="text-muted">Export your data, review AI activity, or delete your account.</span>
+</div>
 
-        <div class="stat-grid">
-            <div class="stat"><p class="stat__value">{{ course_count }}</p><p class="stat__label">Courses</p></div>
-            <div class="stat"><p class="stat__value">{{ deadline_count }}</p><p class="stat__label">Deadlines</p></div>
-            <div class="stat"><p class="stat__value">{{ task_count }}</p><p class="stat__label">Tasks</p></div>
-            <div class="stat"><p class="stat__value">{{ session_count }}</p><p class="stat__label">Focus sessions</p></div>
-            <div class="stat"><p class="stat__value">{{ note_count }}</p><p class="stat__label">Notes</p></div>
-        </div>
+<div class="stat-grid">
+    <div class="stat">
+        <p class="stat__value">{{ course_count }}</p>
+        <p class="stat__label">Courses</p>
+    </div>
+    <div class="stat">
+        <p class="stat__value">{{ deadline_count }}</p>
+        <p class="stat__label">Deadlines</p>
+    </div>
+    <div class="stat">
+        <p class="stat__value">{{ task_count }}</p>
+        <p class="stat__label">Tasks</p>
+    </div>
+    <div class="stat">
+        <p class="stat__value">{{ session_count }}</p>
+        <p class="stat__label">Focus sessions</p>
+    </div>
+    <div class="stat">
+        <p class="stat__value">{{ note_count }}</p>
+        <p class="stat__label">Notes</p>
+    </div>
+</div>
 
-        <div class="subject-content">
-            <section class="card">
-                <h3 class="card__title">Notifications</h3>
-                <p class="text-muted">Choose what Study Planner sends you.</p>
-                <form method="POST" action="{{ url_for('settings_notifications') }}" class="form">
-                    <label class="toggle">
-                        <input type="checkbox" name="notify_digest" {{ 'checked' if notify_digest else '' }}>
-                        <span class="toggle__track"><span class="toggle__thumb"></span></span>
-                        <span class="toggle__label">Weekly digest — a summary of your deadlines, tasks, and study load for the next 7 days.</span>
-                    </label>
-                    <div class="form-actions" style="justify-content:flex-start;">
-                        <button class="button button--primary" type="submit" style="width:auto;">Save preferences</button>
-                    </div>
-                </form>
+<div class="subject-content">
+    <section class="card">
+        <h3 class="card__title">Notifications</h3>
+        <p class="text-muted">Choose what Study Planner sends you.</p>
+        <form method="POST" action="{{ url_for('settings_notifications') }}" class="form">
+            <label class="toggle">
+                <input type="checkbox" name="notify_digest" {{ 'checked' if notify_digest else '' }}>
+                <span class="toggle__track"><span class="toggle__thumb"></span></span>
+                <span class="toggle__label">Weekly digest — a summary of your deadlines, tasks, and study load for the
+                    next 7 days.</span>
+            </label>
+            <div class="form-actions" style="justify-content:flex-start;">
+                <button class="button button--primary" type="submit" style="width:auto;">Save preferences</button>
+            </div>
+        </form>
 
-                {% if notify_digest %}
-                <div class="digest-preview">
-                    <div class="stat-grid">
-                        <div class="stat"><p class="stat__value">{{ week.upcoming_deadlines|length }}</p><p class="stat__label">Deadlines</p></div>
-                        <div class="stat"><p class="stat__value">{{ week.upcoming_tasks|length }}</p><p class="stat__label">Tasks</p></div>
-                        <div class="stat"><p class="stat__value">{{ (week.total_minutes // 60) }}h {{ week.total_minutes % 60 }}m</p><p class="stat__label">Effort</p></div>
-                    </div>
-                    <p class="text-muted mb-2">This week runs through {{ week.week_end }}. Here's how the digest reads:</p>
-                    {% if week.upcoming_deadlines or week.upcoming_tasks %}
-                    <ul class="digest-preview__list">
-                        {% for d in week.upcoming_deadlines %}
-                            <li>Deadline · <strong>{{ d.title }}</strong> <span class="badge badge--open">due {{ d.due_date }}</span></li>
-                        {% endfor %}
-                        {% for t in week.upcoming_tasks %}
-                            <li>Task · {{ t.title }} <span class="badge badge--{{ t.priority }}">{{ t.due_date }}</span></li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <p class="text-muted mb-0">No deadlines or tasks due in the next 7 days.</p>
-                    {% endif %}
+        {% if notify_digest %}
+        <div class="digest-preview">
+            <div class="stat-grid">
+                <div class="stat">
+                    <p class="stat__value">{{ week.upcoming_deadlines|length }}</p>
+                    <p class="stat__label">Deadlines</p>
                 </div>
-                {% endif %}
-            </section>
-
-            <section class="card">
-                <h3 class="card__title">Your data</h3>
-                <p class="text-muted">Download everything we store about you as a readable JSON file, or permanently remove your account.</p>
-                <div class="form-actions" style="justify-content:flex-start;">
-                    <a class="button button--primary" href="{{ url_for('export_data') }}">Export my data</a>
+                <div class="stat">
+                    <p class="stat__value">{{ week.upcoming_tasks|length }}</p>
+                    <p class="stat__label">Tasks</p>
                 </div>
-            </section>
-
-            <section class="card">
-                <h3 class="card__title">AI activity</h3>
-                {% if audit %}
-                    <table class="data-table">
-                        <thead><tr><th>Action</th><th>Detail</th><th>When</th></tr></thead>
-                        <tbody>
-                            {% for a in audit %}
-                                <tr>
-                                    <td>{{ a.action }}</td>
-                                    <td>{{ a.detail }}</td>
-                                    <td>{{ a.created_at }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p class="text-muted mb-0">No AI activity recorded yet.</p>
-                {% endif %}
-            </section>
-
-            <section class="card priority-critical">
-                <h3 class="card__title">Delete account</h3>
-                <p class="text-muted">This permanently removes your account, planner data, notes, sessions, and AI history. This cannot be undone.</p>
-                <form method="POST" action="{{ url_for('delete_account') }}" class="form">
-                    <button class="button" type="submit" style="background:#c62828;">Delete my account permanently</button>
-                </form>
-            </section>
+                <div class="stat">
+                    <p class="stat__value">{{ (week.total_minutes // 60) }}h {{ week.total_minutes % 60 }}m</p>
+                    <p class="stat__label">Effort</p>
+                </div>
+            </div>
+            <p class="text-muted mb-2">This week runs through {{ week.week_end }}. Here's how the digest reads:</p>
+            {% if week.upcoming_deadlines or week.upcoming_tasks %}
+            <ul class="digest-preview__list">
+                {% for d in week.upcoming_deadlines %}
+                <li>Deadline · <strong>{{ d.title }}</strong> <span class="badge badge--open">due {{ d.due_date
+                        }}</span></li>
+                {% endfor %}
+                {% for t in week.upcoming_tasks %}
+                <li>Task · {{ t.title }} <span class="badge badge--{{ t.priority }}">{{ t.due_date }}</span></li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted mb-0">No deadlines or tasks due in the next 7 days.</p>
+            {% endif %}
         </div>
-    {% endblock %}
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h3 class="card__title">Your data</h3>
+        <p class="text-muted">Download everything we store about you as a readable JSON file, or permanently remove your
+            account.</p>
+        <div class="form-actions" style="justify-content:flex-start;">
+            <a class="button button--primary" href="{{ url_for('export_data') }}">Export my data</a>
+        </div>
+    </section>
+
+    <section class="card">
+        <h3 class="card__title">AI activity</h3>
+        {% if audit %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Action</th>
+                    <th>Detail</th>
+                    <th>When</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in audit %}
+                <tr>
+                    <td>{{ a.action }}</td>
+                    <td>{{ a.detail }}</td>
+                    <td>{{ a.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No AI activity recorded yet.</p>
+        {% endif %}
+    </section>
+
+    <section class="card priority-critical">
+        <h3 class="card__title">Delete account</h3>
+        <p class="text-muted">This permanently removes your account, planner data, notes, sessions, and AI history. This
+            cannot be undone.</p>
+        <form method="POST" action="{{ url_for('delete_account') }}" class="form">
+            <button class="button" type="submit"
+                data-confirm="Delete your account and all stored data permanently? This cannot be undone."
+                style="background:#c62828;">Delete my account permanently</button>
+        </form>
+    </section>
+</div>
+{% endblock %}
