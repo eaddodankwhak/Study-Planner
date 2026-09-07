@@ -44,3 +44,12 @@ class AIProvider(abc.ABC):
     def supports(self, capability):
         """Return True if this provider supports the given capability."""
         return True
+
+    def verify(self, api_key=None):
+        """Validate an API key against the provider.
+
+        Returns (ok: bool, note: str) where note is a short human-readable
+        description ("Works" or why it failed). Used by the BYOK connection
+        flow in AI settings and mocked in hermetic tests.
+        """
+        return False, "Key verification is not supported for this provider."

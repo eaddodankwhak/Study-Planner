@@ -3,7 +3,7 @@
 import os
 import urllib.parse
 
-from ._http import post_json
+from ._http import ProviderHTTPError, get_json, post_json
 from .base import AIProvider
 
 
@@ -64,3 +64,21 @@ class GoogleProvider(AIProvider):
                     text = part.get("text", "")
                     if text:
                         yield text
+
+    def verify(self, api_key=None):
+        """Validate a key via the Gemini models list endpoint."""
+        key = api_key or self.api_key
+        if not key:
+            return False, "No API key provided."
+        list_url = f"{self.base_url}/models?key={urllib.parse.quote(key)}"
+        try:
+            data = get_json(list_url, {"Content-Type": "application/json"}, timeout=30)
+            if isinstance(data.get("models"), list):
+                return True, "Works"
+            return False, "Google returned an unexpected response."
+        except ProviderHTTPError as exc:
+            if exc.status == 400 or exc.status == 403:
+                return False, "Key rejected by Gemini (403)."
+            return False, f"Gemini returned HTTP {exc.status}."
+        except Exception as exc:  # noqa: BLE001 - network/SSL errors surface as-is
+            return False, f"Could not reach Gemini: {exc}"

@@ -12,6 +12,7 @@ helpers. Tables:
   ai_conversations - AI chat conversations (per user)
   ai_messages      - messages within an AI conversation
   ai_usage         - per-user AI usage counters (JSON payload)
+  ai_connections   - per-user BYOK provider keys (obfuscated)
   notes            - per-user study notes (course/topic scoped)
   sessions         - completed study/focus sessions + reflections
 
@@ -19,6 +20,9 @@ The database file lives at Database/instance/study_planner.db and is created
 automatically on first use. Uses only Python's standard library (sqlite3).
 """
 
+import base64
+import hashlib
+import hmac
 import json
 import os
 import random
@@ -139,6 +143,25 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
     created_at INTEGER,
     updated_at INTEGER
 );
+
+-- Per-user BYOK connections ("connect your own Claude/GPT/Gemini account").
+-- The key is obfuscated (XOR keystream + HMAC tag keyed from SECRET_KEY) so a
+-- dumped db file doesn't leak the raw key; see _encrypt_connection_key.
+-- UNIQUE(user_id, provider) makes "reconnecting" an update, never a duplicate.
+CREATE TABLE IF NOT EXISTS ai_connections (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    provider    TEXT NOT NULL,
+    api_key_enc TEXT NOT NULL,
+    key_hint    TEXT,
+    label       TEXT,
+    status      TEXT DEFAULT 'connected',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_connections_user ON ai_connections (user_id);
 
 CREATE TABLE IF NOT EXISTS ai_messages (
     id             TEXT PRIMARY KEY,
@@ -381,9 +404,51 @@ def init_db():
         conn.executescript(_SCHEMA)
         _migrate_add_columns(conn)
         _migrate_legacy_courses(conn)
+        _migrate_ai_connections_schema(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _migrate_ai_connections_schema(conn):
+    """Rebuild ai_connections created by an early BYOK draft definition.
+
+    The first version declared REFERENCES users(id); because connect() enables
+    PRAGMA foreign_keys, that broke connections for users that exist only as a
+    legacy planner legacy row. Recreate the table from the canonical (FK-free)
+    schema when the old definition is detected; otherwise nothing happens.
+    """
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'ai_connections'"
+    ).fetchone()
+    if not row or "REFERENCES users" not in (row["sql"] or ""):
+        return
+    conn.execute(
+        "CREATE TABLE ai_connections_new ("
+        "id          TEXT PRIMARY KEY,"
+        "user_id     TEXT NOT NULL,"
+        "provider    TEXT NOT NULL,"
+        "api_key_enc TEXT NOT NULL,"
+        "key_hint    TEXT,"
+        "label       TEXT,"
+        "status      TEXT DEFAULT 'connected',"
+        "created_at  TEXT NOT NULL DEFAULT (datetime('now')),"
+        "updated_at  TEXT NOT NULL DEFAULT (datetime('now')),"
+        "UNIQUE(user_id, provider)"
+        ")"
+    )
+    conn.execute(
+        "INSERT INTO ai_connections_new "
+        "(id, user_id, provider, api_key_enc, key_hint, label, status, created_at, updated_at) "
+        "SELECT id, user_id, provider, api_key_enc, key_hint, label, status, created_at, updated_at "
+        "FROM ai_connections"
+    )
+    conn.execute("DROP TABLE ai_connections")
+    conn.execute("ALTER TABLE ai_connections_new RENAME TO ai_connections")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ai_connections_user "
+        "ON ai_connections (user_id)"
+    )
 
 
 def _migrate_add_columns(conn):
@@ -623,6 +688,154 @@ def set_ai_preferences(user_id, model=None, level=None):
     if level is not None:
         fields["ai_level"] = level
     update_user(user_id, fields)
+
+
+# --------------------------------------------------------- ai connections
+
+def _connection_secret():
+    """Return (key, salt) derived from SECRET_KEY (falls back to the same
+    default the Flask app uses) so key ciphers survive app restarts."""
+    secret = (os.environ.get("SECRET_KEY") or "study-planner-dev-secret").encode("utf-8")
+    salt = hashlib.sha256(b"study-planner:ai-connections").digest()[:16]
+    key = hashlib.pbkdf2_hmac("sha256", secret, salt, 200_000, dklen=32)
+    return key, salt
+
+
+def _encrypt_connection_key(api_key):
+    """Obfuscate an API key before storage.
+
+    Not a real KDF-envelope (that would need a dedicated secrets store), but
+    XOR with a keyed PRF stream plus an HMAC tag means a raw db dump never
+    contains the plaintext key. Format: base64(nonce).base64(tag).base64(cipher).
+    """
+    key, _ = _connection_secret()
+    nonce = os.urandom(12)
+    payload = api_key.encode("utf-8")
+    stream = b"".join(
+        hmac.new(key, nonce + i.to_bytes(4, "big"), hashlib.sha256).digest()
+        for i in range((len(payload) // 32) + 1)
+    )[:len(payload)]
+    cipher = bytes(a ^ b for a, b in zip(payload, stream))
+    tag = hmac.new(key, nonce + cipher, hashlib.sha256).digest()
+    enc = base64.urlsafe_b64encode(nonce).decode("ascii")
+    tag_b = base64.urlsafe_b64encode(tag).decode("ascii")
+    cip = base64.urlsafe_b64encode(cipher).decode("ascii")
+    return f"{enc}.{tag_b}.{cip}"
+
+
+def _decrypt_connection_key(payload):
+    """Reverse _encrypt_connection_key; returns None on tamper/format errors."""
+    try:
+        nonce_b, tag_b, cip_b = payload.split(".")
+        nonce = base64.urlsafe_b64decode(nonce_b.encode("ascii"))
+        tag = base64.urlsafe_b64decode(tag_b.encode("ascii"))
+        cipher = base64.urlsafe_b64decode(cip_b.encode("ascii"))
+    except (ValueError, TypeError):
+        return None
+    key, _ = _connection_secret()
+    expected = hmac.new(key, nonce + cipher, hashlib.sha256).digest()
+    if not hmac.compare_digest(expected, tag):
+        return None
+    stream = b"".join(
+        hmac.new(key, nonce + i.to_bytes(4, "big"), hashlib.sha256).digest()
+        for i in range((len(cipher) // 32) + 1)
+    )[:len(cipher)]
+    return bytes(a ^ b for a, b in zip(cipher, stream)).decode("utf-8")
+
+
+def _mask_connection(row):
+    """Strip the encrypted blob from a connection row and expose key_hint."""
+    if row is None:
+        return None
+    return {
+        "provider": row["provider"],
+        "key_hint": row.get("key_hint") or "",
+        "label": row.get("label") or "",
+        "status": row.get("status") or "connected",
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def set_ai_connection(user_id, provider, api_key, label=""):
+    """Upsert a user's BYOK connection for a provider.
+
+    Returns the masked connection dict. The plaintext key is never returned
+    and the stored value is obfuscated (see _encrypt_connection_key).
+    """
+    conn = _conn_context()
+    try:
+        conn.execute(
+            "INSERT INTO ai_connections "
+            "(id, user_id, provider, api_key_enc, key_hint, label, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, 'connected') "
+            "ON CONFLICT(user_id, provider) DO UPDATE SET "
+            "api_key_enc = excluded.api_key_enc, "
+            "key_hint = excluded.key_hint, "
+            "label = excluded.label, "
+            "status = 'connected', "
+            "updated_at = datetime('now')",
+            (
+                uuid.uuid4().hex,
+                user_id,
+                provider,
+                _encrypt_connection_key(api_key),
+                f"••••{api_key[-4:]}" if len(api_key) >= 4 else "connected",
+                (label or "").strip(),
+            ),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT provider, key_hint, label, status, created_at, updated_at "
+            "FROM ai_connections WHERE user_id = ? AND provider = ?",
+            (user_id, provider),
+        ).fetchone()
+    finally:
+        conn.close()
+    return _mask_connection(dict(row)) if row else None
+
+
+def get_ai_connections(user_id):
+    """Return all of a user's connections with keys masked."""
+    rows = _query_all(
+        "SELECT provider, key_hint, label, status, created_at, updated_at "
+        "FROM ai_connections WHERE user_id = ? ORDER BY updated_at DESC",
+        (user_id,),
+    )
+    return [_mask_connection(r) for r in rows]
+
+
+def get_ai_connection(user_id, provider):
+    row = _query_one(
+        "SELECT provider, key_hint, label, status, created_at, updated_at "
+        "FROM ai_connections WHERE user_id = ? AND provider = ?",
+        (user_id, provider),
+    )
+    return _mask_connection(row)
+
+
+def get_ai_connection_key(user_id, provider):
+    """Return the decrypted key for routing, or None when not connected."""
+    row = _query_one(
+        "SELECT api_key_enc FROM ai_connections WHERE user_id = ? AND provider = ?",
+        (user_id, provider),
+    )
+    if not row:
+        return None
+    return _decrypt_connection_key(row["api_key_enc"])
+
+
+def delete_ai_connection(user_id, provider):
+    conn = _conn_context()
+    try:
+        cur = conn.execute(
+            "DELETE FROM ai_connections WHERE user_id = ? AND provider = ?",
+            (user_id, provider),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def set_digest_preference(user_id, enabled):
@@ -1099,6 +1312,7 @@ def delete_user(user_id):
             "DELETE FROM ai_messages WHERE user_id = ?",
             "DELETE FROM ai_conversations WHERE user_id = ?",
             "DELETE FROM ai_usage WHERE user_id = ?",
+            "DELETE FROM ai_connections WHERE user_id = ?",
             "DELETE FROM memberships WHERE user_id = ?",
             "DELETE FROM attempts WHERE user_id = ?",
             "DELETE FROM users WHERE id = ?",

@@ -19,6 +19,10 @@ class MockProvider(AIProvider):
     is_mock = True
     name = "mock"
 
+    def __init__(self, api_key=None):
+        # Ignored; kept so the router can build every provider uniformly.
+        self.api_key = None
+
     # Mode headings to make the demo response feel tailored to the task.
     _HEADINGS = {
         "explain": "Let's understand the concept",
@@ -85,3 +89,7 @@ class MockProvider(AIProvider):
         text = result["content"]
         for i in range(0, len(text), chunk):
             yield text[i:i + chunk]
+
+    def verify(self, api_key=None):
+        """The mock always "accepts" keys so the demo flow never blocks."""
+        return True, "Mock provider"

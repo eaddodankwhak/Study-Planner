@@ -2,7 +2,7 @@
 
 import os
 
-from ._http import post_json, stream_json_lines
+from ._http import ProviderHTTPError, get_json, post_json, stream_json_lines
 from .base import AIProvider
 
 
@@ -13,9 +13,9 @@ class AnthropicProvider(AIProvider):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self.base_url = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1")
 
-    def _headers(self):
+    def _headers(self, api_key=None):
         return {
-            "x-api-key": self.api_key,
+            "x-api-key": api_key or self.api_key,
             "anthropic-version": os.getenv("ANTHROPIC_VERSION", "2023-06-01"),
             "Content-Type": "application/json",
         }
@@ -67,3 +67,18 @@ class AnthropicProvider(AIProvider):
                 delta = data.get("delta", {})
                 if delta.get("type") == "text_delta" and delta.get("text"):
                     yield delta["text"]
+
+    def verify(self, api_key=None):
+        """Validate a key via the Anthropic models list endpoint."""
+        key = api_key or self.api_key
+        if not key:
+            return False, "No API key provided."
+        try:
+            get_json(f"{self.base_url}/models", self._headers(key), timeout=30)
+        except ProviderHTTPError as exc:
+            if exc.status == 401 or exc.status == 403:
+                return False, "Key rejected by Claude (401)."
+            return False, f"Claude returned HTTP {exc.status}."
+        except Exception as exc:  # noqa: BLE001 - network/SSL errors surface as-is
+            return False, f"Could not reach Claude: {exc}"
+        return True, "Works"

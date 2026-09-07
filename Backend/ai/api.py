@@ -29,6 +29,10 @@ from .providers import get_provider
 
 ai_api = Blueprint("ai_api", __name__, url_prefix="/api/ai")
 
+#: Providers the "connect your own account" flow accepts, keyed to the
+#: registry's provider ids (see ai/models.py) plus the display label used in UI.
+CONNECTABLE_PROVIDERS = {"anthropic": "Claude", "openai": "ChatGPT", "google": "Gemini"}
+
 UPLOAD_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "Database",
@@ -107,6 +111,29 @@ def _material_text(material_id, user_id):
         return f.read()
 
 
+def _server_provider_keys_available():
+    """True when any real provider key is configured at the server level."""
+    return any(
+        os.getenv(k) for k in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_AI_API_KEY")
+    )
+
+
+def _verify_provider_key(provider, api_key):
+    """Ask the provider adapter to validate a candidate key.
+
+    Module-level so hermetic tests can monkeypatch it instead of hitting the
+    network. Returns (ok: bool, note: str).
+    """
+    try:
+        provider_obj = get_provider(provider, api_key=api_key)
+    except Exception as exc:  # noqa: BLE001 - adapter construction errors surface as-is
+        return False, f"Could not reach {provider}: {exc}"
+    try:
+        return provider_obj.verify(api_key=api_key)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Could not reach {provider}: {exc}"
+
+
 @ai_api.before_request
 def _auth():
     if not session.get("user_id"):
@@ -121,6 +148,16 @@ def meta():
     users = _load_users()
     user = users.get(uid, {})
     used, limit = _sample_usage()
+    connections = db.get_ai_connections(uid)
+    connected_providers = {c["provider"] for c in connections}
+    server_keys = [
+        pid for pid, env in (
+            ("openai", "OPENAI_API_KEY"),
+            ("anthropic", "ANTHROPIC_API_KEY"),
+            ("google", "GOOGLE_AI_API_KEY"),
+        ) if os.getenv(env)
+    ]
+    mock_mode = not _server_provider_keys_available() and not connected_providers
     return jsonify({
         "models": model_registry.models_available(),
         "modes": model_registry.MODES,
@@ -129,8 +166,58 @@ def meta():
             "level": user.get("ai_level", "intermediate"),
         },
         "usage": {"used": used, "limit": limit},
-        "mockMode": getattr(get_provider("mock" if not any(os.getenv(k) for k in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_AI_API_KEY")) else "mock"), "is_mock", True),
+        "mockMode": mock_mode,
+        "connections": connections,
+        "serverKeys": server_keys,
     })
+
+
+# ------------------------------------------------------------ connections
+
+@ai_api.get("/connections")
+def list_connections():
+    uid = session["user_id"]
+    return jsonify({"connections": db.get_ai_connections(uid)})
+
+
+@ai_api.post("/connections")
+def add_connection():
+    """Validate a BYOK key against the provider, then store it (obfuscated).
+
+    Keys are verified live before saving so invalid keys never reach the db.
+    """
+    uid = session["user_id"]
+    body = request.get_json(silent=True) or {}
+    provider = (body.get("provider") or "").strip().lower()
+    api_key = (body.get("apiKey") or "").strip()
+    if provider not in CONNECTABLE_PROVIDERS:
+        return jsonify({"error": "Unknown provider."}), 400
+    if not api_key:
+        return jsonify({"error": "API key cannot be empty."}), 400
+
+    ok, note = _verify_provider_key(provider, api_key)
+    if not ok:
+        return jsonify({"error": note}), 400
+
+    connection = db.set_ai_connection(
+        uid, provider, api_key, label=CONNECTABLE_PROVIDERS[provider]
+    )
+    if not connection:
+        return jsonify({"error": "Could not save connection."}), 500
+    db.log_audit(uid, "ai_connect", provider)
+    return jsonify({"connection": connection}), 201
+
+
+@ai_api.delete("/connections/<provider>")
+def remove_connection(provider):
+    uid = session["user_id"]
+    if provider not in CONNECTABLE_PROVIDERS:
+        return jsonify({"error": "Unknown provider."}), 400
+    ok = db.delete_ai_connection(uid, provider)
+    if not ok:
+        return jsonify({"error": "Not connected."}), 404
+    db.log_audit(uid, "ai_disconnect", provider)
+    return jsonify({"ok": True})
 
 
 # ---------------------------------------------------------- conversations
@@ -249,6 +336,10 @@ def send_message(conversation_id):
         subject_title=body.get("subject"),
     )
 
+    # Use the user's own BYOK key when connected; otherwise the provider falls
+    # back to the server-level key (or the mock provider when neither exists).
+    personal_key = db.get_ai_connection_key(uid, model["provider"])
+
     streaming = request.args.get("stream") in ("1", "true")
 
     if streaming:
@@ -256,7 +347,7 @@ def send_message(conversation_id):
             accumulated = []
 
             def chunks():
-                for ch in service.stream_reply(request_dict):
+                for ch in service.stream_reply(request_dict, api_key=personal_key):
                     accumulated.append(ch)
                     yield ch
 
@@ -289,7 +380,7 @@ def send_message(conversation_id):
 
     # Non-streaming path.
     try:
-        result = service.generate_reply(request_dict)
+        result = service.generate_reply(request_dict, api_key=personal_key)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": service.handle_error(exc)}), 502
 

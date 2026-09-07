@@ -2,7 +2,7 @@
 
 import os
 
-from ._http import post_json, stream_json_lines
+from ._http import ProviderHTTPError, get_json, post_json, stream_json_lines
 from .base import AIProvider
 
 
@@ -13,9 +13,9 @@ class OpenAIProvider(AIProvider):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
-    def _headers(self):
+    def _headers(self, api_key=None):
         return {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {api_key or self.api_key}",
             "Content-Type": "application/json",
         }
 
@@ -51,3 +51,18 @@ class OpenAIProvider(AIProvider):
                 text = delta.get("content")
                 if text:
                     yield text
+
+    def verify(self, api_key=None):
+        """Validate a key via the OpenAI models list endpoint."""
+        key = api_key or self.api_key
+        if not key:
+            return False, "No API key provided."
+        try:
+            get_json(f"{self.base_url}/models", self._headers(key), timeout=30)
+        except ProviderHTTPError as exc:
+            if exc.status == 401:
+                return False, "Key rejected by OpenAI (401)."
+            return False, f"OpenAI returned HTTP {exc.status}."
+        except Exception as exc:  # noqa: BLE001 - network/SSL errors surface as-is
+            return False, f"Could not reach OpenAI: {exc}"
+        return True, "Works"

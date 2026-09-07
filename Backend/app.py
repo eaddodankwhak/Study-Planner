@@ -455,12 +455,15 @@ def logout():
 def settings():
     """Render the account settings surface and its persisted preferences."""
     user = current_user()
+    ai_connections = db.get_ai_connections(user["id"])
     return render_template(
         "settings.html",
         user=user,
         active_nav="settings",
         settings=db.get_settings(user["id"]),
         workspaces=db.collab_workspaces_for(user["id"]),
+        ai_connections=ai_connections,
+        ai_connections_by_provider={c["provider"]: c for c in ai_connections},
     )
 
 

@@ -369,6 +369,42 @@
         </form>
     </section>
 
+    <section class="card settings-panel" aria-labelledby="ai-accounts-heading">
+        <div class="settings-panel__header">
+            <h3 class="card__title" id="ai-accounts-heading">AI accounts</h3><span class="badge badge--open">Your own</span>
+        </div>
+        <p class="settings-panel__intro">Connect your own Claude, ChatGPT, or Gemini account so your AI chats use
+            your API key for that provider. Keys are verified live and stored obfuscated in your local database —
+            they never leave this device.</p>
+        {% for provider, label in [('anthropic','Claude'),('openai','ChatGPT'),('google','Gemini')] %}
+        {% set conn = ai_connections_by_provider.get(provider) %}
+        <div class="settings-membership">
+            <div>
+                <strong>{{ label }}</strong>
+                {% if conn %}
+                <small class="text-muted">Connected{% if conn.key_hint %} · key ends {{ conn.key_hint }}{% endif %}</small>
+                {% else %}
+                <small class="text-muted">Not connected — {{ label }} model chats fall back to the demo provider.</small>
+                {% endif %}
+            </div>
+            {% if conn %}
+            <button class="button button--ghost button--small" type="button" data-ai-disconnect="{{ provider }}">Disconnect</button>
+            {% else %}
+            <div class="settings-controls">
+                <input class="form-input" type="password" data-ai-key="{{ provider }}" placeholder="Paste {{ label }} API key" autocomplete="off">
+                <button class="button button--primary button--small" type="button" data-ai-connect="{{ provider }}">Connect</button>
+            </div>
+            {% endif %}
+        </div>
+        <p class="text-muted" data-ai-error="{{ provider }}" hidden style="margin-top: calc(var(--space-2) * -1);"></p>
+        {% endfor %}
+        <div class="settings-row">
+            <div class="settings-row__copy"><strong>How it works</strong><small>Pick a model family in the AI Hub
+                    (Claude, GPT, or Gemini) and your own key for that provider is used automatically — no server key
+                    needed. Disconnect anytime.</small></div>
+        </div>
+    </section>
+
     <section class="card settings-panel" aria-labelledby="appearance-heading">
         <h3 class="card__title" id="appearance-heading">Appearance &amp; Accessibility</h3>
         <p class="settings-panel__intro">Make the interface easier and more comfortable to use.</p>
@@ -527,5 +563,60 @@
             }
         });
         if (input && submit) input.addEventListener('input', function () { submit.disabled = !['{{ user.email|e }}', 'DELETE'].includes(input.value.trim()); });
+
+        function aiShowError(provider, message) {
+            var el = document.querySelector('[data-ai-error="' + provider + '"]');
+            if (!el) return;
+            el.textContent = message;
+            el.hidden = false;
+        }
+        document.querySelectorAll('[data-ai-connect]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                var provider = btn.getAttribute('data-ai-connect');
+                var input = document.querySelector('[data-ai-key="' + provider + '"]');
+                var apiKey = input ? input.value.trim() : '';
+                if (!apiKey) {
+                    aiShowError(provider, 'Enter an API key first.');
+                    return;
+                }
+                btn.disabled = true;
+                try {
+                    var resp = await fetch('/api/ai/connections', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ provider: provider, apiKey: apiKey })
+                    });
+                    var data = await resp.json().catch(function () { return {}; });
+                    if (!resp.ok) {
+                        aiShowError(provider, (data && data.error) || 'Connection failed.');
+                        btn.disabled = false;
+                        return;
+                    }
+                    window.location.reload();
+                } catch (err) {
+                    aiShowError(provider, 'Could not reach the server.');
+                    btn.disabled = false;
+                }
+            });
+        });
+        document.querySelectorAll('[data-ai-disconnect]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                var provider = btn.getAttribute('data-ai-disconnect');
+                btn.disabled = true;
+                try {
+                    var resp = await fetch('/api/ai/connections/' + encodeURIComponent(provider), { method: 'DELETE' });
+                    var data = await resp.json().catch(function () { return {}; });
+                    if (!resp.ok) {
+                        aiShowError(provider, (data && data.error) || 'Could not disconnect.');
+                        btn.disabled = false;
+                        return;
+                    }
+                    window.location.reload();
+                } catch (err) {
+                    aiShowError(provider, 'Could not reach the server.');
+                    btn.disabled = false;
+                }
+            });
+        });
     });
 </script>{% endblock %}

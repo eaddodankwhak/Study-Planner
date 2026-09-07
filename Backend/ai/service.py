@@ -46,19 +46,20 @@ def build_provider_request(mode, question, material_text, user, conversation_mes
     }
 
 
-def generate_reply(request_dict):
+def generate_reply(request_dict, api_key=None):
     """Run a provider request and return a normalized response.
 
     request_dict comes from build_provider_request(). Returns the provider's
-    normalized generate() result (content + usage).
+    normalized generate() result (content + usage). api_key overrides the
+    environment key so a user's BYOK connection is used when present.
     """
-    provider = get_provider(request_dict["provider_id"])
+    provider = get_provider(request_dict["provider_id"], api_key=api_key)
     return provider.generate(request_dict)
 
 
-def stream_reply(request_dict):
+def stream_reply(request_dict, api_key=None):
     """Yield chunks from a provider for a request dict."""
-    provider = get_provider(request_dict["provider_id"])
+    provider = get_provider(request_dict["provider_id"], api_key=api_key)
     for chunk in provider.stream(request_dict):
         if chunk:
             yield chunk

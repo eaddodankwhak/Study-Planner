@@ -4,43 +4,48 @@ The rest of the application obtains a provider via get_provider(provider_id)
 and never constructs adapters directly. A provider keyed to its configured API
 key is returned when present; otherwise the mock provider is returned so the
 feature always works (clearly isolated for development).
+
+Since the BYOK flow gives each user their own key, adapters are constructed
+fresh on every call so a per-user api_key can be threaded through; there is no
+shared cached instance to leak one user's key into another user's request.
 """
 
 from .base import AIProvider
 from .mock import MockProvider
 
-_PROVIDERS = {}
+_BUILDERS = {}
 
 
-def _register(provider):
-    """Register a provider instance under its name key."""
-    _PROVIDERS[provider.name] = provider
+def _register(builder):
+    """Register a provider class under its name key."""
+    _BUILDERS[builder.name] = builder
 
 
 def _build_providers():
-    """Instantiate and register all known provider adapters."""
+    """Register all known provider adapter classes."""
     from .openai import OpenAIProvider
     from .anthropic import AnthropicProvider
     from .google import GoogleProvider
 
-    _register(OpenAIProvider())
-    _register(AnthropicProvider())
-    _register(GoogleProvider())
-    _register(MockProvider())
+    _register(OpenAIProvider)
+    _register(AnthropicProvider)
+    _register(GoogleProvider)
+    _register(MockProvider)
 
 
-def get_provider(provider_id):
-    """Return a provider adapter.
+def get_provider(provider_id, api_key=None):
+    """Return a provider adapter, built fresh for this call.
 
-    If the requested provider has a configured API key it is returned; otherwise
-    the mock provider is returned so requests still work (and so the AI Hub is
-    usable during development without credentials).
+    api_key takes precedence over the environment-configured key so a per-user
+    BYOK connection can be used without mutating any shared state. Falls back to
+    the mock provider when no usable key is present (development/demo).
     """
-    if not _PROVIDERS:
+    if not _BUILDERS:
         _build_providers()
-    provider = _PROVIDERS.get(provider_id)
-    if provider is None:
+    builder = _BUILDERS.get(provider_id)
+    if builder is None:
         return MockProvider()
+    provider = builder(api_key=api_key)
     if getattr(provider, "is_mock", False):
         return provider
     # Real provider -> only use it when credentials are present.
@@ -49,32 +54,39 @@ def get_provider(provider_id):
     return MockProvider()
 
 
-def provider_available(provider_id):
-    """Return True if a provider has a configured API key (or is the mock)."""
-    if not _PROVIDERS:
+def provider_available(provider_id, api_key=None):
+    """Return True if a provider has a usable key (or is the mock).
+
+    Judged by the *requested* provider rather than the router's mock fallback,
+    so an unkeyed real provider is correctly reported as unavailable even
+    though get_provider() hands back the mock for safe requests.
+    """
+    if not _BUILDERS:
         _build_providers()
-    provider = _PROVIDERS.get(provider_id)
-    if provider is None:
+    builder = _BUILDERS.get(provider_id)
+    if builder is None:
         return False
-    if getattr(provider, "is_mock", False):
+    if getattr(builder, "is_mock", False):
         return True
-    return bool(provider.api_key)
+    if api_key is not None:
+        return bool(api_key)
+    return bool(builder().api_key)
 
 
 def list_providers():
     """Return metadata about all registered providers."""
-    if not _PROVIDERS:
+    if not _BUILDERS:
         _build_providers()
-    return [
-        {
-            "id": key,
-            "name": p.name,
-            "isMock": bool(getattr(p, "is_mock", False)),
-            "available": provider_available(key),
-        }
-        for key, p in _PROVIDERS.items()
-    ]
-
-
-# Make the base class importable from this package level for subclasses.
-__all__ = ["AIProvider", "get_provider", "provider_available", "list_providers"]
+    result = []
+    for key, builder in _BUILDERS.items():
+        if getattr(builder, "is_mock", False):
+            result.append({"id": key, "name": builder.name, "isMock": True, "available": True})
+        else:
+            probe = builder()
+            result.append({
+                "id": key,
+                "name": builder.name,
+                "isMock": False,
+                "available": bool(probe.api_key),
+            })
+    return result

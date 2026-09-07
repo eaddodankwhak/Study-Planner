@@ -598,7 +598,13 @@
     els.usage.append(label, bar);
 
     if (els.mockHint) {
-      els.mockHint.hidden = !m.mockMode;
+      var model = findModel(state.model) || {};
+      var keyEnv = { claude: "anthropic", gpt: "openai", gemini: "google" }[model.id];
+      var connected = (state.meta.connections || []).some(function (c) { return c.provider === keyEnv; });
+      var serverKeyed = (state.meta.serverKeys || []).indexOf(keyEnv) >= 0;
+      els.mockHint.hidden = false;
+      els.mockHint.textContent = connected ? "connected to your account"
+        : serverKeyed ? "server-provided" : "connect your account";
     }
     els.currentModel.textContent = (findModel(state.model) || {}).displayName || state.model;
   }

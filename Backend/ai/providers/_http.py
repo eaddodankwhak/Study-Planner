@@ -19,6 +19,23 @@ class ProviderHTTPError(Exception):
         super().__init__(f"AI provider returned HTTP {status}")
 
 
+def get_json(url, headers, timeout=30):
+    """GET a URL and return the parsed JSON body (checking status).
+
+    Used by provider.verify() calls to validate a per-user BYOK key.
+    """
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8")
+            if not raw:
+                return {}
+            return json.loads(raw)
+    except urllib.error.HTTPError as exc:  # noqa: F821
+        body = exc.read().decode("utf-8", errors="replace")
+        raise ProviderHTTPError(exc.code, body) from exc
+
+
 def post_json(url, headers, payload, timeout=60):
     """POST a JSON payload and return the parsed JSON body (checking status)."""
     data = json.dumps(payload).encode("utf-8")
