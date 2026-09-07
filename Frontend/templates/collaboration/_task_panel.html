@@ -1,0 +1,206 @@
+<div class="task-detail">
+    <div class="task-detail__head">
+        <h4 class="task-detail__title">{{ task.title }}</h4>
+        <span class="status-badge status--{{ task.status }}" data-status-badge>
+            <span class="status-badge__text">{{ 'Blocked' if task.status == 'blocked' else ('To do' if task.status == 'todo' else (task.status|replace('_',' '))|title) }}</span>
+        </span>
+    </div>
+    {% if task.description %}
+        <p class="task-detail__desc">{{ task.description }}</p>
+    {% else %}
+        <p class="text-muted">No description.</p>
+    {% endif %}
+
+    {% if can_edit %}
+    {% set ws_id = workspace_id %}
+    <details class="task-detail__edit" data-edit-details {% if request.args.get('edit') %}open{% endif %}>
+        <summary class="task-detail__summary">Edit task</summary>
+        <form class="task-edit-form" action="{{ url_for('collab.task_update', workspace_id=ws_id, task_id=task.id) }}" method="post">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label class="form-label" for="t-title">Title</label>
+                    <input class="form-input" id="t-title" name="title" value="{{ task.title }}" required>
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="t-due">Due date</label>
+                    <input class="form-input" id="t-due" name="due_date" type="date" value="{{ task.due_date or '' }}">
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="t-priority">Priority</label>
+                    <select class="form-input" id="t-priority" name="priority">
+                        {% for p in priorities %}
+                            <option value="{{ p }}" {{ 'selected' if p == task.priority }}>{{ p|title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="t-milestone">Milestone</label>
+                    <select class="form-input" id="t-milestone" name="milestone_id">
+                        <option value="">None</option>
+                        {% for m in milestones %}
+                            <option value="{{ m.id }}" {{ 'selected' if task.milestone_id == m.id }}>{{ m.title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-field">
+                <label class="form-label" for="t-desc">Description</label>
+                <textarea class="form-input" id="t-desc" name="description" rows="3">{{ task.description or '' }}</textarea>
+            </div>
+            <div class="form-actions">
+                <button class="button button--small" type="submit">Save changes</button>
+            </div>
+        </form>
+    </details>
+    {% endif %}
+
+    <div class="task-detail__row">
+        <span class="text-muted">Assignee:</span>
+        {% if task.assignee_name %}
+            <strong data-assignee-label>{{ task.assignee_name }}</strong>
+        {% else %}
+            <em data-assignee-label>Unassigned</em>
+        {% endif %}
+        {% if can_edit %}
+        <span class="task-detail__assign-actions">
+            {% if task.assignee_id != current_user_id %}
+            <button class="button button--ghost button--small" type="button" data-assign-me>Assign to me</button>
+            {% endif %}
+            {% if is_owner %}
+            <select class="form-input form-input--auto" data-assign-select aria-label="Reassign to">
+                <option value="">Reassign…</option>
+                {% for m in members %}
+                    <option value="{{ m.user_id }}" {{ 'selected' if task.assignee_id == m.user_id }}>{{ m.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+        </span>
+        {% endif %}
+    </div>
+
+    {% if can_edit %}
+    <div class="task-detail__controls">
+        <div class="task-detail__controls-label">
+            <span class="text-muted">Update status:</span>
+            <span class="task-detail__status-buttons">
+                <button class="button button--ghost button--small" type="button" data-status-btn data-task-id="{{ task.id }}" data-status="todo"
+                        {% if task.status == 'todo' %}disabled{% endif %}>To do</button>
+                <button class="button button--ghost button--small" type="button" data-status-btn data-task-id="{{ task.id }}" data-status="in_progress"
+                        {% if task.status == 'in_progress' %}disabled{% endif %}>In progress</button>
+                <button class="button button--ghost button--small" type="button" data-status-btn data-task-id="{{ task.id }}" data-status="in_review"
+                        {% if task.status == 'in_review' %}disabled{% endif %}>In review</button>
+                <button class="button button--ghost button--small" type="button" data-status-btn data-task-id="{{ task.id }}" data-status="completed"
+                        {% if task.status == 'completed' %}disabled{% endif %}>Completed</button>
+                <button class="button button--ghost button--small" type="button" data-status-btn data-task-id="{{ task.id }}" data-status="cancelled"
+                        {% if task.status == 'cancelled' %}disabled{% endif %}>Cancel</button>
+            </span>
+        </div>
+
+        {% if task.status != 'blocked' %}
+        <details class="task-detail__block" data-block-form>
+            <summary class="button button--ghost button--small button--danger">Mark blocked…</summary>
+            <form class="task-block-form" data-block-submit action="#" method="post">
+                <div class="form-field">
+                    <label class="form-label" for="blk-reason">What are you stuck on? *</label>
+                    <input class="form-input" id="blk-reason" name="blocked_reason" required
+                           placeholder="e.g. waiting for the dataset from the lab">
+                </div>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="form-label" for="blk-recipient">Ask someone for help</label>
+                        <select class="form-input" id="blk-recipient" name="recipient_id">
+                            <option value="">No one right now</option>
+                            {% for m in members %}
+                                <option value="{{ m.user_id }}">{{ m.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="blk-needed">What do you need?</label>
+                        <input class="form-input" id="blk-needed" name="what_needed" placeholder="e.g. the raw results file">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="blk-by">Needed by</label>
+                        <input class="form-input" id="blk-by" name="needed_by" type="date">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="button button--danger button--small" type="submit">Block task</button>
+                </div>
+            </form>
+        </details>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if item_labels or labels %}
+    <div class="task-detail__labels">
+        <span class="text-muted">Labels:</span>
+        {% for l in labels %}
+            <button class="label-chip js-label-toggle{{ ' is-on' if l.id in item_labels|map(attribute='id')|list else '' }}"
+                    type="button" data-label-toggle data-label-id="{{ l.id }}"
+                    style="--label-color: {{ l.color }}" disabled="{{ '' if can_edit else 'disabled' }}">
+                {{ l.name }}
+            </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="task-detail__deps">
+        <details>
+            <summary class="task-detail__summary">Dependencies ({{ dependencies|length }} block{{ 's' if dependencies|length != 1 }})</summary>
+            <ul class="task-detail__dep-list">
+                {% for dep in dependencies %}
+                    <li class="task-detail__dep-item">
+                        <span class="label-chip{{ ' label-chip--done' if dep.status == 'completed' else '' }}">{{ dep.title }}</span>
+                        {% if can_edit %}
+                        <form class="inline-form" action="{{ url_for('collab.task_remove_dependency', workspace_id=ws_id, task_id=task.id) }}" method="post">
+                            <input type="hidden" name="depends_on_id" value="{{ dep.id }}">
+                            <button class="button button--ghost button--small" type="submit">Remove</button>
+                        </form>
+                        {% endif %}
+                    </li>
+                {% else %}
+                    <li class="text-muted">No dependencies yet.</li>
+                {% endfor %}
+            </ul>
+            {% if can_edit and other_tasks %}
+            <form class="task-dep-form" action="{{ url_for('collab.task_add_dependency', workspace_id=ws_id, task_id=task.id) }}" method="post">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="form-label" for="dep-task">Depends on</label>
+                        <select class="form-input" id="dep-task" name="depends_on_id" required>
+                            {% for t in other_tasks %}
+                                <option value="{{ t.id }}">{{ t.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button class="button button--small" type="submit">Add dependency</button>
+                    </div>
+                </div>
+            </form>
+            {% endif %}
+        </details>
+    </div>
+
+    <section class="task-detail__comments">
+        <h5 class="task-detail__comments-title">Discussion ({{ comments|length }})</h5>
+        <ul class="comments-list" data-comments-list aria-live="polite">
+            {% for c in comments %}
+                {% set comment = c %}
+                {% include 'collaboration/_comment_item.html' with context %}
+            {% endfor %}
+        </ul>
+        <form class="comment-form" data-comment-form action="{{ url_for('collab.task_comment', workspace_id=ws_id, task_id=task.id) }}" method="post">
+            <input type="hidden" name="ajax" value="1">
+            <div class="form-field">
+                <label class="form-label" for="cc-body-{{ task.id }}">Add a comment</label>
+                <textarea class="form-input" id="cc-body-{{ task.id }}" name="body" rows="2" maxlength="2000" required></textarea>
+            </div>
+            <div class="form-actions">
+                <button class="button button--small" type="submit">Post comment</button>
+            </div>
+        </form>
+    </section>
+</div>

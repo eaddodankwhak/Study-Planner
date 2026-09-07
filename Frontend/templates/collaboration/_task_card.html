@@ -1,0 +1,92 @@
+{% set is_subtask = task.parent_id is not none %}
+{% set open_now = open_task and open_task == task.id %}
+<article class="task-card status-{{ task.status }}{{ ' task-card--subtask' if is_subtask else '' }}{{ ' is-open' if open_now else '' }}"
+         data-task-card data-task-id="{{ task.id }}" data-status-current="{{ task.status }}">
+    <div class="task-card__head">
+        <div class="task-card__title-row">
+            <span class="status-badge status--{{ task.status }}" data-status-badge>
+                <span class="status-badge__icon" aria-hidden="true">
+                    {{- {
+                        'todo': '\u25cb', 'in_progress': '\u25cf', 'in_review': '\u21bb',
+                        'blocked': '\u26d4', 'completed': '\u2713', 'cancelled': '\u2715'
+                    }.get(task.status, '?') -}}
+                </span>
+                <span class="status-badge__text">{% if task.status == 'blocked' %}Blocked{% else %}{{ 'To do' if task.status == 'todo' else (task.status|replace('_',' '))|title }}{% endif %}</span>
+            </span>
+            <h4 class="task-card__title">{{ task.title }}{% if is_subtask %} <span class="text-muted">(sub-task)</span>{% endif %}</h4>
+        </div>
+        <div class="task-card__controls">
+            {% if task.can_edit %}
+            <button class="button button--ghost button--small" type="button"
+                    data-status-btn data-task-id="{{ task.id }}" data-status="in_progress"
+                    {% if task.status == 'in_progress' %}disabled{% endif %}>Start</button>
+            <button class="button button--ghost button--small" type="button"
+                    data-status-btn data-task-id="{{ task.id }}" data-status="in_review"
+                    {% if task.status == 'in_review' %}disabled{% endif %}>In review</button>
+            <button class="button button--ghost button--small" type="button"
+                    data-status-btn data-task-id="{{ task.id }}" data-status="completed"
+                    {% if task.status == 'completed' %}disabled{% endif %}>Done</button>
+            {% if task.status != 'blocked' %}
+            <button class="button button--ghost button--small button--danger" type="button"
+                    data-block-btn data-task-id="{{ task.id }}">Block</button>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    {% if task.description %}
+        <p class="task-card__desc">{{ task.description }}</p>
+    {% endif %}
+
+    <div class="task-card__meta">
+        <span>Assignee: <strong>{{ task.assignee_name or 'unassigned' }}</strong></span>
+        {% if task.due_date %}<span>Due <strong>{{ task.due_date }}</strong></span>{% endif %}
+        <span>Priority: <strong>{{ task.priority|title }}</strong></span>
+        {% if task.status == 'blocked' and task.blocked_reason %}
+            <span class="blocked-reason" title="{{ task.blocked_reason }}">Blocked: {{ task.blocked_reason }}</span>
+        {% endif %}
+    </div>
+
+    {% if task.labels %}
+        <div class="task-card__labels">
+            {% for label in task.labels %}
+                <span class="label-chip" style="--label-color: {{ label.color }}">{{ label.name }}</span>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if task.dependencies %}
+        <div class="task-card__deps">
+            <span class="text-muted">Depends on:</span>
+            {% for dep in task.dependencies %}
+                <span class="label-chip{{ ' label-chip--done' if dep.status == 'completed' else (' label-chip--warn' if dep.status != 'completed' else '') }}">
+                    {{ dep.title }}{% if dep.status != 'completed' %} ({{ dep.status }}){% endif %}
+                </span>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if task.dependents %}
+        <div class="task-card__deps">
+            <span class="text-muted">Blocks:</span>
+            {% for dep in task.dependents %}
+                <span class="label-chip">{{ dep.title }}</span>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="task-card__actions">
+        <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_detail', workspace_id=workspace.id, tab='tasks', open=task.id) }}"
+           data-expand-task>Details{% if task.comments_count %} · {{ task.comments_count }} comment{{ 's' if task.comments_count != 1 }}{% endif %}</a>
+        {% if is_subtask and task.can_edit %}
+            <form class="inline-form" action="{{ url_for('collab.task_update', workspace_id=workspace.id, task_id=task.id) }}" method="post">
+                <input type="hidden" name="unnest" value="1">
+                <button class="button button--ghost button--small" type="submit">Make top-level</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="task-panel" data-task-panel data-task-id="{{ task.id }}" {% if not open_now %}hidden{% endif %}>
+        <div class="task-panel__loader">Loading…</div>
+    </div>
+</article>

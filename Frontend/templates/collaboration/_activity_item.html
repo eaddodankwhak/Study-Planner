@@ -1,0 +1,31 @@
+{% set event_names = {
+    'workspace_created': 'created the workspace',
+    'member_joined': 'joined the workspace',
+    'member_added': 'added a member',
+    'member_removed': 'removed a member',
+    'task_created': 'added a task',
+    'task_status': 'changed a task status',
+    'task_assign': 'changed an assignment',
+    'task_updated': 'edited a task',
+    'task_deleted': 'deleted a task',
+    'task_label': 'labelled a task',
+    'task_label_removed': 'unlabelled a task',
+    'task_dependency': 'added a dependency',
+    'task_dependency_removed': 'removed a dependency',
+    'comment': 'posted a message',
+    'request_created': 'raised an info request',
+    'request_status': 'updated an info request',
+    'milestone_created': 'created a milestone',
+    'milestone_deleted': 'removed a milestone',
+    'label_created': 'created a label',
+    'label_deleted': 'removed a label',
+    'daily_log': 'posted a daily log'
+} %}
+<li class="activity-item">
+    <span class="activity-item__actor">{{ activity.actor_name or activity.actor_id }}</span>
+    <span class="activity-item__verb">{{ event_names.get(activity.event_type, activity.event_type) }}</span>
+    {% if activity.summary %}
+        <span class="activity-item__detail">{{ activity.summary }}</span>
+    {% endif %}
+    <span class="activity-item__time">{{ activity.created_at }}</span>
+</li>

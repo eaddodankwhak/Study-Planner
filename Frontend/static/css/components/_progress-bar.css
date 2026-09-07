@@ -1,0 +1,15 @@
+/* Progress bar used on workspace cards (completion visually + via aria). */
+
+.progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary-light);
+  transition: width 0.3s ease;
+}

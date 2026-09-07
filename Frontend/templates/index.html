@@ -168,6 +168,29 @@
 
             <section class="card">
                 <div class="dashboard-heading">
+                    <h3 class="card__title mb-0">Group Workspaces</h3>
+                    <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_list') }}">Manage</a>
+                </div>
+                {% if workspaces %}
+                    <ul class="task-list">
+                        {% for ws in workspaces[:6] %}
+                            <li class="task">
+                                <a href="{{ url_for('collab.workspace_detail', workspace_id=ws.id) }}">
+                                    <strong>{{ ws.course_code or 'GROUP' }}</strong> — {{ ws.name }}
+                                </a>
+                                <span class="text-muted">{{ ws.num_tasks }} task{{ 's' if ws.num_tasks != 1 }} · {{ ws.member_count }} member{{ 's' if ws.member_count != 1 }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">
+                        Work with your study group on a shared project — <a href="{{ url_for('collab.workspace_list') }}">create a workspace</a>.
+                    </p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <div class="dashboard-heading">
                     <h3 class="card__title mb-0">My Subjects</h3>
                     <p class="text-muted mb-0">Your courses arranged just like a school portal.</p>
                 </div>

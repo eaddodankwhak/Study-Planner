@@ -1,0 +1,42 @@
+/* Activity feed / daily logs styling. */
+
+.activity-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.activity-item {
+  position: relative;
+  padding: var(--space-2) 0 var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.85rem;
+}
+
+.activity-item:last-child { border-bottom: none; }
+
+.activity-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.1rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+}
+
+.activity-item__actor { font-weight: 700; color: var(--color-primary); }
+
+.activity-item__verb { color: var(--color-text); }
+
+.activity-item__detail { color: var(--color-muted); }
+
+.activity-item__time {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  color: var(--color-muted);
+}
+
+.activity-item__body { margin: var(--space-1) 0; }

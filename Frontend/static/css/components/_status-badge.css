@@ -1,0 +1,45 @@
+/* Status badges. Always carry text + an icon so state is never color-only. */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  background: var(--color-surface);
+}
+
+.status-badge__icon { font-size: 0.85rem; line-height: 1; }
+
+.status--todo { color: var(--color-muted); }
+
+.status--in_progress {
+  color: #0b5a86;
+  border-color: rgb(11 90 134 / 0.4);
+  background: rgb(27 106 138 / 0.08);
+}
+
+.status--in_review {
+  color: #8a5c0b;
+  border-color: rgb(240 153 55 / 0.45);
+  background: rgb(240 153 55 / 0.1);
+}
+
+.status--blocked {
+  color: var(--color-error);
+  border-color: rgb(198 40 40 / 0.45);
+  background: rgb(198 40 40 / 0.08);
+}
+
+.status--completed {
+  color: var(--color-success);
+  border-color: rgb(46 125 50 / 0.45);
+  background: rgb(46 125 50 / 0.08);
+}
+
+.status--cancelled { color: var(--color-muted); text-decoration: line-through; }

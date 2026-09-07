@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ workspace.name }} — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <meta name="user-id" content="{{ user.id if user else '' }}">
+</head>
+<body class="ws-detail">
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                {% include '_nav.html' %}
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main" data-workspace-id="{{ workspace.id }}">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="{{ url_for('collab.workspace_list') }}">Workspaces</a>
+            <span>/</span>
+            <span>{{ workspace.name }}</span>
+        </nav>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <div class="ws-detail__head">
+            <div>
+                <h2>{{ workspace.name }}</h2>
+                <p class="text-muted mb-0">
+                    {% if workspace.course_code %}{{ workspace.course_code }} · {% endif %}
+                    {{ members|length }} member{{ 's' if members|length != 1 }}
+                    {% if workspace.deadline %} · due {{ workspace.deadline }}{% endif %}
+                    · invite code <strong data-invite-code>{{ workspace.invite_code }}</strong>
+                    <button class="btn-copy" data-copy="{{ workspace.invite_code }}" type="button">Copy</button>
+                </p>
+                {% if workspace.description %}<p class="ws-detail__desc">{{ workspace.description }}</p>{% endif %}
+            </div>
+        </div>
+
+        <nav class="ws-tabs" role="tablist" aria-label="Workspace sections">
+            {% for t in tabs %}
+                <a class="ws-tabs__tab{{ ' is-active' if tab == t else '' }}" role="tab"
+                   aria-selected="{{ 'true' if tab == t else 'false' }}"
+                   href="{{ url_for('collab.workspace_detail', workspace_id=workspace.id, tab=t) }}">
+                    {{ t|title }}
+                </a>
+            {% endfor %}
+        </nav>
+
+        {% set open_tasks = roots|selectattr('status', 'ne', 'completed')|selectattr('status', 'ne', 'cancelled')|list %}
+        {% set blocked_items = tasks|selectattr('status', 'eq', 'blocked')|list %}
+        {% set done_tasks = tasks|selectattr('status', 'eq', 'completed')|list %}
+        {% set active_tasks = tasks|selectattr('status', 'ne', 'completed')|selectattr('status', 'ne', 'cancelled')|list %}
+
+        {% if tab == 'overview' %}
+        <section class="ws-tab">
+            <div class="stat-grid">
+                <div class="stat"><div class="stat__value">{{ active_tasks|length }}</div><div class="stat__label">Open tasks</div></div>
+                <div class="stat"><div class="stat__value">{{ blocked_items|length }}</div><div class="stat__label">Blocked</div></div>
+                <div class="stat"><div class="stat__value">{{ done_tasks|length }}</div><div class="stat__label">Done</div></div>
+                <div class="stat">
+                    <div class="stat__value">{{ (done_tasks|length * 100 / tasks|length)|int if tasks else 0 }}%</div>
+                    <div class="stat__label">Complete</div>
+                </div>
+            </div>
+
+            {% if blocked_items %}
+            <section class="card priority-critical">
+                <h3 class="card__title">Needs attention — blocked</h3>
+                <ul class="task-list">
+                    {% for t in blocked_items %}
+                        <li class="task task--high">
+                            <a href="{{ url_for('collab.workspace_detail', workspace_id=workspace.id, tab='tasks', open=t.id) }}">{{ t.title }}</a>
+                            <span class="badge badge--high">blocked</span>
+                            {% if t.blocked_reason %}<span class="text-muted">{{ t.blocked_reason }}</span>{% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
+
+            <section class="card">
+                <div class="dashboard-heading">
+                    <h3 class="card__title mb-0">Milestones</h3>
+                    <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_detail', workspace_id=workspace.id, tab='tasks') }}">Add tasks</a>
+                </div>
+                {% if milestones %}
+                    <ul class="task-list">
+                        {% for m in milestones %}
+                            <li class="task">
+                                <a href="{{ url_for('collab.workspace_detail', workspace_id=workspace.id, tab='tasks') }}">{{ m.title }}</a>
+                                <span class="text-muted">due {{ m.due_date or '—' }} · {{ m.num_tasks }} task{{ 's' if m.num_tasks != 1 }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">No milestones yet — create one in the Tasks tab.</p>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h3 class="card__title">Recent activity</h3>
+                <ul class="activity-feed">
+                    {% for a in activity[:5] %}
+                        {% include 'collaboration/_activity_item.html' with context %}
+                    {% else %}
+                        <li class="text-muted">Nothing yet.</li>
+                    {% endfor %}
+                </ul>
+                {% if activity|length > 5 %}
+                    <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_detail', workspace_id=workspace.id, tab='activity') }}">View all</a>
+                {% endif %}
+            </section>
+        </section>
+
+        {% elif tab == 'tasks' %}
+        <section class="ws-tab">
+            <div class="ws-tab__grid">
+                <div class="ws-tab__form-col">
+                    <section class="card">
+                        <h3 class="card__title">Add a task</h3>
+                        <form action="{{ url_for('collab.task_create', workspace_id=workspace.id) }}" method="post">
+                            <div class="form-field">
+                                <label class="form-label" for="task-title">Title *</label>
+                                <input class="form-input" id="task-title" name="title" required placeholder="e.g. Collect feed-inventory data">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="task-desc">Description</label>
+                                <textarea class="form-input" id="task-desc" name="description" rows="2"></textarea>
+                            </div>
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label class="form-label" for="task-priority">Priority</label>
+                                    <select class="form-input" id="task-priority" name="priority">
+                                        <option value="low">Low</option>
+                                        <option value="normal" selected>Normal</option>
+                                        <option value="high">High</option>
+                                        <option value="urgent">Urgent</option>
+                                    </select>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label" for="task-due">Due date</label>
+                                    <input class="form-input" id="task-due" name="due_date" type="date">
+                                </div>
+                                {% if is_owner %}
+                                <div class="form-field">
+                                    <label class="form-label" for="task-assign">Assignee</label>
+                                    <select class="form-input" id="task-assign" name="assignee_id">
+                                        <option value="">Unassigned</option>
+                                        {% for m in members %}
+                                            <option value="{{ m.user_id }}">{{ m.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% else %}
+                                <input type="hidden" name="assignee_id" value="{{ user.id }}">
+                                {% endif %}
+                                <div class="form-field">
+                                    <label class="form-label" for="task-milestone">Milestone</label>
+                                    <select class="form-input" id="task-milestone" name="milestone_id">
+                                        <option value="">None</option>
+                                        {% for m in milestones %}
+                                            <option value="{{ m.id }}">{{ m.title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% if roots %}
+                                <div class="form-field">
+                                    <label class="form-label" for="task-parent">Sub-task of</label>
+                                    <select class="form-input" id="task-parent" name="parent_id">
+                                        <option value="">— Make it a top-level task —</option>
+                                        {% for t in roots %}
+                                            <option value="{{ t.id }}">{{ t.title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-actions">
+                                <button class="button" type="submit">Add task</button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <details class="card ws-form-toggle">
+                        <summary class="card__title">Add a milestone (owner)</summary>
+                        <form action="{{ url_for('collab.milestone_create', workspace_id=workspace.id) }}" method="post">
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label class="form-label" for="ms-title">Title *</label>
+                                    <input class="form-input" id="ms-title" name="title" required placeholder="e.g. Draft due">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label" for="ms-due">Due date</label>
+                                    <input class="form-input" id="ms-due" name="due_date" type="date">
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="button button--small" type="submit">Add milestone</button>
+                            </div>
+                        </form>
+                    </details>
+
+                    <details class="card ws-form-toggle">
+                        <summary class="card__title">Add a label</summary>
+                        <form action="{{ url_for('collab.label_create', workspace_id=workspace.id) }}" method="post">
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label class="form-label" for="label-name">Name *</label>
+                                    <input class="form-input" id="label-name" name="name" required placeholder="e.g. Reads-heavy">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label" for="label-color">Colour</label>
+                                    <input class="form-input" id="label-color" name="color" type="color" value="#3b82f6">
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="button button--small" type="submit">Add label</button>
+                            </div>
+                        </form>
+                    </details>
+                </div>
+
+                <div class="ws-tab__list-col">
+                    {% for m in milestones %}
+                        <section class="card mb-3">
+                            <div class="dashboard-heading">
+                                <h3 class="card__title mb-0">{{ m.title }} <span class="text-muted">· due {{ m.due_date or '—' }}</span></h3>
+                                {% if is_owner %}
+                                <form class="inline-form" action="{{ url_for('collab.milestone_delete', workspace_id=workspace.id, milestone_id=m.id) }}" method="post">
+                                    <button class="button button--ghost button--small" type="submit">Delete</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                            {% for t in roots if t.milestone_id == m.id %}
+                                {% set task = t %}
+                                {% include 'collaboration/_task_card.html' with context %}
+                                {% for c in t.children %}
+                                    {% set task = c %}
+                                    {% include 'collaboration/_task_card.html' with context %}
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted mb-0">No tasks in this milestone.</p>
+                            {% endfor %}
+                        </section>
+                    {% endfor %}
+
+                    <section class="card mb-3">
+                        <div class="dashboard-heading">
+                            <h3 class="card__title mb-0">No milestone</h3>
+                        </div>
+                        {% set ungrouped = roots|selectattr('milestone_id', 'none')|list %}
+                        {% for t in ungrouped %}
+                            {% set task = t %}
+                            {% include 'collaboration/_task_card.html' with context %}
+                            {% for c in t.children %}
+                                {% set task = c %}
+                                {% include 'collaboration/_task_card.html' with context %}
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted mb-0">No tasks yet — add one above.</p>
+                        {% endfor %}
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        {% elif tab == 'chat' %}
+        <section class="ws-tab">
+            <section class="card chat">
+                <h3 class="card__title">Chat</h3>
+                <ul class="comments-list chat__thread" data-chat-thread aria-live="polite">
+                    {% for c in chat %}
+                        {% set comment = c %}
+                        {% include 'collaboration/_comment_item.html' with context %}
+                    {% else %}
+                        <li class="text-muted">No messages yet. Say hello to your group.</li>
+                    {% endfor %}
+                </ul>
+                <form class="comment-form" data-chat-form action="{{ url_for('collab.chat_post', workspace_id=workspace.id) }}" method="post">
+                    <input type="hidden" name="ajax" value="1">
+                    <div class="form-field">
+                        <label class="form-label" for="chat-body">Message</label>
+                        <textarea class="form-input" id="chat-body" name="body" rows="2" maxlength="2000" required placeholder="Type a message…"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button class="button" type="submit">Send</button>
+                    </div>
+                </form>
+            </section>
+        </section>
+
+        {% elif tab == 'requests' %}
+        <section class="ws-tab">
+            <div class="ws-tab__grid">
+                <div class="ws-tab__form-col">
+                    <section class="card">
+                        <h3 class="card__title">Raise an info request</h3>
+                        <form action="{{ url_for('collab.request_create', workspace_id=workspace.id) }}" method="post">
+                            <div class="form-field">
+                                <label class="form-label" for="req-what">What do you need? *</label>
+                                <input class="form-input" id="req-what" name="what_needed" required placeholder="e.g. the past exam paper from group 2">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="req-recipient">Ask</label>
+                                <select class="form-input" id="req-recipient" name="recipient_id">
+                                    {% for m in members %}
+                                        <option value="{{ m.user_id }}">{{ m.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label class="form-label" for="req-why">Why you need it</label>
+                                    <input class="form-input" id="req-why" name="why_needed" placeholder="e.g. stuck on Chapter 4">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label" for="req-by">Needed by</label>
+                                    <input class="form-input" id="req-by" name="needed_by" type="date">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label" for="req-task">Related task</label>
+                                    <select class="form-input" id="req-task" name="work_item_id">
+                                        <option value="">None</option>
+                                        {% for t in active_tasks %}
+                                            <option value="{{ t.id }}">{{ t.title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="button" type="submit">Raise request</button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+
+                <div class="ws-tab__list-col">
+                    <section class="card">
+                        <h3 class="card__title">Requests ({{ requests|length }})</h3>
+                        <ul class="task-list">
+                            {% for r in requests %}
+                                <li class="task">
+                                    <div>
+                                        <strong>{{ r.what_needed }}</strong>
+                                        <span class="badge badge--{{ 'high' if r.status == 'pending' else ('done' if r.status == 'provided' else 'open') }}">{{ r.status|title }}</span>
+                                    </div>
+                                    <div class="text-muted">
+                                        {{ r.requester_name }} asked {{ r.recipient_name }}
+                                        {% if r.needed_by %}· needed by {{ r.needed_by }}{% endif %}
+                                    </div>
+                                    {% if is_owner or r.requester_id == user.id or r.recipient_id == user.id %}
+                                    <form class="inline-form" action="{{ url_for('collab.request_update_status', workspace_id=workspace.id, request_id=r.id) }}" method="post">
+                                        <select class="form-input form-input--auto" name="status">
+                                            {% for s in ['pending','provided','unavailable','reassigned'] %}
+                                                <option value="{{ s }}" {{ 'selected' if s == r.status }}>{{ s|title }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button class="button button--ghost button--small" type="submit">Update</button>
+                                    </form>
+                                    {% endif %}
+                                </li>
+                            {% else %}
+                                <li class="text-muted">No requests yet.</li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        {% elif tab == 'log' %}
+        <section class="ws-tab">
+            <div class="ws-tab__grid">
+                <div class="ws-tab__form-col">
+                    <section class="card">
+                        <h3 class="card__title">Log today's work</h3>
+                        <form action="{{ url_for('collab.log_save', workspace_id=workspace.id) }}" method="post">
+                            <div class="form-field">
+                                <label class="form-label" for="log-date">Date</label>
+                                <input class="form-input" id="log-date" name="log_date" type="date" value="{{ today }}">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="log-summary">What did you get done? *</label>
+                                <textarea class="form-input" id="log-summary" name="summary" rows="3" required>{{ today_log.summary or '' }}</textarea>
+                            </div>
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label class="form-label" for="log-minutes">Minutes spent</label>
+                                    <input class="form-input" id="log-minutes" name="minutes_spent" type="number" min="0" value="{{ today_log.minutes_spent or '' }}">
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label" for="log-blocked">Blocked by</label>
+                                    <input class="form-input" id="log-blocked" name="blocked_by" value="{{ today_log.blocked_by or '' }}">
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label" for="log-plan">Plan for tomorrow</label>
+                                <textarea class="form-input" id="log-plan" name="plan_for_tomorrow" rows="2">{{ today_log.plan_for_tomorrow or '' }}</textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button class="button" type="submit">Save log</button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+
+                <div class="ws-tab__list-col">
+                    <section class="card">
+                        <h3 class="card__title">Recent logs</h3>
+                        <ul class="activity-feed">
+                            {% for l in daily_logs %}
+                                <li class="activity-item">
+                                    <span class="activity-item__actor">{{ l.user_name }}</span>
+                                    <span class="activity-item__time">{{ l.log_date }}</span>
+                                    <p class="activity-item__body">{{ l.summary }}</p>
+                                    {% if l.minutes_spent %}<p class="text-muted mb-0">{{ l.minutes_spent }} min</p>{% endif %}
+                                    {% if l.blocked_by %}<p class="text-muted mb-0">Blocked by: {{ l.blocked_by }}</p>{% endif %}
+                                    {% if l.plan_for_tomorrow %}<p class="text-muted mb-0">Tomorrow: {{ l.plan_for_tomorrow }}</p>{% endif %}
+                                </li>
+                            {% else %}
+                                <li class="text-muted">No logs yet — be the first.</li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        {% elif tab == 'activity' %}
+        <section class="ws-tab">
+            <section class="card">
+                <h3 class="card__title">Activity history</h3>
+                <ul class="activity-feed">
+                    {% for a in activity %}
+                        {% include 'collaboration/_activity_item.html' with context %}
+                    {% else %}
+                        <li class="text-muted">Nothing yet.</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </section>
+
+        {% elif tab == 'members' %}
+        <section class="ws-tab">
+            <div class="ws-tab__grid">
+                <div class="ws-tab__form-col">
+                    {% if is_owner %}
+                    <section class="card">
+                        <h3 class="card__title">Add a member</h3>
+                        <p class="text-muted">Share this code so a friend can join: <strong>{{ workspace.invite_code }}</strong>
+                            <button class="btn-copy" data-copy="{{ workspace.invite_code }}" type="button">Copy</button>
+                        </p>
+                        <form action="{{ url_for('collab.workspace_member_add', workspace_id=workspace.id) }}" method="post">
+                            <div class="form-field">
+                                <label class="form-label" for="mem-email">Their account email *</label>
+                                <input class="form-input" id="mem-email" name="email" type="email" required>
+                            </div>
+                            <div class="form-actions">
+                                <button class="button" type="submit">Add member</button>
+                            </div>
+                        </form>
+                    </section>
+                    {% endif %}
+                </div>
+
+                <div class="ws-tab__list-col">
+                    <section class="card">
+                        <h3 class="card__title">Members ({{ members|length }})</h3>
+                        <ul class="member-list">
+                            {% for m in members %}
+                                <li class="member-row">
+                                    <div>
+                                        <strong>{{ m.name }}</strong>
+                                        <span class="text-muted"> · {{ m.email }}</span>
+                                        {% if m.role == 'owner' %}<span class="badge badge--dark">owner</span>{% endif %}
+                                    </div>
+                                    {% if is_owner and m.role != 'owner' %}
+                                    <form class="inline-form" action="{{ url_for('collab.workspace_member_remove', workspace_id=workspace.id) }}" method="post">
+                                        <input type="hidden" name="user_id" value="{{ m.user_id }}">
+                                        <button class="button button--ghost button--small button--danger" type="submit">Remove</button>
+                                    </form>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/collaboration/workspace.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/collaboration/task-detail.js') }}" defer></script>
+</body>
+</html>

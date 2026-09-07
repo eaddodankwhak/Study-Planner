@@ -10,3 +10,8 @@
 @import url("layout.css");
 @import url("components.css");
 @import url("utilities.css");
+@import url("components/_workspace-card.css");
+@import url("components/_task-card.css");
+@import url("components/_status-badge.css");
+@import url("components/_progress-bar.css");
+@import url("components/_activity-feed.css");

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Workspaces — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <meta name="user-id" content="{{ user.id if user else '' }}">
+</head>
+<body>
+    <header class="page-header">
+        <div class="container page-header__inner">
+            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <div class="page-header__user">
+                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                {% include '_nav.html' %}
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-main">
+        <div class="dashboard-heading">
+            <div>
+                <h2>Group Workspaces</h2>
+                <p class="text-muted mb-0">Shared projects with your study group — tasks, chat, and accountability.</p>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <div class="workspaces-create">
+            <section class="card">
+                <h3 class="card__title">Create a workspace</h3>
+                <form action="{{ url_for('collab.workspace_create') }}" method="post">
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label class="form-label" for="name">Workspace name *</label>
+                            <input class="form-input" id="name" name="name" placeholder="e.g. Animal Nutrition Group 3" required>
+                        </div>
+                        <div class="form-field">
+                            <label class="form-label" for="course_code">Course code</label>
+                            <input class="form-input" id="course_code" name="course_code" placeholder="e.g. BIO 101">
+                        </div>
+                        <div class="form-field">
+                            <label class="form-label" for="deadline">Project deadline</label>
+                            <input class="form-input" id="deadline" name="deadline" type="date">
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="description">Description</label>
+                        <textarea class="form-input" id="description" name="description" rows="2" placeholder="What is the group working on?"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button class="button" type="submit">Create workspace</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card">
+                <h3 class="card__title">Join with an invite code</h3>
+                <form action="{{ url_for('collab.workspace_join') }}" method="post" class="join-workspace">
+                    <div class="form-field">
+                        <label class="form-label" for="invite_code">Invite code</label>
+                        <input class="form-input" id="invite_code" name="invite_code" placeholder="e.g. WS-7K2M" required>
+                    </div>
+                    <div class="form-actions">
+                        <button class="button" type="submit">Join workspace</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        {% if workspaces %}
+            <h3 class="card__title">Your workspaces ({{ workspaces|length }})</h3>
+            <div class="workspace-grid">
+                {% for ws in workspaces %}
+                    {% set pct = (ws.num_completed * 100 / ws.num_tasks) if ws.num_tasks else 0 %}
+                    <article class="workspace-card">
+                        <a class="workspace-card__main" href="{{ url_for('collab.workspace_detail', workspace_id=ws.id) }}">
+                            <div class="workspace-card__top">
+                                <span class="workspace-card__code">{{ ws.course_code or 'GROUP' }}</span>
+                                <span class="workspace-card__meta">{{ ws.member_count }} member{{ 's' if ws.member_count != 1 }}</span>
+                            </div>
+                            <h4 class="workspace-card__title">{{ ws.name }}</h4>
+                            {% if ws.description %}
+                                <p class="workspace-card__desc">{{ ws.description }}</p>
+                            {% endif %}
+                            <div class="workspace-card__stats">
+                                <span>{{ ws.num_tasks }} task{{ 's' if ws.num_tasks != 1 }}</span>
+                                <span>{{ ws.num_completed }} done</span>
+                                {% if ws.deadline %}<span>due {{ ws.deadline }}</span>{% endif %}
+                            </div>
+                            <div class="progress-bar" role="progressbar" aria-valuenow="{{ pct|int }}"
+                                 aria-valuemin="0" aria-valuemax="100" aria-label="Completion">
+                                <div class="progress-bar__fill" style="width: {{ pct|int }}%"></div>
+                            </div>
+                        </a>
+                        <div class="workspace-card__foot">
+                            <button class="btn-copy" data-copy="{{ ws.invite_code }}" type="button">
+                                Copy code {{ ws.invite_code }}
+                            </button>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <section class="card empty-state">
+                <p>No workspaces yet. Create one above or join your group with the invite code your owner shared.</p>
+            </section>
+        {% endif %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/collaboration/workspace.js') }}" defer></script>
+</body>
+</html>

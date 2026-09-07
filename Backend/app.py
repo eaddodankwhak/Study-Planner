@@ -32,6 +32,7 @@ import db
 import planner
 import stats
 import ai as ai_pkg
+import collaboration as collab_pkg
 
 # Ensure tables and any lightweight migrations (e.g. notify_digest) exist.
 db.init_db()
@@ -97,6 +98,9 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "study-planner-dev-secre
 
 # Register the AI Learning Hub API blueprint.
 app.register_blueprint(ai_pkg.get_ai_blueprint())
+
+# Register the Collaborative Workspace blueprint.
+app.register_blueprint(collab_pkg.get_collaboration_blueprint())
 
 # Sample subjects shown on the dashboard (Sakai-style course cards).
 SUBJECTS = [
@@ -618,6 +622,7 @@ def home():
         deadlines=deadline_list,
         tasks=task_list,
         checkpoints=checkpoint_data,
+        workspaces=db.collab_workspaces_for(user["id"]) if hasattr(db, "collab_workspaces_for") else [],
     )
 
 
