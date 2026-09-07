@@ -3,199 +3,260 @@
 {% block title %}My Study Planner{% endblock %}
 {% block body_tag %} class="home"{% endblock %}
 {% block main %}
-        <div class="dashboard-heading">
-            <h2>What should I do today?</h2>
-            <p class="text-muted mb-0">Your courses, deadlines, and tasks in one view.</p>
-        </div>
-
-        <section class="stat-grid">
-            <div class="stat">
-                <div class="stat__value">{{ courses|length }}</div>
-                <div class="stat__label">Courses</div>
-            </div>
-            <div class="stat">
-                <div class="stat__value">{{ deadlines|length }}</div>
-                <div class="stat__label">Deadlines</div>
-            </div>
-            <div class="stat">
-                <div class="stat__value">{{ tasks|length }}</div>
-                <div class="stat__label">Tasks</div>
-            </div>
-            <div class="stat">
-                <div class="stat__value">{{ user.available_hours if user and user.available_hours else '—' }}h</div>
-                <div class="stat__label">Daily availability</div>
-            </div>
-        </section>
-
-        {% if checkpoints %}
-        <section class="card mb-4 priority-critical">
-            <div class="dashboard-heading">
-                <h3 class="card__title mb-0">Today's Plan ({{ checkpoints.today }})</h3>
-                <a class="button button--ghost button--small" href="{{ url_for('task') }}">Manage tasks</a>
-            </div>
-
-            {% if checkpoints.overdue_tasks %}
-                <h4 class="card__title">Overdue tasks</h4>
-                <ul class="task-list">
-                    {% for t in checkpoints.overdue_tasks %}
-                        <li class="task task--high">
-                            <span>{{ t.title }} <span class="text-muted">(due {{ t.due_date }})</span></span>
-                            <span class="badge badge--high">overdue</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-
-            {% if checkpoints.today_tasks %}
-                <h4 class="card__title">Due today</h4>
-                <ul class="task-list">
-                    {% for t in checkpoints.today_tasks %}
-                        <li class="task task--{{ t.priority }}">
-                            <span>{{ t.title }} <span class="text-muted">· {{ t.estimated_minutes }} min</span></span>
-                            <a class="button button--ghost button--small" href="{{ url_for('session_page', task_id=t.id) }}">Focus</a>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-
-            {% if checkpoints.behind %}
-                <h4 class="card__title">You're behind on…</h4>
-                <ul class="task-list">
-                    {% for d in checkpoints.behind %}
-                        <li class="task task--high">
-                            <a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a>
-                            <span class="text-muted">due {{ d.due_date }} · {{ d._report.days_left }} day(s) left</span>
-                            <form action="{{ url_for('deadline_recover', deadline_id=d.id) }}" method="post" class="inline-form">
-                                <button class="button button--primary button--small" type="submit">Rebuild (2 taps)</button>
-                            </form>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-
-            {% if not checkpoints.overdue_tasks and not checkpoints.today_tasks and not checkpoints.behind %}
-                <p class="text-muted mb-0">Nothing due right now. Protect your streak with a short focus session.</p>
-                <a class="button button--primary mt-2" href="{{ url_for('session_page') }}">Start a focus session</a>
-            {% endif %}
-        </section>
+<section class="home-hero" aria-labelledby="home-heading">
+    <div class="home-hero__glow" aria-hidden="true"></div>
+    <div class="home-hero__identity">
+        {% if user and user.avatar_path %}
+        <img class="home-hero__avatar" src="{{ url_for('profile_avatar', filename=user.avatar_path) }}"
+            alt="{{ user.display_name or user.name }} profile photo">
+        {% else %}
+        <span class="home-hero__avatar" aria-hidden="true">{{ (user.display_name or user.name)[0]|upper if user and
+            (user.display_name or user.name) else 'S' }}</span>
         {% endif %}
-
-        <div class="subject-content">
-            <section class="card">
-                <div class="dashboard-heading">
-                    <h3 class="card__title mb-0">Upcoming Deadlines</h3>
-                    <a class="button button--ghost button--small" href="{{ url_for('deadlines') }}">Manage</a>
-                </div>
-                {% if deadlines %}
-                    <table class="data-table">
-                        <thead>
-                            <tr><th>Item</th><th>Type</th><th>Due</th><th>Status</th></tr>
-                        </thead>
-                        <tbody>
-                            {% for d in deadlines[:5] %}
-                                <tr>
-                                    <td><a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a></td>
-                                    <td>{{ d.type }}</td>
-                                    <td>{{ d.due_date }}</td>
-                                    <td>{% if d.status == 'done' %}<span class="badge badge--done">done</span>{% else %}<span class="badge badge--open">open</span>{% endif %}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p class="text-muted mb-0">No deadlines yet.</p>
-                {% endif %}
-            </section>
-
-            <section class="card">
-                <div class="dashboard-heading">
-                    <h3 class="card__title mb-0">Open Tasks</h3>
-                    <a class="button button--ghost button--small" href="{{ url_for('task') }}">Manage</a>
-                </div>
-                {% set open_tasks = tasks|selectattr('status', 'ne', 'done')|list %}
-                {% if open_tasks %}
-                    <ul class="task-list">
-                        {% for t in open_tasks[:8] %}
-                            <li class="task task--{{ t.priority }}">
-                                <span>
-                                    {{ t.title }}
-                                    <span class="text-muted"> · {{ t.estimated_minutes }} min</span>
-                                </span>
-                                <span class="badge badge--{{ t.priority }}">{{ t.priority }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-muted mb-0">You're all caught up.</p>
-                {% endif %}
-            </section>
-
-            <section class="card">
-                <div class="dashboard-heading">
-                    <h3 class="card__title mb-0">My Courses</h3>
-                    <a class="button button--ghost button--small" href="{{ url_for('courses') }}">Manage</a>
-                </div>
-                {% if courses %}
-                    <ul class="task-list">
-                        {% for course in courses %}
-                            <li class="task">
-                                <a href="{{ url_for('course_detail', course_id=course.id) }}">
-                                    <strong>{{ course.code }}</strong> — {{ course.title }}
-                                </a>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-muted mb-0">No courses yet. <a href="{{ url_for('courses') }}">Add a course</a>.</p>
-                {% endif %}
-            </section>
-
-            <section class="card">
-                <div class="dashboard-heading">
-                    <h3 class="card__title mb-0">Group Workspaces</h3>
-                    <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_list') }}">Manage</a>
-                </div>
-                {% if workspaces %}
-                    <ul class="task-list">
-                        {% for ws in workspaces[:6] %}
-                            <li class="task">
-                                <a href="{{ url_for('collab.workspace_detail', workspace_id=ws.id) }}">
-                                    <strong>{{ ws.course_code or 'GROUP' }}</strong> — {{ ws.name }}
-                                </a>
-                                <span class="text-muted">{{ ws.num_tasks }} task{{ 's' if ws.num_tasks != 1 }} · {{ ws.member_count }} member{{ 's' if ws.member_count != 1 }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="empty-state">
-                        <p class="empty-state__body">Work with your study group on a shared project — tasks, chat, and deadlines in one place.</p>
-                        <div class="empty-state__action">
-                            <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_list') }}">Create a workspace</a>
-                        </div>
-                    </div>
-                {% endif %}
-            </section>
-
-            <section class="card">
-                <div class="dashboard-heading">
-                    <h3 class="card__title mb-0">My Subjects</h3>
-                    <p class="text-muted mb-0">Your courses arranged just like a school portal.</p>
-                </div>
-                <div class="course-grid">
-                    {% for subject in subjects %}
-                        <article class="course-card course-card--{{ subject.color }}">
-                            <a class="course-card__header" href="{{ url_for('course_detail', course_id=subject.id) }}">
-                                <span class="course-card__code">{{ subject.code }}</span>
-                                <span class="course-card__title">{{ subject.title }}</span>
-                            </a>
-                            <div class="course-card__body">
-                                {{ subject.term }} · {{ subject.instructor }}
-                            </div>
-                        </article>
-                    {% else %}
-                        <p class="text-muted mb-0">No courses yet. <a href="{{ url_for('courses') }}">Add a course</a>.</p>
-                    {% endfor %}
-                </div>
-            </section>
+        <div>
+            <p class="home-hero__eyebrow" id="home-greeting">Good day</p>
+            <h2 id="home-heading">What should I do today?</h2>
+            <p class="home-hero__subtitle">{{ user.display_name or user.name if user else 'Student' }}, your courses,
+                deadlines, and tasks in one view.</p>
         </div>
-    {% endblock %}
+    </div>
+    <p class="home-hero__status">A clear next step makes a focused study day.</p>
+</section>
+
+<section class="stat-grid">
+    <div class="stat stat--courses">
+        <span class="stat__icon" aria-hidden="true">▦</span>
+        <div class="stat__value">{{ courses|length }}</div>
+        <div class="stat__label">Courses</div>
+    </div>
+    <div class="stat {{ 'stat--calm' if not deadlines else 'stat--urgent' }}">
+        <span class="stat__icon" aria-hidden="true">◷</span>
+        <div class="stat__value">{{ deadlines|length }}</div>
+        <div class="stat__label">Deadlines</div>
+    </div>
+    <div class="stat stat--tasks">
+        <span class="stat__icon" aria-hidden="true">✓</span>
+        <div class="stat__value">{{ tasks|length }}</div>
+        <div class="stat__label">Tasks</div>
+    </div>
+    <div class="stat stat--availability">
+        <span class="stat__ring" aria-hidden="true"><span></span></span>
+        <div class="stat__value">{{ user.available_hours if user and user.available_hours else '—' }}h</div>
+        <div class="stat__label">Daily availability</div>
+    </div>
+</section>
+
+{% if checkpoints %}
+<section class="card mb-4 priority-critical home-plan-card">
+    <div class="dashboard-heading">
+        <h3 class="card__title mb-0">Today's Plan ({{ checkpoints.today }})</h3>
+        <a class="button button--ghost button--small" href="{{ url_for('task') }}">Manage tasks</a>
+    </div>
+
+    {% if checkpoints.overdue_tasks %}
+    <h4 class="card__title">Overdue tasks</h4>
+    <ul class="task-list">
+        {% for t in checkpoints.overdue_tasks %}
+        <li class="task task--high">
+            <span>{{ t.title }} <span class="text-muted">(due {{ t.due_date }})</span></span>
+            <span class="badge badge--high">overdue</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if checkpoints.today_tasks %}
+    <h4 class="card__title">Due today</h4>
+    <ul class="task-list">
+        {% for t in checkpoints.today_tasks %}
+        <li class="task task--{{ t.priority }}">
+            <span>{{ t.title }} <span class="text-muted">· {{ t.estimated_minutes }} min</span></span>
+            <a class="button button--ghost button--small" href="{{ url_for('session_page', task_id=t.id) }}">Focus</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if checkpoints.behind %}
+    <h4 class="card__title">You're behind on…</h4>
+    <ul class="task-list">
+        {% for d in checkpoints.behind %}
+        <li class="task task--high">
+            <a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a>
+            <span class="text-muted">due {{ d.due_date }} · {{ d._report.days_left }} day(s) left</span>
+            <form action="{{ url_for('deadline_recover', deadline_id=d.id) }}" method="post" class="inline-form">
+                <button class="button button--primary button--small" type="submit">Rebuild (2 taps)</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if not checkpoints.overdue_tasks and not checkpoints.today_tasks and not checkpoints.behind %}
+    <div class="empty-state empty-state--positive">
+        <span class="empty-state__icon" aria-hidden="true">✓</span>
+        <p class="empty-state__title">You're all clear for now</p>
+        <p class="empty-state__body">Protect your momentum with a short focus session.</p>
+    </div>
+    <a class="button button--primary mt-2" href="{{ url_for('session_page') }}">Start a focus session</a>
+    {% endif %}
+</section>
+{% endif %}
+
+<div class="subject-content">
+    <section class="card">
+        <div class="dashboard-heading">
+            <h3 class="card__title mb-0">Upcoming Deadlines</h3>
+            <a class="button button--ghost button--small" href="{{ url_for('deadlines') }}">Manage</a>
+        </div>
+        {% if deadlines %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Type</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in deadlines[:5] %}
+                <tr>
+                    <td><a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a></td>
+                    <td>{{ d.type }}</td>
+                    <td>{{ d.due_date }}</td>
+                    <td>{% if d.status == 'done' %}<span class="badge badge--done">done</span>{% else %}<span
+                            class="badge badge--open">open</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state empty-state--positive">
+            <span class="empty-state__icon" aria-hidden="true">✓</span>
+            <p class="empty-state__title">Nothing due yet</p>
+            <p class="empty-state__body">You're all clear. New deadlines will appear here.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <div class="dashboard-heading">
+            <h3 class="card__title mb-0">Open Tasks</h3>
+            <a class="button button--ghost button--small" href="{{ url_for('task') }}">Manage</a>
+        </div>
+        {% set open_tasks = tasks|selectattr('status', 'ne', 'done')|list %}
+        {% if open_tasks %}
+        <ul class="task-list">
+            {% for t in open_tasks[:8] %}
+            <li class="task task--{{ t.priority }}">
+                <span>
+                    {{ t.title }}
+                    <span class="text-muted"> · {{ t.estimated_minutes }} min</span>
+                </span>
+                <span class="badge badge--{{ t.priority }}">{{ t.priority }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state empty-state--positive">
+            <span class="empty-state__icon" aria-hidden="true">✓</span>
+            <p class="empty-state__title">You're all caught up</p>
+            <p class="empty-state__body">Enjoy the breathing room or start a focus session.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <div class="dashboard-heading">
+            <h3 class="card__title mb-0">My Courses</h3>
+            <a class="button button--ghost button--small" href="{{ url_for('courses') }}">Manage</a>
+        </div>
+        {% if courses %}
+        <ul class="task-list">
+            {% for course in courses %}
+            <li class="task">
+                <a href="{{ url_for('course_detail', course_id=course.id) }}">
+                    <strong>{{ course.code }}</strong> — {{ course.title }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">
+            <span class="empty-state__icon" aria-hidden="true">▦</span>
+            <p class="empty-state__title">Your course list is waiting</p>
+            <p class="empty-state__body"><a href="{{ url_for('courses') }}">Add a course</a> to begin building your
+                plan.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <div class="dashboard-heading">
+            <h3 class="card__title mb-0">Group Workspaces</h3>
+            <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_list') }}">Manage</a>
+        </div>
+        {% if workspaces %}
+        <ul class="task-list">
+            {% for ws in workspaces[:6] %}
+            <li class="task">
+                <a href="{{ url_for('collab.workspace_detail', workspace_id=ws.id) }}">
+                    <strong>{{ ws.course_code or 'GROUP' }}</strong> — {{ ws.name }}
+                </a>
+                <span class="text-muted">{{ ws.num_tasks }} task{{ 's' if ws.num_tasks != 1 }} · {{ ws.member_count }}
+                    member{{ 's' if ws.member_count != 1 }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">
+            <span class="empty-state__icon" aria-hidden="true">◎</span>
+            <p class="empty-state__body">Work with your study group on a shared project — tasks, chat, and deadlines in
+                one place.</p>
+            <div class="empty-state__action">
+                <a class="button button--ghost button--small" href="{{ url_for('collab.workspace_list') }}">Create a
+                    workspace</a>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <div class="dashboard-heading">
+            <h3 class="card__title mb-0">My Subjects</h3>
+            <p class="text-muted mb-0">Your courses arranged just like a school portal.</p>
+        </div>
+        <div class="course-grid">
+            {% for subject in subjects %}
+            <article class="course-card course-card--{{ subject.color }}">
+                <a class="course-card__header" href="{{ url_for('course_detail', course_id=subject.id) }}">
+                    <span class="course-card__code">{{ subject.code }}</span>
+                    <span class="course-card__title">{{ subject.title }}</span>
+                </a>
+                <div class="course-card__body">
+                    {{ subject.term }} · {{ subject.instructor }}
+                </div>
+            </article>
+            {% else %}
+            <div class="empty-state">
+                <span class="empty-state__icon" aria-hidden="true">▦</span>
+                <p class="empty-state__title">Your subjects will live here</p>
+                <p class="empty-state__body"><a href="{{ url_for('courses') }}">Add a course</a> to begin.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var greeting = document.getElementById('home-greeting');
+        if (!greeting) return;
+        var hour = new Date().getHours();
+        greeting.textContent = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+    }());
+</script>
+{% endblock %}

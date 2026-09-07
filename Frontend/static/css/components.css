@@ -1244,6 +1244,197 @@ body.home .page-main {
   padding-top: var(--space-6);
 }
 
+body.home .home-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-bottom: var(--space-6);
+  padding: var(--space-6) var(--space-8);
+  color: var(--color-text-inverse);
+  background: linear-gradient(120deg, var(--color-primary-dark), var(--color-primary) 58%, #176579);
+  border: 1px solid rgb(255 255 255 / 0.24);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.home-hero__glow {
+  position: absolute;
+  z-index: -1;
+  width: 18rem;
+  height: 18rem;
+  right: -5rem;
+  top: -9rem;
+  border-radius: 50%;
+  background: rgb(143 216 208 / 0.25);
+  filter: blur(8px);
+}
+
+.home-hero__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.home-hero__avatar {
+  display: inline-grid;
+  flex: 0 0 3.75rem;
+  width: 3.75rem;
+  height: 3.75rem;
+  place-items: center;
+  border: 2px solid rgb(255 255 255 / 0.72);
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #2b1b00;
+  font-size: 1.35rem;
+  font-weight: 800;
+  object-fit: cover;
+}
+
+.home-hero__eyebrow {
+  margin: 0 0 var(--space-1);
+  color: #bde8e4;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.home-hero h2 {
+  margin: 0 0 var(--space-2);
+  font-size: clamp(1.45rem, 3vw, 2.15rem);
+}
+
+.home-hero__subtitle,
+.home-hero__status {
+  margin: 0;
+  color: #e7f4f5;
+}
+
+.home-hero__status {
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgb(255 255 255 / 0.2);
+  font-size: 0.92rem;
+}
+
+body.home .stat {
+  position: relative;
+  min-height: 8.5rem;
+  padding: var(--space-4);
+  text-align: left;
+  overflow: hidden;
+}
+
+.stat__icon {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary);
+  background: rgb(27 106 138 / 0.14);
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.stat__ring {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  width: 2.65rem;
+  height: 2.65rem;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--color-accent) 0 72%, rgb(240 153 55 / 0.18) 72% 100%);
+}
+
+.stat__ring span {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
+.stat--calm {
+  border-top: 3px solid var(--color-success);
+}
+
+.stat--calm .stat__icon {
+  color: var(--color-success);
+  background: #e7f4e9;
+}
+
+.stat--urgent {
+  border-top: 3px solid var(--priority-moderate);
+}
+
+.stat--urgent .stat__icon {
+  color: var(--priority-moderate);
+  background: #fdf1df;
+}
+
+.stat--tasks .stat__icon {
+  color: var(--color-primary-light);
+}
+
+.stat--availability .stat__value {
+  padding-right: 3rem;
+}
+
+body.home .home-plan-card {
+  border-top: 4px solid var(--color-accent);
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.82), rgb(255 248 235 / 0.72));
+}
+
+body.home .home-plan-card .card__title {
+  color: var(--color-primary-dark);
+}
+
+body.home .empty-state {
+  padding: var(--space-4) var(--space-2);
+  text-align: left;
+}
+
+body.home .empty-state__icon {
+  display: inline-grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  margin-bottom: var(--space-2);
+  border-radius: 50%;
+  color: var(--color-success);
+  background: #e7f4e9;
+  font-weight: 800;
+}
+
+body.home .empty-state__title {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+body.home .empty-state__body {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+body.home .empty-state--positive {
+  background: rgb(231 244 233 / 0.45);
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 42rem) {
+  body.home .home-hero {
+    padding: var(--space-5);
+  }
+
+  body.home .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 body.home .card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);

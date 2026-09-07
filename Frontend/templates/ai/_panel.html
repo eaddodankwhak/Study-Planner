@@ -1,7 +1,7 @@
 {# Shared AI assistant panel. Rendered once inside the launch drawer on every
-   page (base.html) and again full-width by /ai-hub. The JS controller
-   (js/ai_hub.js) hydrates it the same way in both contexts so the two views
-   can never drift apart. #}
+page (base.html) and again full-width by /ai-hub. The JS controller
+(js/ai_hub.js) hydrates it the same way in both contexts so the two views
+can never drift apart. #}
 
 <div class="ai-panel" data-ai-panel>
 
@@ -30,13 +30,15 @@
         <span class="ai-panel__mock" id="ai-mock-hint" hidden>demo mode</span>
         <div class="ai-panel__model-select" data-model-select>
           <span class="ai-panel__model-label">Model</span>
-          <button type="button" class="ai-panel__model-trigger" id="ai-model-trigger"
-                  aria-haspopup="listbox" aria-expanded="false">
+          <button type="button" class="ai-panel__model-trigger" id="ai-model-trigger" aria-haspopup="listbox"
+            aria-expanded="false">
             <span class="ai-panel__model-name" id="ai-current-model">Claude</span>
-            <svg class="ai-panel__chevron" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            <svg class="ai-panel__chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
           </button>
-          <ul class="ai-panel__model-list" id="ai-model-list" role="listbox" hidden></ul>
+          <ul class="ai-panel__model-list" id="ai-model-list" role="listbox" tabindex="-1" hidden></ul>
         </div>
       </div>
     </header>
@@ -47,16 +49,16 @@
       <div class="ai-chat" id="ai-chat" aria-live="polite"></div>
 
       {# Server-rendered empty state: exactly the affordances the prompt wants —
-         the quick-action card grid only, no redundant pill row. Overlay on the
-         chat area until a conversation starts. #}
+      the quick-action card grid only, no redundant pill row. Overlay on the
+      chat area until a conversation starts. #}
       <div class="ai-panel-empty" id="ai-empty-state" data-empty-state>
         <div class="ai-panel-empty__inner">
           <h2 class="ai-panel__prompt">How can I help you study today?</h2>
           <p class="ai-panel__hint">Pick a starting point, or just start typing.</p>
           <div class="ai-panel__quick-grid">
             {% for action in quick_actions %}
-            <button type="button" class="ai-panel__quick-card"
-                    data-init-prompt="{{ action.template }}">{{ action.label }}</button>
+            <button type="button" class="ai-panel__quick-card" data-init-prompt="{{ action.template }}">{{ action.label
+              }}</button>
             {% endfor %}
           </div>
         </div>
@@ -68,9 +70,12 @@
     <div class="ai-composer">
       <div class="ai-attachments" id="ai-attachments"></div>
       <div class="ai-input-row">
-        <button type="button" class="ai-attach-btn" id="ai-attach-btn" aria-label="Attach study material">＋ Attach</button>
-        <input type="file" id="ai-file-input" class="hidden" accept=".txt,.md,.csv,.json,.log,.pdf,.docx,.png,.jpg,.jpeg,.gif">
-        <textarea id="ai-input" class="ai-textarea" rows="1" placeholder="Ask anything about your studies…" aria-label="Message"></textarea>
+        <button type="button" class="ai-attach-btn" id="ai-attach-btn" aria-label="Attach study material">＋
+          Attach</button>
+        <input type="file" id="ai-file-input" class="hidden"
+          accept=".txt,.md,.csv,.json,.log,.pdf,.docx,.png,.jpg,.jpeg,.gif">
+        <textarea id="ai-input" class="ai-textarea" rows="1" placeholder="Ask anything about your studies…"
+          aria-label="Message"></textarea>
         <button type="button" class="button ai-send" id="ai-send">Send</button>
       </div>
     </div>

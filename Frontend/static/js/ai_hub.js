@@ -121,6 +121,7 @@
     state.meta.models.forEach(function (m) {
       var li = el("li", "ai-panel__model-option");
       li.setAttribute("role", "option");
+      li.setAttribute("tabindex", "0");
       li.setAttribute("data-provider", m.id);
       li.setAttribute("aria-selected", String(m.id === state.model));
       var strong = el("strong", null, m.displayName);
@@ -128,7 +129,12 @@
       li.append(strong, span);
       li.addEventListener("click", function () {
         setModel(m.id);
-        closeModelList();
+      });
+      li.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setModel(m.id);
+        }
       });
       els.modelList.appendChild(li);
     });
@@ -165,12 +171,15 @@
   function setModel(id) {
     state.model = id;
     renderModels();
+    // Keep selection state and menu visibility in one transition. This also
+    // closes the menu when a model is changed by keyboard or future callers.
+    closeModelList();
     if (state.current) {
       api("/conversations/" + state.current.id, { method: "PATCH", body: { model: id } }).then(function () {
         state.current.model = id;
-      }).catch(function () {});
+      }).catch(function () { });
     }
-    api("/preferences", { method: "PUT", body: { model: id } }).catch(function () {});
+    api("/preferences", { method: "PUT", body: { model: id } }).catch(function () { });
   }
 
   // ------------------------------------------------------------- modes
