@@ -1,0 +1,239 @@
+/*
+ * dark.css — adaptability layer.
+ *
+ * Two dark fallbacks, both landing AFTER premium.css so they win the
+ * cascade:
+ *
+ *   1. Automatic (no theme preference / logged-out pages): follow the OS via
+ *      `@media (prefers-color-scheme: dark)`, unless the page explicitly
+ *      forces light (`[data-theme="light"]`).
+ *   2. Forced dark: `[data-theme="dark"]` on <html>, set server-side from the
+ *      user's saved appearance, so there is no flash as CSS loads.
+ *
+ * Text size follows the same pattern: `[data-text-size="large/larger"]` on
+ * <html> scales the root font-size, and every `rem` token (spacing, type,
+ * borders) scales with it. Three steps only — no arbitrary zoom.
+ */
+
+:root {
+  color-scheme: light;
+}
+
+:root[data-text-size="large"] {
+  font-size: 112.5%;
+}
+
+:root[data-text-size="larger"] {
+  font-size: 125%;
+}
+
+/* ---------------------------------------------------------------------------
+   Dark token set — applied by OS preference (system) or forced dark.
+   Defined twice (media block first, attribute block after) so the explicit
+   `[data-theme="dark"]` attribute wins ties when the OS is also dark.
+--------------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --color-primary: #3d7ea6;
+    --color-primary-dark: #30648a;
+    --color-primary-darker: #244c6b;
+    --color-primary-light: #7fb9dd;
+
+    --color-accent: #d9ab6a;
+    --color-accent-dark: #c8944f;
+
+    --color-bg: #131a21;
+    --color-surface: #1b232c;
+    --color-text: #e8edf2;
+    --color-text-inverse: #ffffff;
+    --color-muted: #a1adb7;
+    --color-border: #333e49;
+
+    --color-success: #7cc681;
+    --color-error: #f47f78;
+    --color-blocked: #e47462;
+
+    --priority-critical: #f47f78;
+    --priority-moderate: #e2b45f;
+    --priority-mastered: #7cc681;
+
+    --status-todo: #9aa6b1;
+    --status-progress: #6fc0e8;
+    --status-review: #e2b45f;
+    --status-blocked: var(--color-blocked);
+    --status-done: var(--color-success);
+    --status-cancel: var(--color-muted);
+
+    --glass-bg: rgb(27 35 44 / 0.78);
+    --glass-border: rgb(255 255 255 / 0.12);
+    --glass-shadow: 0 8px 32px rgb(0 0 0 / 0.45);
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+    --shadow-md: 0 6px 18px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 18px 44px rgb(0 0 0 / 0.55);
+
+    --ring-color: rgb(127 185 221 / 0.45);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-primary: #3d7ea6;
+  --color-primary-dark: #30648a;
+  --color-primary-darker: #244c6b;
+  --color-primary-light: #7fb9dd;
+
+  --color-accent: #d9ab6a;
+  --color-accent-dark: #c8944f;
+
+  --color-bg: #131a21;
+  --color-surface: #1b232c;
+  --color-text: #e8edf2;
+  --color-text-inverse: #ffffff;
+  --color-muted: #a1adb7;
+  --color-border: #333e49;
+
+  --color-success: #7cc681;
+  --color-error: #f47f78;
+  --color-blocked: #e47462;
+
+  --priority-critical: #f47f78;
+  --priority-moderate: #e2b45f;
+  --priority-mastered: #7cc681;
+
+  --status-todo: #9aa6b1;
+  --status-progress: #6fc0e8;
+  --status-review: #e2b45f;
+  --status-blocked: var(--color-blocked);
+  --status-done: var(--color-success);
+  --status-cancel: var(--color-muted);
+
+  --glass-bg: rgb(27 35 44 / 0.78);
+  --glass-border: rgb(255 255 255 / 0.12);
+  --glass-shadow: 0 8px 32px rgb(0 0 0 / 0.45);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-md: 0 6px 18px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 18px 44px rgb(0 0 0 / 0.55);
+
+  --ring-color: rgb(127 185 221 / 0.45);
+}
+
+/* ---------------------------------------------------------------------------
+   Hardcoded light surfaces from lower layers that need a dark equivalent.
+   Mirrored for both dark scopes.
+--------------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body::before {
+    background-image: radial-gradient(rgb(0 0 0 / 0.14) 0.6px, transparent 0.6px);
+  }
+
+  :root:not([data-theme="light"]) .form-input,
+  :root:not([data-theme="light"]) .form-field input,
+  :root:not([data-theme="light"]) .form-field select,
+  :root:not([data-theme="light"]) .form-field textarea,
+  :root:not([data-theme="light"]) select.form-input {
+    background: var(--color-surface);
+    border-color: #3d4854;
+    color: var(--color-text);
+  }
+
+  :root:not([data-theme="light"]) .form-input::placeholder,
+  :root:not([data-theme="light"]) .form-field input::placeholder {
+    color: var(--color-muted);
+  }
+
+  :root:not([data-theme="light"]) .button--ghost:hover {
+    background: rgb(127 185 221 / 0.14);
+  }
+
+  :root:not([data-theme="light"]) body.home .stat,
+  :root:not([data-theme="light"]) body.home .card,
+  :root:not([data-theme="light"]) .card {
+    background: rgb(27 35 44 / 0.85);
+  }
+
+  :root:not([data-theme="light"]) .task:hover,
+  :root:not([data-theme="light"]) .data-table tr:hover td {
+    background: var(--color-surface);
+  }
+
+  :root:not([data-theme="light"]) .palette__dialog {
+    background: rgb(27 35 44 / 0.96);
+  }
+
+  :root:not([data-theme="light"]) .skeleton {
+    background: rgb(232 237 242 / 0.08);
+  }
+
+  :root:not([data-theme="light"]) .flashes .success {
+    background: rgb(124 198 129 / 0.16);
+    color: var(--color-success);
+    border-color: rgb(124 198 129 / 0.4);
+  }
+
+  :root:not([data-theme="light"]) .flashes .error {
+    background: rgb(244 127 120 / 0.16);
+    color: var(--color-error);
+    border-color: rgb(244 127 120 / 0.4);
+  }
+}
+
+:root[data-theme="dark"] body::before {
+  background-image: radial-gradient(rgb(0 0 0 / 0.14) 0.6px, transparent 0.6px);
+}
+
+:root[data-theme="dark"] .form-input,
+:root[data-theme="dark"] .form-field input,
+:root[data-theme="dark"] .form-field select,
+:root[data-theme="dark"] .form-field textarea,
+:root[data-theme="dark"] select.form-input {
+  background: var(--color-surface);
+  border-color: #3d4854;
+  color: var(--color-text);
+}
+
+:root[data-theme="dark"] .form-input::placeholder,
+:root[data-theme="dark"] .form-field input::placeholder {
+  color: var(--color-muted);
+}
+
+:root[data-theme="dark"] .button--ghost:hover {
+  background: rgb(127 185 221 / 0.14);
+}
+
+:root[data-theme="dark"] body.home .stat,
+:root[data-theme="dark"] body.home .card,
+:root[data-theme="dark"] .card {
+  background: rgb(27 35 44 / 0.85);
+}
+
+:root[data-theme="dark"] .task:hover,
+:root[data-theme="dark"] .data-table tr:hover td {
+  background: var(--color-surface);
+}
+
+:root[data-theme="dark"] .palette__dialog {
+  background: rgb(27 35 44 / 0.96);
+}
+
+:root[data-theme="dark"] .skeleton {
+  background: rgb(232 237 242 / 0.08);
+}
+
+:root[data-theme="dark"] .flashes .success {
+  background: rgb(124 198 129 / 0.16);
+  color: var(--color-success);
+  border-color: rgb(124 198 129 / 0.4);
+}
+
+:root[data-theme="dark"] .flashes .error {
+  background: rgb(244 127 120 / 0.16);
+  color: var(--color-error);
+  border-color: rgb(244 127 120 / 0.4);
+}

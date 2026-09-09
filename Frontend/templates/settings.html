@@ -422,8 +422,8 @@
 
     <section class="card settings-panel" aria-labelledby="appearance-heading">
         <h3 class="card__title" id="appearance-heading">Appearance &amp; Accessibility</h3>
-        <p class="settings-panel__intro">Make the interface easier and more comfortable to use.</p>
-        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form">
+        <p class="settings-panel__intro">Make the interface easier and more comfortable to use. Changes apply immediately as you preview — <strong>Save accessibility settings</strong> to keep them. Press <kbd>?</kbd> on any page to view keyboard shortcuts.</p>
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form" id="appearance-form">
             <div class="settings-inline">
                 <div class="form-field"><label class="form-label" for="theme">Theme</label><select class="form-input"
                         id="theme" name="theme">
@@ -431,8 +431,8 @@
                         </option>
                         <option value="light" {% if settings.appearance.theme=='light' %}selected{% endif %}>Light
                         </option>
-                        <option value="dark" {% if settings.appearance.theme=='dark' %}selected{% endif %}>Dark (coming
-                            soon)</option>
+                        <option value="dark" {% if settings.appearance.theme=='dark' %}selected{% endif %}>Dark
+                        </option>
                     </select></div>
                 <div class="form-field"><label class="form-label" for="text_size">Text size</label><select
                         class="form-input" id="text_size" name="text_size">
@@ -653,4 +653,14 @@
             });
         });
     });
+
+    (function () {
+        const theme = document.getElementById('theme');
+        const textSize = document.getElementById('text_size');
+        const root = document.documentElement;
+        if (theme) root.dataset.theme = theme.value;
+        if (textSize) root.dataset.textSize = textSize.value;
+        if (theme) theme.addEventListener('change', function () { root.dataset.theme = theme.value; });
+        if (textSize) textSize.addEventListener('change', function () { root.dataset.textSize = textSize.value; });
+    })();
 </script>{% endblock %}

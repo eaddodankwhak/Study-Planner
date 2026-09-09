@@ -13,9 +13,12 @@
 
     var input = palette.querySelector("[data-palette-input]");
     var list = palette.querySelector("[data-palette-list]");
-    var hint = palette.querySelector("[data-palette-hint]");
     var selectedIndex = -1;
     var lastTrigger = null;
+
+    function isOpen() {
+        return palette.classList.contains("is-open");
+    }
 
     function open() {
         palette.classList.add("is-open");
@@ -36,29 +39,19 @@
 
     // Keep Tab/Shift+Tab cycling inside the open palette (focus trap).
     function trapFocus(event) {
-        var anchors = list.querySelectorAll(".palette__item");
-        var focusable = anchors.length ? [input].concat(Array.prototype.slice.call(anchors)) : [input];
+        var focusable = [input].concat(Array.prototype.slice.call(list.querySelectorAll(".palette__item")));
+        if (focusable.length === 0) return;
         var first = focusable[0];
         var last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
+
+        if (!event.shiftKey && document.activeElement === last) {
             event.preventDefault();
             first.focus();
+        } else if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
         }
     }
-
-    document.addEventListener("keydown", function (e) {
-        var open = palette.classList.contains("is-open");
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-            e.preventDefault();
-            open ? close() : open();
-        } else if (!open) {
-            return;
-        } else if (e.key === "Tab") {
-            trapFocus(e);
-        } else if (e.key === "Escape") {
 
     document.querySelectorAll("[data-palette-trigger]").forEach(function (trigger) {
         trigger.addEventListener("click", function () {
@@ -128,12 +121,14 @@
     }
 
     document.addEventListener("keydown", function (e) {
-        var open = palette.classList.contains("is-open");
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
             e.preventDefault();
-            open ? close() : open();
-        } else if (!open) {
+            isOpen() ? close() : open();
             return;
+        }
+        if (!isOpen()) return;
+        if (e.key === "Tab") {
+            trapFocus(e);
         } else if (e.key === "Escape") {
             close();
         } else if (e.key === "ArrowDown") {

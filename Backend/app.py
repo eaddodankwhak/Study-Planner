@@ -10,6 +10,7 @@ Provides a Sakai-style interface with real authentication:
 """
 
 import json
+import math
 import os
 import re
 import time
@@ -59,7 +60,7 @@ def _login_blocked(email, ip):
     now = time.time()
     lock_until = rec.get("locked_until", 0)
     if lock_until > now:
-        return True, int(lock_until - now)
+        return True, math.ceil(lock_until - now)
     return False, 0
 
 
@@ -78,6 +79,11 @@ def _record_login_failure(email, ip):
 
 def _clear_login_failures(email, ip):
     _login_track.pop(_login_key(email, ip), None)
+
+
+# Used so a login attempt for a nonexistent account costs the same bcrypt
+# work as a real one (keeps user enumeration timing-flat).
+_DUMMY_PASSWORD_HASH = generate_password_hash("study-planner-dummy-account")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
@@ -162,6 +168,21 @@ def inject_ai_launcher():
         "providers": AI_PROVIDERS,
         "user_settings": db.get_settings(session["user_id"]) if session.get("user_id") else None,
     }
+
+
+@app.context_processor
+def inject_appearance():
+    """Expose the user's saved theme and text-size so base.html can render
+    them onto <html> before first paint (no flash of wrong theme/size)."""
+    settings = db.get_settings(session["user_id"]) if session.get("user_id") else None
+    appearance = settings.get("appearance", {}) if settings else {}
+    theme = appearance.get("theme", "system")
+    text_size = appearance.get("text_size", "default")
+    if theme not in {"system", "light", "dark"}:
+        theme = "system"
+    if text_size not in {"default", "large", "larger"}:
+        text_size = "default"
+    return {"app_theme": theme, "app_text_size": text_size}
 
 # Sample subjects shown on the dashboard (Sakai-style course cards).
 SUBJECTS = [
@@ -421,6 +442,10 @@ def signup_post():
         flash("Please fill in all fields.", "error")
         return redirect(url_for("signup"))
 
+    if len(password) < 8:
+        flash("Password must be at least 8 characters.", "error")
+        return redirect(url_for("signup"))
+
     if db.get_user_by_email(email):
         flash("An account with that email already exists.", "error")
         return redirect(url_for("signup"))
@@ -449,19 +474,45 @@ def login_post():
 
     blocked, wait = _login_blocked(email, ip)
     if blocked:
-        flash(f"Too many attempts. Try again in {wait} seconds.", "error")
+        flash(
+            f"Too many failed attempts. Your account is temporarily locked; "
+            f"try again in {wait} seconds.",
+            "error",
+        )
         return redirect(url_for("login"))
 
     user = db.get_user_by_email(email)
 
-    if user and check_password_hash(user["password"], password):
+    # Hash comparison always runs against a real (or dummy) hash so response
+    # timing does not reveal whether the email exists.
+    stored = user["password"] if user else _DUMMY_PASSWORD_HASH
+    if user and check_password_hash(stored, password):
         _clear_login_failures(email, ip)
         session["user_id"] = user["id"]
         flash(f"Welcome back, {user['name']}!", "success")
         return redirect(url_for("home"))
 
+    # Count this failure before recording it so the "attempts remaining"
+    # message is accurate (notably on the attempt that triggers the lockout).
+    now = time.time()
+    prior = _login_track.get(_login_key(email, ip), {}).get("fails", [])
+    prior = [ts for ts in prior if now - ts < LOGIN_WINDOW_SECONDS]
+    attempts_used = len(prior) + 1
     _record_login_failure(email, ip)
-    flash("Invalid email or password.", "error")
+    remaining = max(0, LOGIN_MAX_ATTEMPTS - attempts_used)
+    if remaining:
+        flash(
+            f"Invalid email or password. {remaining} "
+            f"attempt{'s' if remaining != 1 else ''} remaining before a "
+            "temporary lockout.",
+            "error",
+        )
+    else:
+        flash(
+            f"Invalid email or password. Too many attempts — the account is "
+            f"locked for {LOGIN_LOCKOUT_SECONDS} seconds.",
+            "error",
+        )
     return redirect(url_for("login"))
 
 
@@ -545,9 +596,19 @@ def settings_preferences():
             "planning_aggressiveness": request.form.get("planning_aggressiveness", "balanced"),
         }
     if {"theme", "text_size", "reduce_motion"}.intersection(request.form):
+        theme = request.form.get("theme", "system")
+        text_size = request.form.get("text_size", "default")
+        if theme not in {"system", "light", "dark"}:
+            theme = allowed["appearance"].get("theme", "system")
+        if text_size not in {"default", "large", "larger"}:
+            text_size = allowed["appearance"].get("text_size", "default")
+        if theme not in {"system", "light", "dark"}:
+            theme = "system"
+        if text_size not in {"default", "large", "larger"}:
+            text_size = "default"
         updates["appearance"] = {
-            "theme": request.form.get("theme", "system"),
-            "text_size": request.form.get("text_size", "default"),
+            "theme": theme,
+            "text_size": text_size,
             "reduce_motion": request.form.get("reduce_motion") == "on",
         }
     if {"ai_activity", "workspace_visibility"}.intersection(request.form):
