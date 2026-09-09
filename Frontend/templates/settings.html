@@ -224,6 +224,12 @@
             flex-direction: column;
         }
     }
+
+    /* AI connect feedback: loud enough to be noticed under the row. */
+    .ai-connect-note {
+        color: var(--color-accent, #0f62fe);
+        font-weight: var(--font-weight-medium, 600);
+    }
 </style>
 {% endblock %}
 
@@ -577,9 +583,22 @@
             var el = document.querySelector('[data-ai-error="' + provider + '"]');
             if (!el) return;
             el.textContent = message;
+            el.classList.add('ai-connect-note');
             el.hidden = false;
+            el.setAttribute('role', 'alert');
         }
         document.querySelectorAll('[data-ai-connect]').forEach(function (btn) {
+            var provider = btn.getAttribute('data-ai-connect');
+            var keyInput = document.querySelector('[data-ai-key="' + provider + '"]');
+            if (keyInput) keyInput.addEventListener('input', function () {
+                var el = document.querySelector('[data-ai-error="' + provider + '"]');
+                if (el) {
+                    el.textContent = '';
+                    el.classList.remove('ai-connect-note');
+                    el.removeAttribute('role');
+                    el.hidden = true;
+                }
+            });
             btn.addEventListener('click', async function () {
                 var provider = btn.getAttribute('data-ai-connect');
                 var input = document.querySelector('[data-ai-key="' + provider + '"]');
