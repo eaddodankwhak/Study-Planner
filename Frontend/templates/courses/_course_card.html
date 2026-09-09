@@ -10,4 +10,56 @@
     {% if meta %}
         <div class="course-card__meta">{{ meta | join(' · ') }}</div>
     {% endif %}
+    <div class="course-card__actions">
+        <details class="course-card__edit">
+            <summary class="button button--ghost button--small">Edit</summary>
+            <form class="course-form" action="{{ url_for('courses_update', course_id=course.id) }}" method="post">
+                <div class="course-form__grid">
+                    <div class="field">
+                        <label for="edit_title_{{ course.id }}">Course title</label>
+                        <input id="edit_title_{{ course.id }}" name="title"
+                            value="{{ course.title if course.title != 'To be assigned' else '' }}">
+                    </div>
+                    <div class="field">
+                        <label for="edit_lecturer_{{ course.id }}">Lecturer</label>
+                        <input id="edit_lecturer_{{ course.id }}" name="lecturer"
+                            value="{{ course.lecturer if course.lecturer != 'To be assigned' else '' }}">
+                    </div>
+                    <div class="field field--narrow">
+                        <label for="edit_credits_{{ course.id }}">Credits</label>
+                        <input id="edit_credits_{{ course.id }}" name="credits" type="number" min="0" max="12"
+                            value="{{ course.credits or 0 }}">
+                    </div>
+                    <div class="field">
+                        <label for="edit_schedule_{{ course.id }}">Class schedule</label>
+                        <input id="edit_schedule_{{ course.id }}" name="schedule"
+                            value="{{ course.schedule or '' }}" placeholder="e.g. Mon &amp; Wed 10:00">
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Card colour</label>
+                    <div class="course-color-radios">
+                        <label><input type="radio" name="color" value=""
+                                {{ 'checked' if not course.color }}> Auto</label>
+                        {% for hue in colors %}
+                        <label><input type="radio" name="color" value="{{ hue }}"
+                                {{ 'checked' if course.color == hue }}> {{ hue|title }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="edit_desc_{{ course.id }}">Description</label>
+                    <textarea id="edit_desc_{{ course.id }}" name="description" rows="2"
+                        placeholder="What's this course about?">{{ course.description or '' }}</textarea>
+                </div>
+                <div class="course-form__footer">
+                    <button type="submit" class="button button--primary">Save changes</button>
+                </div>
+            </form>
+        </details>
+        <form class="inline-form mb-0" action="{{ url_for('courses_delete', course_id=course.id) }}" method="post">
+            <button class="button button--ghost button--small" type="submit"
+                data-confirm="Delete this course? Its deadlines, notes and sessions will be kept but unlinked.">Delete</button>
+        </form>
+    </div>
 </article>

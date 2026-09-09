@@ -1,6 +1,30 @@
 {% extends "base.html" %}
 
 {% block title %}Schedule — Study Planner{% endblock %}
+{% block head %}<style>
+    .table-scroll {
+        overflow-x: auto;
+    }
+
+    .inline-actions {
+        display: inline-flex;
+        gap: var(--space-2);
+        align-items: center;
+        white-space: nowrap;
+    }
+
+    .schedule-add > summary {
+        cursor: pointer;
+        font-weight: var(--font-weight-medium, 600);
+        color: var(--color-primary, inherit);
+        list-style-position: inside;
+        padding: var(--space-2) 0;
+    }
+
+    .schedule-add > summary::marker {
+        color: var(--color-accent);
+    }
+</style>{% endblock %}
 {% block main %}
         <div class="dashboard-heading">
             <div>
@@ -37,7 +61,9 @@
             <div class="schedule-grid__main">
                 <section class="card mb-4">
                     <h3 class="card__title">Upcoming Events</h3>
-                    <form action="{{ url_for('calendar_add') }}" method="post">
+                    <details class="schedule-add" {% if not events %}open{% endif %}>
+                        <summary>Add an event</summary>
+                        <form action="{{ url_for('calendar_add') }}" method="post">
                         <div class="form-grid">
                             <div class="form-field">
                                 <label class="form-label" for="ev_title">Title</label>
@@ -97,9 +123,11 @@
                             <button class="button" type="submit">Add Event</button>
                         </div>
                     </form>
+                    </details>
 
                     {% if events %}
                     <h4 class="card__title mt-4">All Events</h4>
+                    <div class="table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -132,6 +160,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                     {% else %}
                     <div class="empty-state">
                         <p class="mb-0">No events yet. Add your first lecture or session above.</p>
@@ -141,7 +170,9 @@
 
                 <section class="card mb-4">
                     <h3 class="card__title">Tasks</h3>
-                    <form action="{{ url_for('task_add') }}" method="post">
+                    <details class="schedule-add" {% if not tasks %}open{% endif %}>
+                        <summary>Add a task</summary>
+                        <form action="{{ url_for('task_add') }}" method="post">
                         <div class="form-grid">
                             <div class="form-field">
                                 <label class="form-label" for="tk_title">Title</label>
@@ -179,6 +210,7 @@
                             <button class="button" type="submit">Add Task</button>
                         </div>
                     </form>
+                    </details>
 
                     {% if tasks %}
                     <h4 class="card__title mt-4">All Tasks</h4>
@@ -215,7 +247,9 @@
             <div class="schedule-grid__side">
                 <section class="card">
                     <h3 class="card__title">Deadlines &amp; Assessments</h3>
-                    <form action="{{ url_for('deadlines_add') }}" method="post">
+                    <details class="schedule-add" {% if not deadlines %}open{% endif %}>
+                        <summary>Add a deadline</summary>
+                        <form action="{{ url_for('deadlines_add') }}" method="post">
                         <div class="form-grid">
                             <div class="form-field">
                                 <label class="form-label" for="dl_title">Title</label>
@@ -262,9 +296,11 @@
                             <button class="button" type="submit">Add Deadline</button>
                         </div>
                     </form>
+                    </details>
 
                     {% if deadlines %}
                     <h4 class="card__title mt-4">All Deadlines</h4>
+                    <div class="table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr><th>Item</th><th>Course</th><th>Type</th><th>Due</th><th>Weight</th><th>Effort</th><th>Status</th><th></th></tr>
@@ -287,17 +323,26 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if d.status != 'done' %}
-                                    <form action="{{ url_for('deadline_complete', deadline_id=d.id) }}" method="post"
-                                        class="mb-0">
-                                        <button class="button button--ghost button--small" type="submit">Mark done</button>
-                                    </form>
-                                    {% endif %}
+                                    <div class="inline-actions">
+                                        {% if d.status != 'done' %}
+                                        <form action="{{ url_for('deadline_complete', deadline_id=d.id) }}" method="post"
+                                            class="mb-0">
+                                            <button class="button button--ghost button--small" type="submit">Mark done</button>
+                                        </form>
+                                        {% endif %}
+                                        <form action="{{ url_for('deadline_delete', deadline_id=d.id) }}" method="post"
+                                            class="mb-0">
+                                            <input type="hidden" name="back" value="{{ url_for('schedule') }}">
+                                            <button class="button button--ghost button--small" type="submit"
+                                                data-confirm="Delete this deadline and its lead-up steps? This cannot be undone.">Delete</button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                     {% else %}
                     <div class="empty-state">
                         <p class="mb-0">No deadlines yet. Add your first assessment above, then break it into

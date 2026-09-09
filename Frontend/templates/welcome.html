@@ -140,7 +140,7 @@
                 achievable study routine.
             </p>
             <button type="button" class="button button--primary" id="next-btn">Next</button>
-            <div class="welcome__dots" aria-hidden="true">
+            <div class="welcome__dots" role="group" aria-label="Welcome slides">
                 <button class="welcome__dot is-active" type="button" data-slide="1" aria-label="Show welcome slide"
                     aria-current="true"></button>
                 <button class="welcome__dot" type="button" data-slide="2" aria-label="Show feature slide"></button>
@@ -159,7 +159,7 @@
             </ul>
             <a class="button button--primary" href="{{ url_for('home') if user else url_for('signup') }}">{{ 'Go to
                 dashboard' if user else 'Start' }}</a>
-            <div class="welcome__dots" aria-hidden="true">
+            <div class="welcome__dots" role="group" aria-label="Welcome slides">
                 <button class="welcome__dot" type="button" data-slide="1" aria-label="Show welcome slide"></button>
                 <button class="welcome__dot is-active" type="button" data-slide="2" aria-label="Show feature slide"
                     aria-current="true"></button>
@@ -179,7 +179,15 @@
             function showSlide(n) {
                 slide1.hidden = n !== 1;
                 slide2.hidden = n !== 2;
-                dots.forEach((d) => d.classList.toggle('is-active', Number(d.dataset.slide) === n));
+                dots.forEach((d) => {
+                    const active = Number(d.dataset.slide) === n;
+                    d.classList.toggle('is-active', active);
+                    if (active) {
+                        d.setAttribute('aria-current', 'true');
+                    } else {
+                        d.removeAttribute('aria-current');
+                    }
+                });
             }
 
             document.getElementById('next-btn').addEventListener('click', () => showSlide(2));

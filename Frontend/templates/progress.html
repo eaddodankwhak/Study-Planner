@@ -1,10 +1,57 @@
 {% extends "base.html" %}
 
 {% block title %}Progress — Study Planner{% endblock %}
+{% block head %}
+<style>
+    .week-bars {
+        list-style: none;
+        margin: 0 0 var(--space-3);
+        padding: 0;
+        display: grid;
+        gap: var(--space-2);
+    }
+
+    .week-bars__item {
+        display: grid;
+        grid-template-columns: 2.5rem minmax(6rem, 1fr) 3rem;
+        gap: var(--space-2);
+        align-items: center;
+    }
+
+    .week-bars__day {
+        font-size: 0.85rem;
+        font-weight: var(--font-weight-medium, 600);
+        color: var(--color-text-muted, inherit);
+    }
+
+    .week-bars__track {
+        height: 0.75rem;
+        border-radius: 999px;
+        background: var(--color-surface-2, rgba(0, 0, 0, 0.08));
+        overflow: hidden;
+    }
+
+    .week-bars__fill {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: var(--color-accent);
+        transition: width 0.3s ease;
+    }
+
+    .week-bars__value {
+        text-align: right;
+        font-size: 0.85rem;
+        color: var(--color-text-muted, inherit);
+    }
+</style>
+{% endblock %}
+
 {% block main %}
         <div class="dashboard-heading">
             <h2>Progress</h2>
             <span class="text-muted">Your study effort, current streak, and completion overview.</span>
+            <a class="button button--ghost button--small" href="{{ url_for('report') }}">Print / export report</a>
         </div>
 
         <div class="stat-grid">
@@ -34,12 +81,43 @@
             <section class="card priority-critical">
                 <h3 class="card__title">Needs review</h3>
                 <p class="text-muted">You rated {{ stats.low_confidence_sessions|length }} recent session(s) as low-confidence. Revisit these before they pile up.</p>
-                <a class="button button--primary" href="{{ url_for('quiz_take_page') }}">Take a practice quiz</a>
+                <ul class="task-list">
+                    {% for s in stats.low_confidence_sessions %}
+                    <li class="task">
+                        <span>
+                            <strong>{{ (course_map.get(s.course_id).title) if course_map.get(s.course_id) else 'Unassigned' }}</strong>
+                            <span class="text-muted"> · {{ s._when }} · {{ s.duration_minutes }} min</span>
+                        </span>
+                        {% if course_map.get(s.course_id) %}
+                        <a class="button button--small button--ghost"
+                            href="{{ course_url(course_map.get(s.course_id), 'quizzes') }}">Practise now</a>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="form-actions" style="justify-content:flex-start;">
+                    <a class="button button--primary" href="{{ url_for('session_page') }}">Refocus with a new session</a>
+                </div>
             </section>
         {% endif %}
 
         <section class="card">
             <h3 class="card__title">Weekly study minutes</h3>
+            {% if week %}
+            <ol class="week-bars" aria-label="Minutes studied per day, last {{ week|length }} days">
+                {% for row in week %}
+                <li class="week-bars__item">
+                    <span class="week-bars__day">{{ row.weekday }}</span>
+                    <span class="week-bars__track" aria-hidden="true">
+                        <span class="week-bars__fill" style="width: {{ row.pct }}%"></span>
+                    </span>
+                    <span class="week-bars__value">{{ row.minutes }}m</span>
+                </li>
+                {% endfor %}
+            </ol>
             <p class="text-muted mb-0">Keep a daily habit to protect your streak and stay ahead of deadlines.</p>
+            {% else %}
+            <p class="text-muted mb-0">No focused minutes yet this week. Run a <a href="{{ url_for('session_page') }}">focus session</a> to start a streak.</p>
+            {% endif %}
         </section>
     {% endblock %}

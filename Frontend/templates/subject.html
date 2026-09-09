@@ -6,7 +6,7 @@
 <div class="app-shell">
     {% include '_course_sidebar.html' %}
 
-    <main class="page-main">
+    <main class="page-main" id="main-content">
         <!-- Subject title bar / breadcrumb -->
         <div class="subject-banner course-card--{{ subject.color }}">
             <div class="subject-banner__info">
@@ -54,7 +54,8 @@
                 <form class="upload-form" action="{{ url_for('subject_upload', slug=subject.slug) }}" method="post"
                     enctype="multipart/form-data">
                     <div class="form-field">
-                        <input type="file" name="material">
+                        <label class="form-label" for="subject-material">Material file</label>
+                        <input id="subject-material" type="file" name="material">
                         <button class="button" type="submit">Upload</button>
                     </div>
                 </form>
@@ -352,44 +353,57 @@
             {% if active_tool == 'calendar' %}
             <section class="card">
                 <h2 class="card__title">Class Calendar</h2>
+                {% if calendar_events %}
                 <ul class="task-list">
-                    <li class="task"><span><strong>Mon</strong> — Lecture session</span></li>
-                    <li class="task"><span><strong>Wed</strong> — Tutorial / lab</span></li>
-                    <li class="task"><span><strong>Fri</strong> — Quiz</span></li>
+                    {% for ev in calendar_events %}
+                    <li class="task">
+                        <span>
+                            <strong>{{ ev.title }}</strong>
+                            <span class="text-muted"> · {{ ev.type }} · {{ ev.start }}{% if ev.recurrence == 'weekly'
+                                %} · repeats weekly{% endif %}</span>
+                        </span>
+                    </li>
+                    {% endfor %}
                 </ul>
+                <p class="text-muted mb-0 mt-2">Classes you record under Schedule appear here.</p>
+                {% else %}
+                <p class="text-muted mb-0">No classes recorded for this course yet. Add lectures, labs and tutorials
+                    under <a href="{{ url_for('schedule') }}">Schedule</a>.</p>
+                {% endif %}
             </section>
             {% endif %}
 
             {% if active_tool == 'grades' %}
             <section class="card">
                 <h2 class="card__title">Grades</h2>
-                <p class="text-muted">Your grades for this subject will appear here.</p>
+                <p class="text-muted">Grade entry isn't available yet — your marks stay with your instructor. Here's what
+                    this course is worth instead.</p>
+                {% if deadlines %}
                 <table class="grade-table">
                     <thead>
                         <tr>
                             <th>Assessment</th>
-                            <th>Score</th>
                             <th>Weight</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
+                        {% for d in deadlines %}
                         <tr>
-                            <td>Midterm</td>
-                            <td>—</td>
-                            <td>30%</td>
+                            <td><a href="{{ url_for('deadline_detail', deadline_id=d.id) }}">{{ d.title }}</a></td>
+                            <td>{{ d.weight }}%</td>
+                            <td>
+                                {% if d.status == 'done' %}<span class="badge badge--done">done</span>{% else %}<span
+                                    class="badge badge--open">{{ d.status }}</span>{% endif %}
+                            </td>
                         </tr>
-                        <tr>
-                            <td>Assignments</td>
-                            <td>—</td>
-                            <td>20%</td>
-                        </tr>
-                        <tr>
-                            <td>Final exam</td>
-                            <td>—</td>
-                            <td>50%</td>
-                        </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
+                {% else %}
+                <p class="text-muted mb-0">No assessments recorded yet. Add them under Assignments, then plan them into
+                    lead-up steps.</p>
+                {% endif %}
             </section>
             {% endif %}
         </div>

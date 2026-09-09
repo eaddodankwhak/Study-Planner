@@ -3,6 +3,40 @@
 {% block title %}Courses — Study Planner{% endblock %}
 
 {% block body_tag %} class="courses-page"{% endblock %}
+{% block head %}<style>
+    /* Per-card edit/delete affordances (courses only, not the dashboard). */
+    .course-card {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .course-card__actions {
+        display: flex;
+        gap: var(--space-2);
+        margin-top: auto;
+        padding-top: var(--space-3);
+    }
+
+    .course-card__edit {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .course-card__edit .course-form {
+        margin-top: var(--space-2);
+        padding: var(--space-3);
+        border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+        border-radius: var(--radius);
+        background: var(--color-bg, #fff);
+    }
+
+    .course-color-radios {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        font-size: 0.85rem;
+    }
+</style>{% endblock %}
 {% block main %}
 <header class="courses-page__header">
     <div>

@@ -5,6 +5,7 @@ Combines planning data (from :mod:`planner`) and activity data (from
 """
 
 from datetime import date as _date
+from datetime import timedelta as _timedelta
 
 
 def _active_days(rows):
@@ -58,3 +59,38 @@ def overview(user_id, db, planner):
         ],
         "quiz_best": quiz_best,
     }
+
+
+def weekly_minutes(user_id, db, days=7):
+    """Minute-by-minute breakdown for the last N days (oldest first).
+
+    Real activity, one row per day — the Progress page's "weekly study
+    minutes" chart is backed by this instead of being a static heading.
+    """
+    activity = db.minutes_by_day(user_id, days=days)
+    per_day = {}
+    today = _date.today()
+    for s in activity.get("sessions", []):
+        local = s.get("started_at")
+        if not local:
+            continue
+        try:
+            day = _date.fromtimestamp(local)
+        except (TypeError, ValueError, OSError):
+            continue
+        if day < today - _timedelta(days=days):
+            continue
+        per_day[day] = per_day.get(day, 0) + int(s.get("duration_minutes") or 0)
+
+    max_minutes = max(per_day.values(), default=0)
+    rows = []
+    for i in range(days - 1, -1, -1):
+        day = today - _timedelta(days=i)
+        minutes = per_day.get(day, 0)
+        rows.append({
+            "date": day.isoformat(),
+            "weekday": day.strftime("%a"),
+            "minutes": minutes,
+            "pct": round((minutes / max_minutes) * 100) if max_minutes else 0,
+        })
+    return rows

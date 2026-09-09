@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 
 {% block title %}Notes — Study Planner{% endblock %}
+{% block head %}<style>
+    .note-edit__form {
+        margin-top: var(--space-2);
+        padding: var(--space-3);
+        border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+        border-radius: var(--radius);
+    }
+</style>{% endblock %}
 {% block main %}
 <div class="dashboard-heading">
     <h2>Notes</h2>
@@ -50,6 +58,19 @@
                 <td>{{ n.course_label or '—' }}</td>
                 <td>{{ n.topic or '—' }}</td>
                 <td>
+                    <details class="note-edit">
+                        <summary class="button button--ghost button--small">Edit</summary>
+                        <form method="POST" action="{{ url_for('notes_update', note_id=n.id) }}" class="form note-edit__form">
+                            <input type="hidden" name="back" value="{{ url_for('notes') }}">
+                            <label class="form-label" for="note-title-{{ n.id }}">Title</label>
+                            <input id="note-title-{{ n.id }}" class="form-input" type="text" name="title" value="{{ n.title }}" required>
+                            <label class="form-label" for="note-topic-{{ n.id }}">Topic</label>
+                            <input id="note-topic-{{ n.id }}" class="form-input" type="text" name="topic" value="{{ n.topic or '' }}">
+                            <label class="form-label" for="note-body-{{ n.id }}">Body</label>
+                            <textarea id="note-body-{{ n.id }}" class="form-input" name="body" rows="3">{{ n.body or '' }}</textarea>
+                            <button type="submit" class="button button--small">Save changes</button>
+                        </form>
+                    </details>
                     <form method="POST" action="{{ url_for('notes_delete', note_id=n.id) }}" class="inline-form">
                         <input type="hidden" name="back" value="{{ url_for('notes') }}">
                         <button type="submit" class="button button--ghost"

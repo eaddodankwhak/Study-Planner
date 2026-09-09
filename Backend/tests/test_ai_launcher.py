@@ -135,13 +135,13 @@ class AILauncherTest(unittest.TestCase):
         self.assertNotIn('id="ai-drawer"', html)
         self.assertNotIn("ai-drawer-backdrop", html)
 
-    def test_nav_has_no_ai_tab(self):
-        # "Pick one entry point": the nav tab is retired in favour of the
-        # persistent launcher, so there's a single AI entry point.
+    def test_nav_has_ai_tab(self):
+        # The persistent launcher remains the everywhere assistant, but AI
+        # also gets a visible nav/palette home per the UX audit.
         r = self.client.get("/dashboard")
         html = r.data.decode()
-        self.assertNotIn(">AI Hub<", html)
-        self.assertNotIn('href="/ai"', html)
+        self.assertIn(">AI Hub<", html)
+        self.assertIn('href="/ai"', html)
 
     def test_drawer_panel_initial_markup_matches_spec(self):
         r = self.client.get("/dashboard")

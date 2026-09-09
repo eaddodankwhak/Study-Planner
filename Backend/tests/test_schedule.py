@@ -142,6 +142,53 @@ class SchedulePageTest(unittest.TestCase):
         html = self.client.get("/deadlines").data.decode()
         self.assertIn("Assignment 2", html)
 
+    def test_deadline_delete_removes_deadline_its_steps_and_redirects(self):
+        d = planner.create_deadline(
+            UID,
+            title="Dropped module",
+            type="exam",
+            due_date="2026-11-01",
+            weight="50",
+            estimated_hours="8",
+        )
+        task = planner.add_task(UID, deadline_id=d["id"], title="Study session", due_date="2026-10-20")
+        self.assertEqual(len(planner.list_tasks(UID)), 1)
+        r = self.client.post(
+            "/deadlines/" + d["id"] + "/delete",
+            data={"back": "/deadlines"},
+            follow_redirects=False,
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertIsNone(planner.get_deadline(UID, d["id"]))
+        self.assertIsNone(planner.get_task(UID, task["id"]))
+
+    def test_deadline_delete_redirects_back_to_schedule_when_requested(self):
+        d = planner.create_deadline(UID, title="Mini test", type="assignment", due_date="2026-09-20")
+        r = self.client.post(
+            "/deadlines/" + d["id"] + "/delete",
+            data={"back": "/schedule"},
+            follow_redirects=False,
+        )
+        self.assertTrue(r.headers["Location"].endswith("/schedule"))
+
+    def test_unlink_course_detaches_records_without_deleting_them(self):
+        from courses import upsert_course
+
+        course = upsert_course(UID, "DCIT 205")
+        ev = planner.create_event(UID, title="Lecture", type="lecture", course_id=course["id"],
+                                  recurrence="none", start="2026-09-08T10:00")
+        d = planner.create_deadline(UID, title="Coursework", type="assignment", due_date="2026-10-01",
+                                    course_id=course["id"], weight="20", estimated_hours="3")
+        t = planner.add_task(UID, title="Prep", due_date="2026-09-30", course_id=course["id"],
+                             deadline_id=d["id"])
+
+        planner.unlink_course(UID, course["id"])
+
+        events = planner.list_events(UID)
+        self.assertEqual(events[0]["course_id"], None)
+        self.assertEqual(planner.get_deadline(UID, d["id"])["course_id"], None)
+        self.assertEqual(planner.get_task(UID, t["id"])["course_id"], None)
+
 
 if __name__ == "__main__":
     unittest.main()

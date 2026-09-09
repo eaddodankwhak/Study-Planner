@@ -124,6 +124,55 @@ class CoursesTest(unittest.TestCase):
         run_migration()
         self.assertEqual(len(courses.get_user_courses(self.uid)), 2)
 
+    def test_update_course_edits_fields_but_never_the_code(self):
+        c = courses.upsert_course(
+            self.uid, "DCIT 204",
+            title="Old Title", lecturer="Dr. A", credits="3", schedule="Mon", color="navy",
+        )
+        updated = courses.update_course(
+            self.uid, c["id"],
+            title="New Title",
+            lecturer="Dr. B",
+            credits="4",
+            schedule="Tue",
+            description="Now with details",
+            color="teal",
+        )
+        self.assertEqual(updated["code"], "DCIT 204")
+        self.assertEqual(updated["title"], "New Title")
+        self.assertEqual(updated["lecturer"], "Dr. B")
+        self.assertEqual(updated["credits"], 4)
+        self.assertEqual(updated["schedule"], "Tue")
+        self.assertEqual(updated["description"], "Now with details")
+        self.assertEqual(updated["color"], "teal")
+        # Still exactly one row — the edit never spawns a sibling via upsert.
+        self.assertEqual(len(courses.get_user_courses(self.uid)), 1)
+
+    def test_update_course_is_scoped_to_owner(self):
+        c = courses.upsert_course(self.uid, "DCIT 204", title="Mine")
+        # Trying to edit someone else's row via the foreign id returns None.
+        self.assertIsNone(courses.update_course(self.other, c["id"], title="Hijacked"))
+        self.assertEqual(courses.get_course(self.uid, c["id"])["title"], "Mine")
+
+    def test_update_course_clears_blank_fields_back_to_assigned(self):
+        c = courses.upsert_course(self.uid, "DCIT 204", title="Titled", lecturer="Lecturer")
+        courses.update_course(self.uid, c["id"], lecturer="")
+        rows = courses.get_user_courses(self.uid)
+        self.assertEqual(rows[0]["title"], "Titled")
+        self.assertEqual(rows[0]["lecturer"], "To be assigned")
+
+    def test_delete_course_removes_only_the_owned_row(self):
+        a = courses.upsert_course(self.uid, "DCIT 204")
+        courses.upsert_course(self.uid, "STAT 222")
+        courses.upsert_course(self.other, "BIO 101")
+        self.assertTrue(courses.delete_course(self.uid, a["id"]))
+        rows = courses.get_user_courses(self.uid)
+        self.assertEqual([r["code"] for r in rows], ["STAT 222"])
+        # The other user's course is untouched.
+        self.assertEqual(courses.get_user_courses(self.other)[0]["code"], "BIO 101")
+        # Deleting again (or someone else's id) is a no-op.
+        self.assertFalse(courses.delete_course(self.uid, a["id"]))
+
 
 class CoursesRoutesTest(unittest.TestCase):
     def setUp(self):
@@ -200,6 +249,28 @@ class CoursesRoutesTest(unittest.TestCase):
         rows = courses.get_user_courses(self.uid)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["code"], "MATH 101")
+
+    def test_courses_update_route_edits_row_and_redirects(self):
+        c = courses.upsert_course(self.uid, "DCIT 204", title="Old", color="navy")
+        r = self.client.post(
+            "/courses/" + c["id"] + "/update",
+            data={"title": "Renamed", "lecturer": "Dr. X", "credits": "2",
+                  "schedule": "", "description": "", "color": "teal"},
+            follow_redirects=False,
+        )
+        self.assertEqual(r.status_code, 302)
+        row = courses.get_course(self.uid, c["id"])
+        self.assertEqual(row["title"], "Renamed")
+        self.assertEqual(row["color"], "teal")
+
+    def test_courses_delete_route_removes_row_and_redirects(self):
+        c = courses.upsert_course(self.uid, "DCIT 204")
+        r = self.client.post(
+            "/courses/" + c["id"] + "/delete",
+            follow_redirects=False,
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertIsNone(courses.get_course(self.uid, c["id"]))
 
 
 class CoursesPageModernizationTest(unittest.TestCase):

@@ -210,6 +210,8 @@
       del.setAttribute("aria-label", "Delete conversation");
       del.addEventListener("click", function (e) {
         e.stopPropagation();
+        var title = c.title || "Untitled";
+        if (!window.confirm('Delete the conversation "' + title + '"? This cannot be undone.')) return;
         deleteConversation(c.id);
       });
       actions.appendChild(del);
@@ -596,7 +598,11 @@
     els.input.addEventListener("input", autosize);
     els.send.addEventListener("click", function () { sendMessage(); });
     els.newConv.addEventListener("click", createConversation);
-    els.clearConv.addEventListener("click", clearCurrent);
+    els.clearConv.addEventListener("click", function () {
+      if (!state.current) return;
+      if (!window.confirm("Clear the current conversation? This cannot be undone.")) return;
+      clearCurrent();
+    });
     els.attachBtn.addEventListener("click", function () { els.fileInput.click(); });
     els.fileInput.addEventListener("change", onFileSelected);
 

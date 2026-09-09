@@ -34,6 +34,26 @@
         if (el) el.textContent = text || status.replace(/_/g, " ");
     }
 
+    // global.js/hci.js disables the submit button on every form submit; AJAX
+    // forms cancel navigation instead, so re-arm them after the request lands.
+    function rearm(form) {
+        if (!form) return;
+        form.dataset.submitting = "false";
+        form.setAttribute("aria-busy", "false");
+        var submit = form.querySelector("button[type=submit], input[type=submit]");
+        if (submit) {
+            submit.disabled = false;
+            if (submit.dataset.originalLabel) {
+                if (submit.tagName === "INPUT") {
+                    submit.value = submit.dataset.originalLabel;
+                } else {
+                    submit.textContent = submit.dataset.originalLabel;
+                }
+                delete submit.dataset.originalLabel;
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ forms
     document.addEventListener("submit", function (ev) {
         var form = ev.target.closest("[data-comment-form], [data-chat-form]");
@@ -53,8 +73,10 @@
                 if (list.querySelector(".text-muted")) list.innerHTML = "";
                 list.insertAdjacentHTML("beforeend", j.html);
                 form.reset();
+                rearm(form);
             });
         }).catch(function () {
+            rearm(form);
             alert("Could not post. Check your connection.");
         });
     });
@@ -91,9 +113,13 @@
                     }
                     form.closest("[data-block-form]").open = false;
                     form.reset();
+                    rearm(form);
                 });
             })
-            .catch(function () { alert("Could not block task."); });
+            .catch(function () {
+                rearm(form);
+                alert("Could not block task.");
+            });
     });
 
     // ------------------------------------------------------------ assignment

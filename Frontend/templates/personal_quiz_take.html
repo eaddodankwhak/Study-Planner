@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ quiz.title }} — Practice{% endblock %}
+{% block head %}<style>#quiz-timer.is-warning{color:var(--color-error, #b3261e);}</style>{% endblock %}
 {% block main %}
 <div class="dashboard-heading"><div><p class="text-muted mb-0">Private PDF practice</p><h1>{{ quiz.title }}</h1></div><strong id="quiz-timer" data-seconds="{{ quiz.duration_minutes * 60 }}">{{ quiz.duration_minutes }}:00</strong></div>
 <form id="personal-quiz-form" class="card" method="post" action="{{ url_for('personal_quiz_submit', quiz_id=quiz.id) }}">

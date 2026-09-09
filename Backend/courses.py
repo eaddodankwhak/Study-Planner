@@ -62,7 +62,9 @@ def _to_dict(row):
     code = d.get("course_code") or ""
     d["code"] = code
     d["title"] = d.get("title") or "To be assigned"
-    d["instructor"] = d.get("lecturer") or "To be assigned"
+    lecturer = d.get("lecturer") or "To be assigned"
+    d["lecturer"] = lecturer
+    d["instructor"] = lecturer
     d["credits"] = d.get("credits") or 0
     d["term"] = d.get("term") or DEFAULT_TERM
     d["color"] = d.get("color") or auto_color(code)
@@ -90,6 +92,66 @@ def get_course(user_id, course_id):
 def all_courses():
     """Raw rows across all users (used for resolver-style lookups)."""
     return db._query_all("SELECT * FROM courses")
+
+
+def update_course(user_id, course_id, **fields):
+    """Edit one course row in place, scoped to its owner.
+
+    The code is immutable once created (upsert keyed on UNIQUE(user_id,
+    course_code)); editing changes the title, lecturer, schedule, credits,
+    description, and colour so no duplicate row can ever be spawned by a
+    rename. Only the fields actually passed are changed — an omitted key is
+    left untouched, while an explicitly blank value clears the field. Returns
+    the fresh row, or None if it is not the user's course.
+    """
+    sets, params = [], []
+    for key in ("title", "lecturer", "schedule", "description"):
+        if key not in fields:
+            continue
+        value = (fields.get(key) or "").strip()
+        sets.append(f"{key} = ?")
+        params.append(value or None)
+    credits = fields.get("credits")
+    if credits is not None:
+        try:
+            credits = int(credits)
+        except (TypeError, ValueError):
+            credits = 0
+        sets.append("credits = ?")
+        params.append(credits)
+    color = (fields.get("color") or "").strip()
+    if color and color.lower() != "auto":
+        sets.append("color = ?")
+        params.append(color)
+    if not sets:
+        return get_course(user_id, course_id)
+
+    params += [course_id, user_id]
+    conn = db._conn_context()
+    try:
+        conn.execute(f"UPDATE courses SET {', '.join(sets)} WHERE id = ? AND user_id = ?", params)
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM courses WHERE id = ? AND user_id = ?",
+            (course_id, user_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    return _to_dict(row) if row else None
+
+
+def delete_course(user_id, course_id):
+    """Delete a course row, scoped to its owner."""
+    conn = db._conn_context()
+    try:
+        cur = conn.execute(
+            "DELETE FROM courses WHERE id = ? AND user_id = ?",
+            (course_id, user_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def upsert_course(user_id, course_code, id=None, **fields):

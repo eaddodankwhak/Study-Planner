@@ -68,6 +68,7 @@
         {% if deadlines %}
             <section class="card">
                 <h3 class="card__title">All Deadlines</h3>
+                <div class="table-scroll">
                 <table class="data-table">
                     <thead>
                         <tr><th>Item</th><th>Course</th><th>Type</th><th>Due</th><th>Weight</th><th>Effort</th><th>Status</th><th></th></tr>
@@ -90,16 +91,24 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if d.status != 'done' %}
+                                    <div class="inline-actions">
+                                        {% if d.status != 'done' %}
                                         <form action="{{ url_for('deadline_complete', deadline_id=d.id) }}" method="post" class="mb-0">
                                             <button class="button button--ghost button--small" type="submit">Mark done</button>
                                         </form>
-                                    {% endif %}
+                                        {% endif %}
+                                        <form action="{{ url_for('deadline_delete', deadline_id=d.id) }}" method="post" class="mb-0">
+                                            <input type="hidden" name="back" value="{{ url_for('deadlines') }}">
+                                            <button class="button button--ghost button--small" type="submit"
+                                                data-confirm="Delete this deadline and its lead-up steps? This cannot be undone.">Delete</button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
             </section>
         {% else %}
             <section class="card empty-state">

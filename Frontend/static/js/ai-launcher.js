@@ -61,8 +61,31 @@
     if (next) {
       var input = drawer.querySelector("input, textarea, button");
       if (input) input.focus();
+    } else {
+      launcher.focus();
     }
   }
+
+  // Keep Tab/Shift+Tab cycling inside the open drawer (focus trap).
+  function trapFocus(event) {
+    if (drawer.getAttribute("aria-hidden") !== "false") return;
+    var focusable = drawer.querySelectorAll("a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex='-1'])");
+    if (!focusable.length) return;
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  // Focus cannot leave the drawer with the keyboard while it is open.
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Tab") trapFocus(e);
+  });
 
   // Expose for the global AI hub controller + tests.
   window.AI_LAUNCHER = { toggle: toggleDrawer, isOpen: function () { return drawer.getAttribute("aria-hidden") === "false"; } };

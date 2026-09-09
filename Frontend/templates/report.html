@@ -22,6 +22,7 @@
             <div class="page-header__user">
                 <span class="page-header__welcome">{{ user.name if user else 'Student' }}</span>
                 <nav class="nav-bar">
+                    <a class="nav-bar__link" href="{{ url_for('home') }}">Dashboard</a>
                     <a class="nav-bar__link" href="{{ url_for('progress') }}">Back to Progress</a>
                 </nav>
             </div>

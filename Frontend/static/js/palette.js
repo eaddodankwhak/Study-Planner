@@ -15,9 +15,11 @@
     var list = palette.querySelector("[data-palette-list]");
     var hint = palette.querySelector("[data-palette-hint]");
     var selectedIndex = -1;
+    var lastTrigger = null;
 
     function open() {
         palette.classList.add("is-open");
+        palette.setAttribute("aria-hidden", "false");
         input.value = "";
         selectedIndex = -1;
         setTimeout(function () {
@@ -28,10 +30,41 @@
 
     function close() {
         palette.classList.remove("is-open");
+        palette.setAttribute("aria-hidden", "true");
+        if (lastTrigger && typeof lastTrigger.focus === "function") lastTrigger.focus();
     }
 
+    // Keep Tab/Shift+Tab cycling inside the open palette (focus trap).
+    function trapFocus(event) {
+        var anchors = list.querySelectorAll(".palette__item");
+        var focusable = anchors.length ? [input].concat(Array.prototype.slice.call(anchors)) : [input];
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    document.addEventListener("keydown", function (e) {
+        var open = palette.classList.contains("is-open");
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+            e.preventDefault();
+            open ? close() : open();
+        } else if (!open) {
+            return;
+        } else if (e.key === "Tab") {
+            trapFocus(e);
+        } else if (e.key === "Escape") {
+
     document.querySelectorAll("[data-palette-trigger]").forEach(function (trigger) {
-        trigger.addEventListener("click", open);
+        trigger.addEventListener("click", function () {
+            lastTrigger = trigger;
+            open();
+        });
     });
 
     // Show suggested pages when there is no query; otherwise filter.

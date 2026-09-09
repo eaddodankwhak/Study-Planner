@@ -228,6 +228,44 @@ def complete_deadline(user_id, deadline_id):
     return False
 
 
+def delete_deadline(user_id, deadline_id):
+    """Remove a deadline and the lead-up steps planned for it."""
+    data = load_all()
+    ud = _user_data(data, user_id)
+    if deadline_id not in ud.get("deadlines", {}):
+        return False
+    del ud["deadlines"][deadline_id]
+    ud["tasks"] = [t for t in ud.get("tasks", []) if t.get("deadline_id") != deadline_id]
+    save_all(data)
+    return True
+
+
+def unlink_course(user_id, course_id):
+    """Detach every planner record from a course without deleting it.
+
+    A deleted course must never leak id references into events, deadlines, or
+    tasks (which would cascade into broken 'owned by ghost course' rows). The
+    records themselves are worth keeping — the student still owes the work.
+    """
+    data = load_all()
+    ud = _user_data(data, user_id)
+    changed = False
+    for ev in ud.get("events", []):
+        if ev.get("course_id") == course_id:
+            ev["course_id"] = None
+            changed = True
+    for d in ud.get("deadlines", {}).values():
+        if d.get("course_id") == course_id:
+            d["course_id"] = None
+            changed = True
+    for t in ud.get("tasks", []):
+        if t.get("course_id") == course_id:
+            t["course_id"] = None
+            changed = True
+    if changed:
+        save_all(data)
+
+
 def parse_date(value):
     """Best-effort parse of a YYYY-MM-DD string into a date."""
     try:

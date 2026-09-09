@@ -133,9 +133,32 @@ AI_PROVIDERS = [
 @app.context_processor
 def inject_ai_launcher():
     """Give every rendered page the AI assistant launcher data (quick actions
-    and provider list are the single source of truth shared by drawer and page)."""
+    and provider list are the single source of truth shared by drawer and page).
+
+    The "Explain a topic" quick action's ``{subject}`` placeholder is resolved
+    to the student's first course here, so a tapped card always sends a filled
+    prompt instead of a literal placeholder.
+    """
+    subject_hint = "a topic you're studying"
+    uid = session.get("user_id")
+    if uid:
+        user_courses = planner.list_courses(uid)
+        if user_courses:
+            first = user_courses[0]
+            subject_hint = first.get("title") or first.get("code") or subject_hint
+    quick_actions = [
+        {
+            "label": action["label"],
+            "template": (
+                action["template"].replace("{subject}", subject_hint)
+                if "{subject}" in action["template"]
+                else action["template"]
+            ),
+        }
+        for action in AI_QUICK_ACTIONS
+    ]
     return {
-        "quick_actions": AI_QUICK_ACTIONS,
+        "quick_actions": quick_actions,
         "providers": AI_PROVIDERS,
         "user_settings": db.get_settings(session["user_id"]) if session.get("user_id") else None,
     }
@@ -957,6 +980,10 @@ def subject(slug):
         if course_id else []
     )
     course_notes = db.list_notes(user["id"], course_id=course_id) if course_id else []
+    course_events = (
+        [e for e in planner.list_events(user["id"]) if e.get("course_id") == course_id]
+        if course_id else []
+    )
 
     return render_template(
         "subject.html",
@@ -976,6 +1003,7 @@ def subject(slug):
         deadlines=course_deadlines,
         tasks=course_tasks,
         notes=course_notes,
+        calendar_events=course_events,
         preview_file=preview_file,
         preview_extension=preview_extension,
     )
@@ -1374,7 +1402,13 @@ def task_toggle(task_id):
 def courses():
     """Render the course & semester management page."""
     user = current_user()
-    return render_template("courses.html", user=user, active_nav="courses", courses=planner.list_courses(user["id"]))
+    return render_template(
+        "courses.html",
+        user=user,
+        active_nav="courses",
+        courses=planner.list_courses(user["id"]),
+        colors=courses_mod.COURSE_COLORS,
+    )
 
 
 @app.post("/courses")
@@ -1393,6 +1427,45 @@ def courses_add():
         color=request.form.get("color", ""),
     )
     flash("Course added.", "success")
+    return redirect(url_for("courses"))
+
+
+@app.post("/courses/<course_id>/update")
+@login_required
+def courses_update(course_id):
+    """Edit a course's mutable details in place (code is immutable)."""
+    user = current_user()
+    course = courses_mod.update_course(
+        user["id"],
+        course_id,
+        title=request.form.get("title", ""),
+        lecturer=request.form.get("lecturer", ""),
+        credits=request.form.get("credits", 0),
+        description=request.form.get("description", ""),
+        schedule=request.form.get("schedule", ""),
+        color=request.form.get("color", ""),
+    )
+    if course:
+        flash("Course updated.", "success")
+    else:
+        flash("Course not found.", "error")
+    return redirect(url_for("courses"))
+
+
+@app.post("/courses/<course_id>/delete")
+@login_required
+def courses_delete(course_id):
+    """Delete a course after detaching its planner and activity references."""
+    user = current_user()
+    planner.unlink_course(user["id"], course_id)
+    db.unlink_course_activity(user["id"], course_id)
+    if courses_mod.delete_course(user["id"], course_id):
+        flash(
+            "Course deleted. Its deadlines, notes and sessions were kept but unlinked.",
+            "success",
+        )
+    else:
+        flash("Course not found.", "error")
     return redirect(url_for("courses"))
 
 
@@ -1561,7 +1634,20 @@ def deadline_complete(deadline_id):
     user = current_user()
     planner.complete_deadline(user["id"], deadline_id)
     flash("Deadline marked complete.", "success")
-    return redirect(url_for("deadlines"))
+    return redirect(request.form.get("back") or url_for("deadlines"))
+
+
+@app.post("/deadlines/<deadline_id>/delete")
+@login_required
+def deadline_delete(deadline_id):
+    """Delete a deadline and its auto/manual lead-up steps."""
+    user = current_user()
+    if planner.delete_deadline(user["id"], deadline_id):
+        flash("Deadline and its lead-up steps deleted.", "success")
+    else:
+        flash("Deadline not found.", "error")
+    back = request.form.get("back") or url_for("deadlines")
+    return redirect(back)
 
 
 @app.post("/deadlines/<deadline_id>/plan")
@@ -1601,7 +1687,18 @@ def progress():
     """Render the Progress overview with real computed statistics."""
     user = current_user()
     overview = stats.overview(user["id"], db, planner)
-    return render_template("progress.html", user=user, active_nav="progress", stats=overview)
+    course_map = {c["id"]: c for c in planner.list_courses(user["id"])}
+    for s in overview["low_confidence_sessions"]:
+        s["_when"] = time.strftime("%b %d", time.localtime(s.get("started_at") or 0))
+        s["_course"] = course_map.get(s.get("course_id"))
+    return render_template(
+        "progress.html",
+        user=user,
+        active_nav="progress",
+        stats=overview,
+        course_map=course_map,
+        week=stats.weekly_minutes(user["id"], db),
+    )
 
 
 @app.get("/ai")
@@ -1637,6 +1734,8 @@ def session_page():
         task=task,
         course=course,
         courses=courses,
+        courses_by_id={c["id"]: c for c in courses},
+        tasks=planner.list_tasks(user["id"]),
         sessions=db.list_sessions(user["id"], limit=10),
     )
 
@@ -1678,9 +1777,16 @@ def session_complete():
 
     flash("Session recorded. Nice work!", "success")
 
-    # Route low-confidence, testable sessions into a quick quiz (Flow A).
+    # Route low-confidence, testable sessions into a course's practice tab —
+    # never into the invite-code entry page, which is a dead end for someone
+    # who just said "I'm lost".
     if conf is not None and conf <= 2:
-        return redirect(url_for("quiz_take_page"))
+        course = planner.get_course(user["id"], course_id) if course_id else None
+        if not course and slug:
+            course = get_subject(slug)
+        if course:
+            return redirect(courses_mod.course_url(course, "quizzes"))
+        return redirect(url_for("session_page"))
 
     back = request.form.get("back") or request.referrer or url_for("dashboard")
     return redirect(back)

@@ -1473,6 +1473,27 @@ def delete_session(session_id, user_id):
         conn.close()
 
 
+def unlink_course_activity(user_id, course_id):
+    """Detach notes and sessions from a course (keeps the records themselves).
+
+    Deleting a course orphans nothing: reflections the student wrote still
+    belong to them, they just stop pretending to belong to a ghost course.
+    """
+    conn = _conn_context()
+    try:
+        conn.execute(
+            "UPDATE notes SET course_id = NULL WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id),
+        )
+        conn.execute(
+            "UPDATE sessions SET course_id = NULL WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def minutes_by_day(user_id, days=14):
     """Return { 'YYYY-MM-DD': total_minutes } for the last N days of study + attempts."""
     conn = _conn_context()
