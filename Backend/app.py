@@ -9,6 +9,7 @@ Provides a Sakai-style interface with real authentication:
 - /about, /task, /progress, /onboarding, /session, /notes - login required
 """
 
+import hmac
 import json
 import math
 import os
@@ -32,6 +33,7 @@ from werkzeug.utils import secure_filename
 import collab
 import courses as courses_mod
 import db
+import google_auth
 import planner
 import stats
 import ai as ai_pkg
@@ -483,6 +485,14 @@ def login_post():
 
     user = db.get_user_by_email(email)
 
+    if user and not user.get("password"):
+        flash(
+            "This account signs in with Google. Use Continue with Google — or "
+            "set a password once you're signed in (Settings > Sign-in methods).",
+            "error",
+        )
+        return redirect(url_for("login"))
+
     # Hash comparison always runs against a real (or dummy) hash so response
     # timing does not reveal whether the email exists.
     stored = user["password"] if user else _DUMMY_PASSWORD_HASH
@@ -524,6 +534,144 @@ def logout():
     return redirect(url_for("login"))
 
 
+# ---------------------------------------------------------------------------
+# Sign in with Google (OAuth 2.0, PKCE). Configured once in Settings with a
+# free Google OAuth Client ID (Desktop app type); the code exchange runs with
+# PKCE and needs no client secret.
+# ---------------------------------------------------------------------------
+
+def get_google_client_id():
+    return (db.get_app_config("google_client_id") or "").strip()
+
+
+@app.get("/oauth/google/start")
+def oauth_google_start():
+    """Begin the Google sign-in flow (no login required)."""
+    client_id = get_google_client_id()
+    if not client_id:
+        flash(
+            "Google sign-in isn't set up yet. Sign in with your password, then "
+            "add your Google OAuth Client ID in Settings > Sign-in methods.",
+            "error",
+        )
+        return redirect(url_for("login"))
+
+    session["google_state"] = google_auth.new_state()
+    session["google_verifier"] = google_auth.new_code_verifier()
+    redirect_to = google_auth.redirect_uri(request.url_root)
+    url = google_auth.authorize_url(
+        client_id,
+        redirect_to,
+        session["google_state"],
+        google_auth.code_challenge(session["google_verifier"]),
+    )
+    return redirect(url)
+
+
+@app.get("/oauth/google/callback")
+def oauth_google_callback():
+    """Handle Google's redirect; verify, link-or-create, and sign in."""
+    if request.args.get("error"):
+        flash("You cancelled the Google sign-in.", "error")
+        return redirect(url_for("login"))
+
+    state = session.pop("google_state", None)
+    verifier = session.pop("google_verifier", None)
+    if not state or not verifier or not hmac.compare_digest(state, request.args.get("state", "")):
+        flash("The Google sign-in request was invalid or expired. Please try again.", "error")
+        return redirect(url_for("login"))
+
+    client_id = get_google_client_id()
+    if not client_id:
+        flash("Google sign-in isn't configured. Add your Client ID in Settings.", "error")
+        return redirect(url_for("login"))
+
+    code = request.args.get("code", "")
+    redirect_uri_value = google_auth.redirect_uri(request.url_root)
+    try:
+        token = google_auth.exchange_code(client_id, redirect_uri_value, verifier, code)
+        claims = google_auth.verify_id_token(token["id_token"], client_id)
+    except google_auth.GoogleAuthError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("login"))
+
+    email = (claims.get("email") or "").strip().lower()
+    sub = claims.get("sub", "")
+    name = (claims.get("name") or "").strip() or email.rsplit("@", 1)[0]
+
+    user = db.get_user_by_google_sub(sub) or db.get_user_by_email(email)
+    if user:
+        if not user.get("google_sub"):
+            db.set_user_google_sub(user["id"], sub)
+        session["user_id"] = user["id"]
+        flash(f"Welcome back, {user['name']}!", "success")
+        return redirect(url_for("home"))
+
+    user_id = uuid.uuid4().hex
+    db.create_user(user_id, name, email, "", google_sub=sub)
+    session["user_id"] = user_id
+    flash(f"Welcome! Your {name} account was created with Google.", "success")
+    return redirect(url_for("onboarding"))
+
+
+@app.post("/settings/password")
+@login_required
+def settings_password():
+    """Set a password (for Google-created accounts) or change it.
+
+    Supports both sign-in paths: an account created with Google has no
+    password yet (no current-password step), and once one is set the user can
+    sign in with either method. Accounts created with a password must confirm
+    the current one before changing.
+    """
+    user = current_user()
+    current = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    confirm = request.form.get("confirm_password", "")
+
+    if len(new_password) < 8:
+        flash("New password must be at least 8 characters.", "error")
+        return redirect(url_for("settings"))
+
+    if new_password != confirm:
+        flash("New password and confirmation do not match.", "error")
+        return redirect(url_for("settings"))
+
+    if user.get("password"):
+        if not check_password_hash(user["password"], current):
+            flash("Current password is incorrect.", "error")
+            return redirect(url_for("settings"))
+
+    db.update_user_password(user["id"], generate_password_hash(new_password))
+    flash("Password saved. You can now sign in with your password or Google.", "success")
+    return redirect(url_for("settings"))
+
+
+@app.post("/settings/signin")
+@login_required
+def settings_signin():
+    """Save or remove the Google OAuth Client ID (app-level, first-time setup)."""
+    client_id = (request.form.get("google_client_id") or "").strip()
+    remove = request.form.get("remove") == "1"
+    if remove:
+        db.delete_app_config("google_client_id")
+        flash("Google sign-in removed. Manual email/password login still works.", "success")
+        return redirect(url_for("settings"))
+    if not client_id:
+        flash("Paste your Google OAuth Client ID to enable Google sign-in.", "error")
+        return redirect(url_for("settings"))
+    if len(client_id) < 10 or not re.fullmatch(r"[A-Za-z0-9\-._~]+", client_id):
+        flash(
+            "That doesn't look like a Google OAuth Client ID "
+            "(they end in '-apps.googleusercontent.com').",
+            "error",
+        )
+        return redirect(url_for("settings"))
+    db.set_app_config("google_client_id", client_id)
+    flash("Google sign-in is set up. It now appears on the login page.", "success")
+    return redirect(url_for("settings"))
+
+
 @app.get("/settings")
 @login_required
 def settings():
@@ -538,6 +686,8 @@ def settings():
         workspaces=db.collab_workspaces_for(user["id"]),
         ai_connections=ai_connections,
         ai_connections_by_provider={c["provider"]: c for c in ai_connections},
+        google_client_id=get_google_client_id(),
+        user_has_password=bool(user.get("password")),
     )
 
 

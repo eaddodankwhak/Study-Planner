@@ -295,11 +295,62 @@
             <div class="form-actions"><button class="button button--primary" type="submit">Save profile</button>
             </div>
         </form>
-        <div class="settings-row settings-disabled">
-            <div class="settings-row__copy"><strong>Change password</strong><small>Requires current-password
-                    confirmation and a secure password flow.</small></div><button class="button button--ghost"
-                type="button" disabled>Coming soon</button>
+    </section>
+
+    <section class="card settings-panel" aria-labelledby="signin-heading">
+        <div class="settings-panel__header">
+            <h3 class="card__title" id="signin-heading">Sign-in methods</h3><span class="text-muted">More ways in is
+                always better</span>
         </div>
+        <p class="settings-panel__intro">Sign in with a Google account and/or a password — either one works, and you
+            can add the other later.</p>
+
+        <div class="settings-row{{ '' if user_has_password else ' settings-disabled' }}">
+            <div class="settings-row__copy"><strong>Password</strong><small>{% if user_has_password %}Signed in with a
+                    password — change it below, or keep using Google.{% else %}Your account was created with Google and
+                    has no password yet — set one to also sign in manually.{% endif %}</small></div>
+        </div>
+        <form method="post" action="{{ url_for('settings_password') }}" class="settings-form">
+            {% if user_has_password %}
+            <div class="form-field"><label class="form-label" for="current_password">Current password</label><input
+                    class="form-input" id="current_password" name="current_password" type="password"
+                    autocomplete="current-password" required></div>
+            {% endif %}
+            <div class="settings-inline">
+                <div class="form-field"><label class="form-label" for="new_password">New password</label><input
+                        class="form-input" id="new_password" name="new_password" type="password" minlength="8"
+                        autocomplete="new-password" required><small class="text-muted">At least 8 characters.</small></div>
+                <div class="form-field"><label class="form-label" for="confirm_password">Confirm new
+                        password</label><input class="form-input" id="confirm_password" name="confirm_password"
+                        type="password" minlength="8" autocomplete="new-password" required></div>
+            </div>
+            <button class="button button--primary" type="submit">{% if user_has_password %}Change
+                password{% else %}Set a password{% endif %}</button>
+        </form>
+
+        <hr class="settings-rule">
+
+        <div class="settings-row">
+            <div class="settings-row__copy"><strong>Google</strong><small>{% if google_client_id %}Connected — "Continue
+                    with Google" is live on the login and sign-up pages.{% else %}Not set up — sign in with your
+                    password, then paste a Google OAuth Client ID below to turn on Google sign-in.{% endif %}</small></div>
+        </div>
+        <form method="post" action="{{ url_for('settings_signin') }}" class="settings-form">
+            <div class="settings-inline">
+                <div class="form-field"><label class="form-label" for="google_client_id">Google OAuth Client ID</label><input
+                        class="form-input" id="google_client_id" name="google_client_id"
+                        value="{{ google_client_id or '' }}" placeholder="xxxx.apps.googleusercontent.com"
+                        autocomplete="off"><small class="text-muted">Free to create: Google Cloud Console → APIs &
+                        Services → Credentials → Create OAuth Client ID → <em>Desktop app</em> → copy the Client ID. The
+                        callback URL this app uses is
+                        http://localhost:PORT/oauth/google/callback.</small></div>
+            </div>
+            <div class="form-actions">
+                <button class="button button--primary" type="submit">Save Google client ID</button>
+                {% if google_client_id %}<button class="button button--ghost" type="submit" name="remove"
+                    value="1">Remove</button>{% endif %}
+            </div>
+        </form>
     </section>
 
     <section class="card settings-panel" aria-labelledby="notifications-heading">

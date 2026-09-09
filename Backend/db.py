@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS users (
     onboarded   INTEGER DEFAULT 0,
     available_hours REAL DEFAULT 4,
     ai_model    TEXT,
-    ai_level    TEXT
+    ai_level    TEXT,
+    google_sub  TEXT
 );
 
 -- Courses are the single source of truth shared by the dashboard "My Subjects"
@@ -86,6 +87,13 @@ CREATE TABLE IF NOT EXISTS memberships (
 CREATE TABLE IF NOT EXISTS subject_codes (
     slug TEXT PRIMARY KEY,
     code TEXT NOT NULL
+);
+
+-- App-level configuration (single row per key): currently the Google OAuth
+-- Client ID used by "Continue with Google" on the login/signup pages.
+CREATE TABLE IF NOT EXISTS app_config (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS materials (
@@ -464,6 +472,8 @@ def _migrate_add_columns(conn):
         conn.execute("ALTER TABLE users ADD COLUMN avatar_path TEXT")
     if "settings_json" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN settings_json TEXT")
+    if "google_sub" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
 
 
 def normalize_course_code(value):
@@ -625,16 +635,51 @@ def get_user_by_email(email):
     return user_to_dict(row) if row else None
 
 
-def create_user(user_id, name, email, password_hash):
+def create_user(user_id, name, email, password_hash, google_sub=None):
     conn = _conn_context()
     try:
         conn.execute(
-            "INSERT INTO users (id, name, email, password, onboarded) VALUES (?, ?, ?, ?, 0)",
-            (user_id, name, email, password_hash),
+            "INSERT INTO users (id, name, email, password, onboarded, google_sub) VALUES (?, ?, ?, ?, 0, ?)",
+            (user_id, name, email, password_hash, google_sub),
         )
         conn.commit()
     finally:
         conn.close()
+
+
+def get_user_by_google_sub(google_sub):
+    if not google_sub:
+        return None
+    row = _query_one("SELECT * FROM users WHERE google_sub = ?", (google_sub,))
+    return user_to_dict(row) if row else None
+
+
+def set_user_google_sub(user_id, google_sub):
+    """Link an account to its Google identity (used for Google sign-in)."""
+    if not google_sub:
+        return
+    _execute("UPDATE users SET google_sub = ? WHERE id = ?", (google_sub, user_id))
+
+
+def update_user_password(user_id, password_hash):
+    _execute("UPDATE users SET password = ? WHERE id = ?", (password_hash, user_id))
+
+
+# ------------------------------------------------------------------- config
+
+def get_app_config(key, default=""):
+    """Read a single app-level configuration value (e.g. google_client_id)."""
+    row = _query_one("SELECT value FROM app_config WHERE key = ?", (key,))
+    return row["value"] if row else default
+
+
+def set_app_config(key, value):
+    """Store (or update) one app-level configuration value."""
+    _execute("INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)", (key, str(value or "")))
+
+
+def delete_app_config(key):
+    _execute("DELETE FROM app_config WHERE key = ?", (key,))
 
 
 def update_user(user_id, fields):
