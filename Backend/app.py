@@ -27,6 +27,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -104,6 +105,10 @@ app = Flask(
     template_folder="../Frontend/templates",
     static_folder="../Frontend/static",
 )
+
+# Trust X-Forwarded headers from Render's proxy so redirect()/url_for generate
+# https URLs after the request has been passed through the edge network.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # Secret key for session cookies. In production, move this to an env variable.
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "study-planner-dev-secret")
@@ -909,13 +914,9 @@ def delete_account():
 
 
 def _column_exists(table):
+    """Backend-agnostic table-existence check (SQLite or Postgres)."""
     try:
-        conn = db.connect()
-        rows = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?", (table,)
-        ).fetchall()
-        conn.close()
-        return len(rows) > 0
+        return db.table_exists(table)
     except Exception:
         return False
 
@@ -2077,4 +2078,8 @@ def notes_delete(note_id):
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    # Bind to the PORT provided by the host (Render sets PORT; default 5000 for
+    # local runs). Debug is off by default so production workers are safe.
+    port = int(os.environ.get("PORT", "5000"))
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)

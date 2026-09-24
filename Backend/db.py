@@ -101,7 +101,8 @@ CREATE TABLE IF NOT EXISTS materials (
     slug        TEXT NOT NULL,
     filename    TEXT NOT NULL,
     uploader_id TEXT,
-    date        TEXT
+    date        TEXT,
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS quizzes (
@@ -111,7 +112,8 @@ CREATE TABLE IF NOT EXISTS quizzes (
     description    TEXT,
     creator        TEXT,
     invite_code    TEXT,
-    questions_json TEXT
+    questions_json TEXT,
+    created_at     TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS attempts (
@@ -120,7 +122,8 @@ CREATE TABLE IF NOT EXISTS attempts (
     user_id TEXT,
     score   INTEGER,
     total   INTEGER,
-    date    TEXT
+    date    TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Private PDF practice quizzes. Answer keys are deliberately stored only
@@ -218,6 +221,52 @@ CREATE TABLE IF NOT EXISTS sessions (
     confidence    INTEGER,
     notes         TEXT
 );
+
+-- Planning pillars (planner events/deadlines/tasks). Previously kept in
+-- Database/planner.json; now rows here so every backend is one database.
+CREATE TABLE IF NOT EXISTS planner_events (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    type        TEXT,
+    title       TEXT,
+    course_id   TEXT,
+    start       TEXT,
+    duration_minutes INTEGER,
+    recurrence  TEXT,
+    weekday     TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_events_user ON planner_events (user_id);
+
+CREATE TABLE IF NOT EXISTS planner_deadlines (
+    id              TEXT PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    course_id       TEXT,
+    title           TEXT,
+    type            TEXT,
+    due_date        TEXT,
+    weight          REAL,
+    estimated_hours REAL,
+    steps_json      TEXT,
+    status          TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_deadlines_user ON planner_deadlines (user_id);
+
+CREATE TABLE IF NOT EXISTS planner_tasks (
+    id                TEXT PRIMARY KEY,
+    user_id           TEXT NOT NULL,
+    deadline_id       TEXT,
+    course_id         TEXT,
+    title             TEXT,
+    due_date          TEXT,
+    estimated_minutes INTEGER,
+    priority          TEXT,
+    status            TEXT,
+    auto              INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_tasks_user ON planner_tasks (user_id);
 
 -- ---------------------------------------------------------------------------
 -- Collaborative workspace tables (Backend/collaboration/).
@@ -392,12 +441,34 @@ CREATE INDEX IF NOT EXISTS idx_collab_requests_ws ON information_requests (works
 _COLUMN_CACHE = {}
 
 
+def using_postgres():
+    """True when DATABASE_URL is set (production/Neon), else local SQLite."""
+    return bool(os.environ.get("DATABASE_URL"))
+
+
+# PostgreSQL variant of the schema: only the id generator and timestamp
+# default differ, everything else is shared. Postgres additionally relies on
+# the created_at columns (added above) for insertion-order queries.
+_SCHEMA_PG = _SCHEMA.replace(
+    "INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY"
+).replace("datetime('now')", "CURRENT_TIMESTAMP")
+
+
 def ensure_db_file():
-    os.makedirs(INSTANCE_DIR, exist_ok=True)
+    if not using_postgres():
+        os.makedirs(INSTANCE_DIR, exist_ok=True)
 
 
 def connect():
-    """Open a new SQLite connection with row access by name."""
+    """Open a connection with row access by name.
+
+    Returns a Postgres wrapper when DATABASE_URL is set, otherwise the local
+    SQLite database file. The wrapper mirrors the sqlite3 API surface, so the
+    rest of the layer does not care which backend it is talking to.
+    """
+    if using_postgres():
+        import pg
+        return pg.connect(os.environ["DATABASE_URL"])
     ensure_db_file()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -409,7 +480,11 @@ def init_db():
     """Create tables if they do not yet exist."""
     conn = connect()
     try:
-        conn.executescript(_SCHEMA)
+        if using_postgres():
+            # Teach the wrapper which tables own SERIAL ids (for lastrowid).
+            import pg
+            pg.configure_schema(_SCHEMA_PG)
+        conn.executescript(_SCHEMA_PG if using_postgres() else _SCHEMA)
         _migrate_add_columns(conn)
         _migrate_legacy_courses(conn)
         _migrate_ai_connections_schema(conn)
@@ -426,6 +501,9 @@ def _migrate_ai_connections_schema(conn):
     legacy planner legacy row. Recreate the table from the canonical (FK-free)
     schema when the old definition is detected; otherwise nothing happens.
     """
+    if using_postgres():
+        # Fresh Postgres schema is always the canonical definition.
+        return
     row = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'ai_connections'"
     ).fetchone()
@@ -461,7 +539,15 @@ def _migrate_ai_connections_schema(conn):
 
 def _migrate_add_columns(conn):
     """Apply lightweight schema migrations to already-created databases."""
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if using_postgres():
+        cols = {
+            r["column_name"] for r in _query_all(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = 'users'"
+            )
+        }
+    else:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
     if "available_hours" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN available_hours REAL DEFAULT 4")
     if "notify_digest" not in cols:
@@ -488,53 +574,22 @@ def normalize_course_code(value):
 
 
 def _migrate_legacy_courses(conn):
-    """One-time move of the two legacy course stores into the courses table.
+    """One-time backfill of course stubs from onboarding codes.
 
-    Runs on every boot through INSERT OR IGNORE, so it is idempotent:
+    idempotent through INSERT OR IGNORE:
 
-      1. planner.json courses keep their legacy uuid ids — this preserves the
-         course_id links held by planner events/deadlines/tasks.
-      2. onboarding codes in users.courses_json become stub rows (no title), so
-         a not-yet-completed course shows "To be assigned" and can be completed
-         later by the /courses form (upsert, never a duplicate).
+      onboarding codes in users.courses_json become stub rows (no title), so
+      a not-yet-completed course shows "To be assigned" and can be completed
+      later by the /courses form (upsert, never a duplicate).
 
     The stub ids are deterministic (uuid5 of the user+code) so a re-run cannot
     spawn a second row. Full courses added going forward use random uuids.
     """
-    try:
-        import planner as _planner
-        doc = _planner.load_all()
-    except Exception:
-        doc = {}
-    if isinstance(doc, dict):
-        for user_id, block in doc.items():
-            if not isinstance(block, dict):
-                continue
-            for cid, c in (block.get("courses") or {}).items():
-                if not isinstance(c, dict):
-                    continue
-                try:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO courses "
-                        "(id, user_id, course_code, title, lecturer, credits, "
-                        "description, schedule, color, term) "
-                        "VALUES (?,?,?,?,?,?,?,?,?,?)",
-                        (
-                            str(cid),
-                            str(user_id),
-                            normalize_course_code(c.get("code") or ""),
-                            (c.get("title") or "").strip() or None,
-                            (c.get("lecturer") or "").strip() or None,
-                            int(c.get("credits") or 0),
-                            (c.get("description") or "").strip() or None,
-                            (c.get("schedule") or "").strip() or None,
-                            (c.get("color") or "").strip() or None,
-                            (c.get("term") or "").strip() or None,
-                        ),
-                    )
-                except sqlite3.IntegrityError:
-                    # Legacy rows can reference users that no longer exist.
-                    continue
+    if not using_postgres():
+        try:
+            from sqlite3 import IntegrityError as _IntegrityError
+        except Exception:  # pragma: no cover
+            _IntegrityError = Exception
 
     for row in conn.execute("SELECT id, courses_json FROM users").fetchall():
         try:
@@ -2168,14 +2223,34 @@ def reset_db_for_tests():
     """Drop all tables and recreate (used by tests)."""
     conn = _conn_context()
     try:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-        )
-        tables = [r["name"] for r in cur.fetchall()]
+        cur = conn.cursor() if not using_postgres() else conn.execute
+        if using_postgres():
+            rows = _query_all(
+                "SELECT tablename AS name FROM pg_tables "
+                "WHERE schemaname = 'public'"
+            )
+            tables = [r["name"] for r in rows]
+        else:
+            cur.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )
+            tables = [r["name"] for r in cur.fetchall()]
         for t in tables:
-            conn.execute(f'DROP TABLE IF EXISTS "{t}"')
+            if using_postgres():
+                conn.execute(f'DROP TABLE IF EXISTS "{t}" CASCADE')
+            else:
+                conn.execute(f'DROP TABLE IF EXISTS "{t}"')
         conn.commit()
     finally:
         conn.close()
     init_db()
+
+
+def table_exists(name):
+    """True when a table with the given name exists in the active backend."""
+    if using_postgres():
+        sql = ("SELECT 1 FROM information_schema.tables "
+               "WHERE table_schema = 'public' AND table_name = ?")
+    else:
+        sql = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"
+    return _query_one(sql, (name,)) is not None

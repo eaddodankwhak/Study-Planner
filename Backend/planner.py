@@ -1,27 +1,25 @@
 """Data persistence for the Study Planner planning features.
 
-Stores each student's courses, calendar events, deadlines, and tasks in a
-single JSON file (Database/planner.json), keyed by user id.
+Stores each student's calendar events, deadlines, and tasks in the database
+(planner_events / planner_deadlines / planner_tasks tables) so every backend
+keeps the data in one place. In a local SQLite file the rows land in
+instance/study_planner.db; with DATABASE_URL set they live in Postgres.
+Courses live in the shared courses table via Backend/courses.py.
 
-Entities:
-    Course  - code, title, lecturer, credits, description, schedule, color
-    Event   - calendar event (lecture/tutorial/lab/exam/other) with optional
-              weekly recurrence rule
-    Deadline- graded deliverable: type, due date, weight, estimated hours,
-              plus manually entered lead-up steps (tasks)
-    Task    - a study/lead-up task tied to a course and optionally a deadline
+Entity shapes (returned by the read helpers):
+
+    Event    id,type,title,course_id,start,duration_minutes,recurrence,weekday
+    Deadline id,course_id,title,type,due_date,weight,estimated_hours,steps,status
+    Task     id,deadline_id,course_id,title,due_date,estimated_minutes,
+             priority,status,auto
 """
 
 import json
-import os
 import uuid
 from datetime import datetime, timedelta
 
+import db
 import courses
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
-PLANNER_FILE = os.path.join(DATABASE_DIR, "planner.json")
 
 DEADLINE_TYPES = [
     "assignment",
@@ -45,30 +43,120 @@ EVENT_TYPES = [
 TASK_PRIORITIES = ["high", "medium", "low"]
 
 
-def _empty():
-    return {"courses": {}, "events": [], "deadlines": {}, "tasks": []}
-
+# ---------------------------------------------------------------------------
+# Whole-document helpers (compat surface used by tests and /export)
+# ---------------------------------------------------------------------------
 
 def load_all():
-    """Load the whole planner document (a map of user_id -> user planner block)."""
-    if not os.path.exists(PLANNER_FILE):
-        return {}
-    with open(PLANNER_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    """Reconstruct the full planner document as a user_id -> block dict.
+
+    Kept for compatibility with callers that still think in terms of the old
+    planner.json document (tests, export). By default (empty data) this is {}.
+    """
+    rows = db._query_all(
+        "SELECT DISTINCT user_id FROM planner_events "
+        "UNION SELECT DISTINCT user_id FROM planner_deadlines "
+        "UNION SELECT DISTINCT user_id FROM planner_tasks"
+    )
+    doc = {}
+    for row in rows:
+        uid = row["user_id"]
+        events = [e for e in list_events(uid)]
+        deadlines = {d["id"]: d for d in list_deadlines(uid)}
+        tasks = [t for t in list_tasks(uid)]
+        doc[uid] = {
+            "courses": {},
+            "events": events,
+            "deadlines": deadlines,
+            "tasks": tasks,
+        }
+    return doc
 
 
 def save_all(data):
-    """Persist the whole planner document."""
-    os.makedirs(DATABASE_DIR, exist_ok=True)
-    with open(PLANNER_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    """Persist a whole planner document into the planner tables.
 
-
-def _user_data(data, user_id):
-    """Return (and lazily create) the planner data block for one user."""
-    if user_id not in data:
-        data[user_id] = {"courses": {}, "events": [], "deadlines": {}, "tasks": []}
-    return data[user_id]
+    For every user block in ``data`` the planner rows are replaced, so passing
+    back a pruned dict removes the dropped users' rows.
+    """
+    conn = db._conn_context()
+    try:
+        for user_id, block in (data or {}).items():
+            if not isinstance(block, dict):
+                continue
+            conn.execute("DELETE FROM planner_events WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM planner_deadlines WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM planner_tasks WHERE user_id = ?", (user_id,))
+            for ev in block.get("events") or []:
+                conn.execute(
+                    "INSERT INTO planner_events "
+                    "(id, user_id, type, title, course_id, start, "
+                    " duration_minutes, recurrence, weekday) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                    (
+                        ev.get("id") or uuid.uuid4().hex,
+                        user_id,
+                        ev.get("type", "other"),
+                        (ev.get("title") or "").strip(),
+                        ev.get("course_id"),
+                        ev.get("start", ""),
+                        int(ev.get("duration_minutes") or 60),
+                        ev.get("recurrence", "none"),
+                        ev.get("weekday", ""),
+                    ),
+                )
+            for d in (block.get("deadlines") or {}).values():
+                conn.execute(
+                    "INSERT INTO planner_deadlines "
+                    "(id, user_id, course_id, title, type, due_date, weight, "
+                    " estimated_hours, steps_json, status) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        d.get("id") or uuid.uuid4().hex,
+                        user_id,
+                        d.get("course_id"),
+                        (d.get("title") or "").strip(),
+                        d.get("type", "assignment"),
+                        d.get("due_date", ""),
+                        float(d.get("weight") or 0),
+                        float(d.get("estimated_hours") or 0),
+                        json.dumps(list(d.get("steps") or [])),
+                        d.get("status", "open"),
+                    ),
+                )
+            for t in block.get("tasks") or []:
+                conn.execute(
+                    "INSERT INTO planner_tasks "
+                    "(id, user_id, deadline_id, course_id, title, due_date, "
+                    " estimated_minutes, priority, status, auto) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        t.get("id") or uuid.uuid4().hex,
+                        user_id,
+                        t.get("deadline_id"),
+                        t.get("course_id"),
+                        (t.get("title") or "").strip(),
+                        t.get("due_date", ""),
+                        int(t.get("estimated_minutes") or 60),
+                        t.get("priority", "medium"),
+                        t.get("status", "todo"),
+                        1 if t.get("auto") else 0,
+                    ),
+                )
+        present = set((data or {}).keys())
+        for table in ("planner_events", "planner_deadlines", "planner_tasks"):
+            uids = conn.execute(
+                f"SELECT DISTINCT user_id FROM {table}"
+            ).fetchall()
+            for row in uids:
+                if row["user_id"] not in present:
+                    conn.execute(
+                        f"DELETE FROM {table} WHERE user_id = ?",
+                        (row["user_id"],),
+                    )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +168,7 @@ def list_courses(user_id):
 
     Courses moved out of planner.json into Backend/courses.py: the dashboard,
     /courses, and onboarding all read the one table, so the views stay in
-    agreement. planner.json still owns events, deadlines, and tasks.
+    agreement.
     """
     return courses.get_user_courses(user_id)
 
@@ -98,17 +186,26 @@ def create_course(user_id, **fields):
 # Events
 # ---------------------------------------------------------------------------
 
+def _event_dict(row):
+    d = dict(row)
+    d.pop("user_id", None)
+    return d
+
+
 def list_events(user_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    return sorted(ud.get("events", []), key=lambda e: e.get("start", ""))
+    rows = db._query_all(
+        "SELECT id, type, title, course_id, start, duration_minutes, "
+        "recurrence, weekday FROM planner_events WHERE user_id = ? "
+        "ORDER BY start",
+        (user_id,),
+    )
+    return [_event_dict(r) for r in rows]
 
 
 def create_event(user_id, **fields):
-    data = load_all()
-    ud = _user_data(data, user_id)
+    event_id = uuid.uuid4().hex
     event = {
-        "id": uuid.uuid4().hex,
+        "id": event_id,
         "type": fields.get("type", "other"),
         "title": fields.get("title", "").strip(),
         "course_id": fields.get("course_id"),
@@ -117,40 +214,69 @@ def create_event(user_id, **fields):
         "recurrence": fields.get("recurrence", "none"),  # none|weekly
         "weekday": fields.get("weekday", ""),
     }
-    ud.setdefault("events", []).append(event)
-    save_all(data)
+    db._execute(
+        "INSERT INTO planner_events "
+        "(id, user_id, type, title, course_id, start, duration_minutes, "
+        " recurrence, weekday) VALUES (?,?,?,?,?,?,?,?,?)",
+        (
+            event_id,
+            user_id,
+            event["type"],
+            event["title"],
+            event["course_id"],
+            event["start"],
+            event["duration_minutes"],
+            event["recurrence"],
+            event["weekday"],
+        ),
+    )
     return event
 
 
 def delete_event(user_id, event_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    ud["events"] = [e for e in ud.get("events", []) if e.get("id") != event_id]
-    save_all(data)
+    db._execute(
+        "DELETE FROM planner_events WHERE user_id = ? AND id = ?",
+        (user_id, event_id),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Deadlines
 # ---------------------------------------------------------------------------
 
+def _deadline_dict(row):
+    d = dict(row)
+    d.pop("user_id", None)
+    try:
+        d["steps"] = json.loads(d.pop("steps_json") or "[]")
+    except (TypeError, ValueError):
+        d["steps"] = []
+    return d
+
+
 def list_deadlines(user_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    return list(ud.get("deadlines", {}).values())
+    rows = db._query_all(
+        "SELECT id, user_id, course_id, title, type, due_date, weight, "
+        "estimated_hours, steps_json, status FROM planner_deadlines "
+        "WHERE user_id = ? ORDER BY due_date",
+        (user_id,),
+    )
+    return [_deadline_dict(r) for r in rows]
 
 
 def get_deadline(user_id, deadline_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    return ud.get("deadlines", {}).get(deadline_id)
+    row = db._query_one(
+        "SELECT id, user_id, course_id, title, type, due_date, weight, "
+        "estimated_hours, steps_json, status FROM planner_deadlines "
+        "WHERE user_id = ? AND id = ?",
+        (user_id, deadline_id),
+    )
+    return _deadline_dict(row) if row else None
 
 
 def create_deadline(user_id, **fields):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    deadlines = ud.setdefault("deadlines", {})
     deadline_id = uuid.uuid4().hex
-    deadlines[deadline_id] = {
+    deadline = {
         "id": deadline_id,
         "course_id": fields.get("course_id"),
         "title": fields.get("title", "").strip(),
@@ -161,34 +287,79 @@ def create_deadline(user_id, **fields):
         "steps": [],
         "status": "open",
     }
-    save_all(data)
-    return deadlines[deadline_id]
+    db._execute(
+        "INSERT INTO planner_deadlines "
+        "(id, user_id, course_id, title, type, due_date, weight, "
+        " estimated_hours, steps_json, status) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (
+            deadline_id,
+            user_id,
+            deadline["course_id"],
+            deadline["title"],
+            deadline["type"],
+            deadline["due_date"],
+            deadline["weight"],
+            deadline["estimated_hours"],
+            "[]",
+            deadline["status"],
+        ),
+    )
+    return deadline
+
+
+def _deadline_steps(conn, user_id, deadline_id):
+    rows = conn.execute(
+        "SELECT id FROM planner_tasks WHERE user_id = ? AND deadline_id = ?",
+        (user_id, deadline_id),
+    ).fetchall()
+    return [r["id"] for r in rows]
+
+
+def _apply_deadline_steps(conn, user_id, deadline_id):
+    steps = _deadline_steps(conn, user_id, deadline_id)
+    conn.execute(
+        "UPDATE planner_deadlines SET steps_json = ? "
+        "WHERE user_id = ? AND id = ?",
+        (json.dumps(steps), user_id, deadline_id),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Tasks (manual lead-up steps tied to a deadline)
 # ---------------------------------------------------------------------------
 
+def _task_dict(row):
+    d = dict(row)
+    d.pop("user_id", None)
+    d["auto"] = bool(d["auto"])
+    return d
+
+
 def list_tasks(user_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    return sorted(ud.get("tasks", []), key=lambda t: t.get("due_date", ""))
+    rows = db._query_all(
+        "SELECT id, user_id, deadline_id, course_id, title, due_date, "
+        "estimated_minutes, priority, status, auto FROM planner_tasks "
+        "WHERE user_id = ? ORDER BY due_date",
+        (user_id,),
+    )
+    return [_task_dict(r) for r in rows]
 
 
 def get_task(user_id, task_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    for t in ud.get("tasks", []):
-        if t.get("id") == task_id:
-            return t
-    return None
+    row = db._query_one(
+        "SELECT id, user_id, deadline_id, course_id, title, due_date, "
+        "estimated_minutes, priority, status, auto FROM planner_tasks "
+        "WHERE user_id = ? AND id = ?",
+        (user_id, task_id),
+    )
+    return _task_dict(row) if row else None
 
 
 def add_task(user_id, **fields):
-    data = load_all()
-    ud = _user_data(data, user_id)
+    task_id = uuid.uuid4().hex
     task = {
-        "id": uuid.uuid4().hex,
+        "id": task_id,
         "deadline_id": fields.get("deadline_id"),
         "course_id": fields.get("course_id"),
         "title": fields.get("title", "").strip(),
@@ -196,47 +367,88 @@ def add_task(user_id, **fields):
         "estimated_minutes": int(fields.get("estimated_minutes") or 60),
         "priority": fields.get("priority", "medium"),
         "status": "todo",
+        "auto": False,
     }
-    ud.setdefault("tasks", []).append(task)
-    deadline_id = fields.get("deadline_id")
-    if deadline_id and deadline_id in ud.get("deadlines", {}):
-        ud["deadlines"][deadline_id].setdefault("steps", []).append(task["id"])
-    save_all(data)
+    conn = db._conn_context()
+    try:
+        conn.execute(
+            "INSERT INTO planner_tasks "
+            "(id, user_id, deadline_id, course_id, title, due_date, "
+            " estimated_minutes, priority, status, auto) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (
+                task_id,
+                user_id,
+                task["deadline_id"],
+                task["course_id"],
+                task["title"],
+                task["due_date"],
+                task["estimated_minutes"],
+                task["priority"],
+                task["status"],
+                0,
+            ),
+        )
+        if task["deadline_id"]:
+            _apply_deadline_steps(conn, user_id, task["deadline_id"])
+        conn.commit()
+    finally:
+        conn.close()
     return task
 
 
 def toggle_task(user_id, task_id):
     """Flip a task between todo and done."""
-    data = load_all()
-    ud = _user_data(data, user_id)
-    for t in ud.get("tasks", []):
-        if t.get("id") == task_id:
-            t["status"] = "done" if t["status"] != "done" else "todo"
-            save_all(data)
-            return True
-    return False
+    row = db._query_one(
+        "SELECT status FROM planner_tasks WHERE user_id = ? AND id = ?",
+        (user_id, task_id),
+    )
+    if not row:
+        return False
+    new_status = "done" if row["status"] != "done" else "todo"
+    db._execute(
+        "UPDATE planner_tasks SET status = ? WHERE user_id = ? AND id = ?",
+        (new_status, user_id, task_id),
+    )
+    return True
 
 
 def complete_deadline(user_id, deadline_id):
-    data = load_all()
-    ud = _user_data(data, user_id)
-    d = ud.get("deadlines", {}).get(deadline_id)
-    if d:
-        d["status"] = "done"
-        save_all(data)
-        return True
-    return False
+    row = db._query_one(
+        "SELECT 1 FROM planner_deadlines WHERE user_id = ? AND id = ?",
+        (user_id, deadline_id),
+    )
+    if not row:
+        return False
+    db._execute(
+        "UPDATE planner_deadlines SET status = 'done' "
+        "WHERE user_id = ? AND id = ?",
+        (user_id, deadline_id),
+    )
+    return True
 
 
 def delete_deadline(user_id, deadline_id):
     """Remove a deadline and the lead-up steps planned for it."""
-    data = load_all()
-    ud = _user_data(data, user_id)
-    if deadline_id not in ud.get("deadlines", {}):
+    row = db._query_one(
+        "SELECT 1 FROM planner_deadlines WHERE user_id = ? AND id = ?",
+        (user_id, deadline_id),
+    )
+    if not row:
         return False
-    del ud["deadlines"][deadline_id]
-    ud["tasks"] = [t for t in ud.get("tasks", []) if t.get("deadline_id") != deadline_id]
-    save_all(data)
+    conn = db._conn_context()
+    try:
+        conn.execute(
+            "DELETE FROM planner_tasks WHERE user_id = ? AND deadline_id = ?",
+            (user_id, deadline_id),
+        )
+        conn.execute(
+            "DELETE FROM planner_deadlines WHERE user_id = ? AND id = ?",
+            (user_id, deadline_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     return True
 
 
@@ -247,23 +459,26 @@ def unlink_course(user_id, course_id):
     tasks (which would cascade into broken 'owned by ghost course' rows). The
     records themselves are worth keeping — the student still owes the work.
     """
-    data = load_all()
-    ud = _user_data(data, user_id)
-    changed = False
-    for ev in ud.get("events", []):
-        if ev.get("course_id") == course_id:
-            ev["course_id"] = None
-            changed = True
-    for d in ud.get("deadlines", {}).values():
-        if d.get("course_id") == course_id:
-            d["course_id"] = None
-            changed = True
-    for t in ud.get("tasks", []):
-        if t.get("course_id") == course_id:
-            t["course_id"] = None
-            changed = True
-    if changed:
-        save_all(data)
+    conn = db._conn_context()
+    try:
+        conn.execute(
+            "UPDATE planner_events SET course_id = NULL "
+            "WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id),
+        )
+        conn.execute(
+            "UPDATE planner_deadlines SET course_id = NULL "
+            "WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id),
+        )
+        conn.execute(
+            "UPDATE planner_tasks SET course_id = NULL "
+            "WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def parse_date(value):
@@ -302,12 +517,10 @@ def auto_plan_deadline(user_id, deadline_id, hours_per_day=None, replace=True):
     from its due date, at most ``hours_per_day`` (defaults to the studio's
     available-hours cap).
 
-    Returns a list of the generated task ids. Idempotent options:
+    Returns a list of the generated task dicts. Idempotent options:
       - replace=True  remove any existing steps for the deadline first.
     """
-    data = load_all()
-    ud = _user_data(data, user_id)
-    d = ud.get("deadlines", {}).get(deadline_id)
+    d = get_deadline(user_id, deadline_id)
     if not d:
         return []
 
@@ -329,45 +542,72 @@ def auto_plan_deadline(user_id, deadline_id, hours_per_day=None, replace=True):
 
     minutes_per_day = int(round(60 * hours_per_day))
 
-    if replace:
-        old_ids = set(ud.get("deadlines", {}).get(deadline_id, {}).get("steps", []))
-        ud.setdefault("tasks", [])[:] = [
-            t for t in ud.get("tasks", []) if t.get("id") not in old_ids
-        ]
-        d["steps"] = []
+    conn = db._conn_context()
+    try:
+        if replace:
+            conn.execute(
+                "DELETE FROM planner_tasks "
+                "WHERE user_id = ? AND deadline_id = ?",
+                (user_id, deadline_id),
+            )
+            conn.execute(
+                "UPDATE planner_deadlines SET steps_json = '[]' "
+                "WHERE user_id = ? AND id = ?",
+                (user_id, deadline_id),
+            )
 
-    # Spread work over the days_to_use days before the due date.
-    remaining_minutes = int(round(total_hours * 60))
-    created = []
-    for i in range(days_to_use):
-        day = due - timedelta(days=(days_to_use - i))
-        chunk = min(remaining_minutes, minutes_per_day)
-        if chunk <= 0:
-            break
-        task = {
-            "id": uuid.uuid4().hex,
-            "deadline_id": deadline_id,
-            "course_id": d.get("course_id"),
-            "title": f"Work on {d.get('title', 'deadline')}",
-            "due_date": day.isoformat(),
-            "estimated_minutes": chunk,
-            "priority": "high",
-            "status": "todo",
-            "auto": True,
-        }
-        ud.setdefault("tasks", []).append(task)
-        d.setdefault("steps", []).append(task["id"])
-        created.append(task)
-        remaining_minutes -= chunk
-    save_all(data)
+        # Spread work over the days_to_use days before the due date.
+        remaining_minutes = int(round(total_hours * 60))
+        created = []
+        for i in range(days_to_use):
+            day = due - timedelta(days=(days_to_use - i))
+            chunk = min(remaining_minutes, minutes_per_day)
+            if chunk <= 0:
+                break
+            task_id = uuid.uuid4().hex
+            conn.execute(
+                "INSERT INTO planner_tasks "
+                "(id, user_id, deadline_id, course_id, title, due_date, "
+                " estimated_minutes, priority, status, auto) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    task_id,
+                    user_id,
+                    deadline_id,
+                    d.get("course_id"),
+                    f"Work on {d.get('title', 'deadline')}",
+                    day.isoformat(),
+                    chunk,
+                    "high",
+                    "todo",
+                    1,
+                ),
+            )
+            created.append(
+                {
+                    "id": task_id,
+                    "deadline_id": deadline_id,
+                    "course_id": d.get("course_id"),
+                    "title": f"Work on {d.get('title', 'deadline')}",
+                    "due_date": day.isoformat(),
+                    "estimated_minutes": chunk,
+                    "priority": "high",
+                    "status": "todo",
+                    "auto": True,
+                }
+            )
+            remaining_minutes -= chunk
+        _apply_deadline_steps(conn, user_id, deadline_id)
+        conn.commit()
+    finally:
+        conn.close()
     return created
 
 
 def db_available_hours(user_id):
     """Read a user's daily available-hours (from the accounts DB)."""
     try:
-        import db as _db
-        u = _db.get_user(user_id)
+        u = db.get_user(user_id)
         if u:
             return float(u.get("available_hours") or 4)
     except Exception:
@@ -379,9 +619,7 @@ def deadline_feasible(user_id, deadline_id):
     """Return a short feasibility report for a deadline:
     days left, sessions remaining vs. needed, and whether it fits.
     """
-    data = load_all()
-    ud = _user_data(data, user_id)
-    d = ud.get("deadlines", {}).get(deadline_id)
+    d = get_deadline(user_id, deadline_id)
     if not d:
         return None
     due = parse_date(d.get("due_date", ""))
