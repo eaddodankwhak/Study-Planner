@@ -2,9 +2,12 @@
 
 Runs against Google's public OAuth endpoints using only the standard library
 (urllib). The app stores the OAuth Client ID locally (Settings > Sign-in
-methods) — no client secret, no shipped key. PKCE is what authorizes the
-code exchange, so the correct Google Cloud setup is a single free OAuth
-Client ID created as a *Desktop app* (loopback redirect, secret optional).
+methods); the optional client secret is stored too and only ever reaches
+Google's token endpoint. PKCE always runs, so a client created as a *Desktop
+app* (loopback redirect, no secret) works for local development, while the
+deployed app uses a *Web application* client whose Authorized redirect URI is
+exactly ``https://<deployed-domain>/oauth/google/callback`` (secret used only
+then — it is never read back into the browser).
 
 Security notes:
 - ``state`` and the PKCE ``code_verifier`` are random per request and kept in
@@ -100,18 +103,23 @@ def _get_json(url):
         raise GoogleAuthError("Google returned an unexpected response.") from exc
 
 
-def exchange_code(client_id, redirect_uri_value, verifier, code):
-    """Swap the authorization code for an ``id_token`` (public client, PKCE)."""
-    token = _post_form(
-        TOKEN_ENDPOINT,
-        {
-            "code": code,
-            "client_id": client_id,
-            "redirect_uri": redirect_uri_value,
-            "grant_type": "authorization_code",
-            "code_verifier": verifier,
-        },
-    )
+def exchange_code(client_id, redirect_uri_value, verifier, code, client_secret=None):
+    """Swap the authorization code for an ``id_token`` (public client, PKCE).
+
+    Web-application clients are confidential: when a client secret is stored
+    it is sent alongside the PKCE verifier. Desktop-type clients (local dev)
+    have no secret and are omitted entirely.
+    """
+    body = {
+        "code": code,
+        "client_id": client_id,
+        "redirect_uri": redirect_uri_value,
+        "grant_type": "authorization_code",
+        "code_verifier": verifier,
+    }
+    if client_secret:
+        body["client_secret"] = client_secret
+    token = _post_form(TOKEN_ENDPOINT, body)
     if "id_token" not in token:
         raise GoogleAuthError("Google did not provide a sign-in token.")
     return token

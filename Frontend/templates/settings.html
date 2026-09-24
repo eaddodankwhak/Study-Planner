@@ -331,22 +331,34 @@
         <hr class="settings-rule">
 
         <div class="settings-row">
-            <div class="settings-row__copy"><strong>Google</strong><small>{% if google_client_id %}Connected — "Continue
-                    with Google" is live on the login and sign-up pages.{% else %}Not set up — sign in with your
-                    password, then paste a Google OAuth Client ID below to turn on Google sign-in.{% endif %}</small></div>
+            <div class="settings-row__copy"><strong>Google</strong><small>{% if google_client_id and google_secret_set %}Connected — "Continue
+                    with Google" is live for everyone.{% elif google_client_id %}Almost ready — add the Client Secret below so Google
+                    accepts the sign-in.{% else %}Not set up — sign in with your password, then paste your Google OAuth Client ID and
+                    Secret below to turn on Google sign-in.{% endif %}</small></div>
         </div>
         <form method="post" action="{{ url_for('settings_signin') }}" class="settings-form">
             <div class="settings-inline">
                 <div class="form-field"><label class="form-label" for="google_client_id">Google OAuth Client ID</label><input
                         class="form-input" id="google_client_id" name="google_client_id"
                         value="{{ google_client_id or '' }}" placeholder="xxxx.apps.googleusercontent.com"
-                        autocomplete="off"><small class="text-muted">Free to create: Google Cloud Console → APIs &
-                        Services → Credentials → Create OAuth Client ID → <em>Web application</em> → copy the Client ID.
-                        Under "Authorized redirect URIs" add exactly
-                        <code>{{ google_redirect_uri }}</code>.</small></div>
+                        autocomplete="off"><small class="text-muted">Google Cloud Console → APIs &amp; Services →
+                        Credentials → Create OAuth Client ID → application type <em>Web application</em>. Paste the Client
+                        ID here.</small></div>
+                <div class="form-field"><label class="form-label" for="google_client_secret">Client Secret</label><input
+                        class="form-input" id="google_client_secret" name="google_client_secret"
+                        value="" type="password" placeholder="Paste from Credentials → Client Secret"
+                        autocomplete="off">{% if google_secret_set %}<small class="text-muted">A secret is saved (it is
+                        never shown back). Clear &gt; Save saves a new one.</small>{% else %}<small class="text-muted">Web
+                        application clients need the secret. Copy it from the same Credentials row that shows your Client
+                        ID. (Local testing can leave this blank.)</small>{% endif %}</div>
             </div>
+            <p class="settings-panel__intro">Two more Google Cloud checks before it goes live for everyone: (1) add
+                <code>{{ google_redirect_uri }}</code> to the client's <em>Authorized redirect URIs</em> (and
+                <code>{{ request.host_url.rstrip('/') }}</code> to <em>Authorized JavaScript origins</em>); (2) open
+                OAuth consent screen and set the app status to <em>In production</em> — otherwise only your test users
+                can sign in, and new visitors see the "unverified app" screen.</p>
             <div class="form-actions">
-                <button class="button button--primary" type="submit">Save Google client ID</button>
+                <button class="button button--primary" type="submit">Save Google sign-in</button>
                 {% if google_client_id %}<button class="button button--ghost" type="submit" name="remove"
                     value="1">Remove</button>{% endif %}
             </div>

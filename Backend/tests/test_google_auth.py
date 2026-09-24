@@ -30,6 +30,7 @@ def _reset():
     for email in (GOOGLE_EMAIL, "manual@example.com", "linked@example.com", "cfg@example.com"):
         db._execute("DELETE FROM users WHERE email = ?", (email,))
     db._execute("DELETE FROM app_config WHERE key = 'google_client_id'")
+    db._execute("DELETE FROM app_config WHERE key = 'google_client_secret'")
 
 
 class PkceHelpersTest(unittest.TestCase):
@@ -70,6 +71,35 @@ class PkceHelpersTest(unittest.TestCase):
         }
         with mock.patch.object(google_auth, "_get_json", return_value=claims):
             self.assertEqual(google_auth.verify_id_token("tok", CLIENT_ID)["email"], GOOGLE_EMAIL)
+
+
+class ExchangeCodeTest(unittest.TestCase):
+    def test_sends_client_secret_for_web_clients(self):
+        captured = {}
+
+        def _fake_post_form(url, data):
+            captured["url"] = url
+            captured["data"] = data
+            return {"id_token": "tok"}
+
+        with mock.patch.object(google_auth, "_post_form", side_effect=_fake_post_form):
+            token = google_auth.exchange_code(
+                CLIENT_ID, "http://x/cb", "verifier", "code", client_secret="GOCSPX-secret"
+            )
+        self.assertEqual(token, {"id_token": "tok"})
+        self.assertEqual(captured["data"]["client_secret"], "GOCSPX-secret")
+        self.assertEqual(captured["data"]["code_verifier"], "verifier")
+
+    def test_omits_secret_when_not_configured(self):
+        captured = {}
+
+        def _fake_post_form(url, data):
+            captured["data"] = data
+            return {"id_token": "tok"}
+
+        with mock.patch.object(google_auth, "_post_form", side_effect=_fake_post_form):
+            google_auth.exchange_code(CLIENT_ID, "http://x/cb", "verifier", "code")
+        self.assertNotIn("client_secret", captured["data"])
 
 
 class GoogleFlowRouteTest(unittest.TestCase):
@@ -269,8 +299,31 @@ class SigninConfigTest(unittest.TestCase):
         )
         self.assertIn("Google sign-in is set up", r.get_data(as_text=True))
         self.assertEqual(db.get_app_config("google_client_id"), CLIENT_ID)
+        self.assertEqual(db.get_app_config("google_client_secret"), "")
         r = self.client.post("/settings/signin", data={"remove": "1"}, follow_redirects=True)
         self.assertIn("Google sign-in removed", r.get_data(as_text=True))
+        self.assertEqual(db.get_app_config("google_client_id"), "")
+        self.assertEqual(db.get_app_config("google_client_secret"), "")
+
+    def test_client_secret_saved_and_removed_with_id(self):
+        r = self.client.post(
+            "/settings/signin",
+            data={"google_client_id": CLIENT_ID, "google_client_secret": "GOCSPX-abc123"},
+            follow_redirects=True,
+        )
+        self.assertIn("Google sign-in is set up", r.get_data(as_text=True))
+        self.assertEqual(db.get_app_config("google_client_id"), CLIENT_ID)
+        self.assertEqual(db.get_app_config("google_client_secret"), "GOCSPX-abc123")
+        r = self.client.post("/settings/signin", data={"remove": "1"}, follow_redirects=True)
+        self.assertEqual(db.get_app_config("google_client_secret"), "")
+
+    def test_malformed_secret_rejected(self):
+        r = self.client.post(
+            "/settings/signin",
+            data={"google_client_id": CLIENT_ID, "google_client_secret": "has spaces not allowed!"},
+            follow_redirects=True,
+        )
+        self.assertIn("valid Google OAuth Client Secret", r.get_data(as_text=True))
         self.assertEqual(db.get_app_config("google_client_id"), "")
 
 

@@ -555,6 +555,10 @@ def get_google_client_id():
     return (db.get_app_config("google_client_id") or "").strip()
 
 
+def get_google_client_secret():
+    return (db.get_app_config("google_client_secret") or "").strip()
+
+
 @app.get("/oauth/google/start")
 def oauth_google_start():
     """Begin the Google sign-in flow (no login required)."""
@@ -600,7 +604,13 @@ def oauth_google_callback():
     code = request.args.get("code", "")
     redirect_uri_value = google_auth.redirect_uri(request.url_root)
     try:
-        token = google_auth.exchange_code(client_id, redirect_uri_value, verifier, code)
+        token = google_auth.exchange_code(
+            client_id,
+            redirect_uri_value,
+            verifier,
+            code,
+            get_google_client_secret(),
+        )
         claims = google_auth.verify_id_token(token["id_token"], client_id)
     except google_auth.GoogleAuthError as exc:
         flash(str(exc), "error")
@@ -661,11 +671,13 @@ def settings_password():
 @app.post("/settings/signin")
 @login_required
 def settings_signin():
-    """Save or remove the Google OAuth Client ID (app-level, first-time setup)."""
+    """Save or remove the Google OAuth Client ID + secret (app-level setup)."""
     client_id = (request.form.get("google_client_id") or "").strip()
+    client_secret = (request.form.get("google_client_secret") or "").strip()
     remove = request.form.get("remove") == "1"
     if remove:
         db.delete_app_config("google_client_id")
+        db.delete_app_config("google_client_secret")
         flash("Google sign-in removed. Manual email/password login still works.", "success")
         return redirect(url_for("settings"))
     if not client_id:
@@ -678,7 +690,12 @@ def settings_signin():
             "error",
         )
         return redirect(url_for("settings"))
+    if client_secret and (len(client_secret) < 8 or not re.fullmatch(r"[A-Za-z0-9\-._~]+", client_secret)):
+        flash("That doesn't look like a valid Google OAuth Client Secret.", "error")
+        return redirect(url_for("settings"))
     db.set_app_config("google_client_id", client_id)
+    if client_secret:
+        db.set_app_config("google_client_secret", client_secret)
     flash("Google sign-in is set up. It now appears on the login page.", "success")
     return redirect(url_for("settings"))
 
@@ -698,6 +715,7 @@ def settings():
         ai_connections=ai_connections,
         ai_connections_by_provider={c["provider"]: c for c in ai_connections},
         google_client_id=get_google_client_id(),
+        google_secret_set=bool(get_google_client_secret()),
         google_redirect_uri=google_auth.redirect_uri(request.url_root),
         user_has_password=bool(user.get("password")),
     )
