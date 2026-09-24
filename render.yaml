@@ -8,11 +8,14 @@ services:
     name: study-planner
     runtime: python
     plan: free
-    rootDir: Backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2
+    buildCommand: cd Backend && pip install -r requirements.txt
+    startCommand: cd Backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2
     healthCheckPath: /
     envVars:
+      # Render Python runtime version. Python 3.14 lacks psycopg2-binary
+      # wheels, so pin to 3.13 (matches the local env).
+      - key: PYTHON_VERSION
+        value: "3.13"
       # Required
       - key: SECRET_KEY
         generateValue: true
