@@ -78,9 +78,12 @@ def _post_form(url, data):
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
-            if resp.status != 200:
-                raise GoogleAuthError("Google rejected the sign-in request.")
             payload = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        # Google answered but rejected the request (bad code, missing secret,
+        # wrong client, ...). HTTPError subclasses URLError, so it must be
+        # caught FIRST or every rejection would be reported as "unreachable".
+        raise GoogleAuthError(_rejection_message(exc)) from exc
     except urllib.error.URLError as exc:
         raise GoogleAuthError("Could not reach Google. Check your connection.") from exc
     try:
@@ -92,15 +95,29 @@ def _post_form(url, data):
 def _get_json(url):
     try:
         with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as resp:
-            if resp.status != 200:
-                raise GoogleAuthError("Google rejected the sign-in request.")
             payload = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        raise GoogleAuthError(_rejection_message(exc)) from exc
     except urllib.error.URLError as exc:
         raise GoogleAuthError("Could not reach Google. Check your connection.") from exc
     try:
         return json.loads(payload)
     except ValueError as exc:
         raise GoogleAuthError("Google returned an unexpected response.") from exc
+
+
+def _rejection_message(exc):
+    """Turn an HTTPError from Google into a short, user-safe message that keeps
+    Google's reason so deployments can tell 'secret missing' from 'bad code'."""
+    detail = ""
+    try:
+        info = json.loads(exc.read().decode("utf-8", "replace"))
+        detail = (info.get("error_description") or info.get("error") or "").strip()
+    except Exception:
+        pass
+    if len(detail) > 120:
+        detail = detail[:117] + "..."
+    return "Google rejected the sign-in request." + (f" ({detail})" if detail else "")
 
 
 def exchange_code(client_id, redirect_uri_value, verifier, code, client_secret=None):

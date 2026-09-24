@@ -102,6 +102,58 @@ class ExchangeCodeTest(unittest.TestCase):
         self.assertNotIn("client_secret", captured["data"])
 
 
+class GoogleHttpErrorMappingTest(unittest.TestCase):
+    """Google rejections must not be reported as an unreachable network.
+
+    urllib.error.HTTPError is a subclass of URLError; unless HTTPError is
+    handled first, a 400 like "client_secret is missing." surfaces as the
+    "Could not reach Google." banner, which is exactly the confusing message
+    seen in production.
+    """
+
+    def _http_error(self, payload, code=400):
+        import io
+        import urllib.error
+
+        return urllib.error.HTTPError(
+            "https://example.example/token",
+            code,
+            "Bad Request",
+            {},
+            io.BytesIO(payload.encode("utf-8")),
+        )
+
+    def test_rejection_keeps_google_reason(self):
+        err = self._http_error(
+            '{"error": "invalid_request", "error_description": "client_secret is missing."}'
+        )
+        with mock.patch(
+            "urllib.request.urlopen", side_effect=err
+        ), self.assertRaises(google_auth.GoogleAuthError) as ctx:
+            google_auth._post_form("https://example.example/token", {"code": "fake"})
+        self.assertIn("Google rejected the sign-in request.", str(ctx.exception))
+        self.assertIn("client_secret is missing.", str(ctx.exception))
+        self.assertNotIn("Could not reach", str(ctx.exception))
+
+    def test_rejection_without_google_body_stays_generic(self):
+        err = self._http_error("")
+        with mock.patch(
+            "urllib.request.urlopen", side_effect=err
+        ), self.assertRaises(google_auth.GoogleAuthError) as ctx:
+            google_auth._get_json("https://example.example/tokeninfo?id_token=x")
+        self.assertEqual(str(ctx.exception), "Google rejected the sign-in request.")
+
+    def test_network_failure_reports_unreachable(self):
+        import urllib.error
+
+        with mock.patch(
+            "urllib.request.urlopen", side_effect=urllib.error.URLError("boom")
+        ), self.assertRaises(google_auth.GoogleAuthError) as ctx:
+            google_auth._post_form("https://token.example/token", {"code": "fake"})
+        self.assertIn("Could not reach Google", str(ctx.exception))
+        self.assertNotIn("rejected", str(ctx.exception))
+
+
 class GoogleFlowRouteTest(unittest.TestCase):
     def setUp(self):
         _reset()
