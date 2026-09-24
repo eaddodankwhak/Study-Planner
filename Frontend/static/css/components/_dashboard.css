@@ -309,3 +309,23 @@ body.home .course-card__title {
   background: var(--color-accent);
   color: #2b1b00;
 }
+
+/* --- Colourful glass hub: one hue per tile & section -------------------- */
+body.home .stat--blue { background-image: var(--glass-blue); }
+body.home .stat--orange { background-image: var(--glass-orange); }
+body.home .stat--green { background-image: var(--glass-green); }
+body.home .stat--violet { background-image: var(--glass-violet); }
+
+body.home .home-section {
+  border-top: 3px solid rgb(15 58 82 / 0.1);
+}
+
+body.home .home-section--plan { border-top-color: var(--color-accent); }
+body.home .home-section--deadlines { border-top-color: var(--deco-blue); }
+body.home .home-section--tasks { border-top-color: var(--deco-green); }
+body.home .home-section--subjects { border-top-color: var(--deco-violet); }
+body.home .home-section--workspaces { border-top-color: var(--deco-orange); }
+
+/* Next-step rails follow the motif (focus=orange, urgent=red, plan=amber). */
+body.home .home-next--clear .home-next__link { border-left-color: var(--deco-green); }
+body.home .home-next--subjects .home-next__link { border-left-color: var(--deco-violet); }

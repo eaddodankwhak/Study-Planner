@@ -35,25 +35,25 @@
 </header>
 
 <nav class="stat-grid" aria-label="Dashboard summary">
-    <a class="stat stat--courses stat--link" href="#section-subjects" data-scroll>
+    <a class="stat stat--courses stat--blue stat--link" href="#section-subjects" data-scroll>
         <span class="stat__icon" aria-hidden="true">▦</span>
         <span class="stat__value" data-stat="courses">{% if home_errors.get('subjects') %}—{% else %}{{ subjects|length }}{% endif %}</span>
         <span class="stat__label">Courses</span>
         <span class="stat__hint">{% if home_errors.get('subjects') %}couldn't load{% else %}jump to subjects{% endif %}</span>
     </a>
-    <a class="stat {{ 'stat--urgent' if deadlines else 'stat--calm' }} stat--link" href="#section-deadlines" data-scroll>
+    <a class="stat {{ 'stat--urgent' if deadlines else 'stat--calm' }} stat--orange stat--link" href="#section-deadlines" data-scroll>
         <span class="stat__icon" aria-hidden="true">◷</span>
         <span class="stat__value" data-stat="deadlines">{% if home_errors.get('deadlines') %}—{% else %}{{ deadlines|length }}{% endif %}</span>
         <span class="stat__label">Deadlines</span>
         <span class="stat__hint">{% if home_errors.get('deadlines') %}couldn't load{% else %}open &amp; upcoming{% endif %}</span>
     </a>
-    <a class="stat stat--tasks stat--link" href="#section-tasks" data-scroll>
+    <a class="stat stat--tasks stat--green stat--link" href="#section-tasks" data-scroll>
         <span class="stat__icon" aria-hidden="true">✓</span>
         <span class="stat__value" data-stat="tasks">{% if home_errors.get('tasks') %}—{% else %}{{ open_tasks|length }}{% endif %}</span>
         <span class="stat__label">Open tasks</span>
         <span class="stat__hint">{% if home_errors.get('tasks') %}couldn't load{% else %}ready to work on{% endif %}</span>
     </a>
-    <div class="stat stat--availability" data-stat-tile>
+    <div class="stat stat--availability stat--violet" data-stat-tile>
         <span class="stat__ring" style="--pct: {{ availability.pct }}; --goal: {{ availability.goal }}" aria-hidden="true"><span></span></span>
         <span class="stat__value" data-stat="available_hours">{{ '%.1f'|format(availability.hours) }}h</span>
         <span class="stat__label">Availability</span>
@@ -143,7 +143,7 @@
         {% endif %}
     </section>
 
-    <section class="card home-section{% if home_errors.get('deadlines') %} is-error{% endif %}" id="section-deadlines">
+    <section class="card home-section home-section--deadlines{% if home_errors.get('deadlines') %} is-error{% endif %}" id="section-deadlines">
         <div class="dashboard-heading">
             <h3 class="card__title mb-0">Upcoming Deadlines</h3>
             <a class="button button--ghost button--small" href="{{ url_for('deadlines') }}">Manage</a>
@@ -188,7 +188,7 @@
         {% endif %}
     </section>
 
-    <section class="card home-section{% if home_errors.get('tasks') %} is-error{% endif %}" id="section-tasks">
+    <section class="card home-section home-section--tasks{% if home_errors.get('tasks') %} is-error{% endif %}" id="section-tasks">
         <div class="dashboard-heading">
             <h3 class="card__title mb-0">Open Tasks</h3>
             <a class="button button--ghost button--small" href="{{ url_for('schedule') }}">Manage</a>
