@@ -33,8 +33,6 @@ h3, .card__title { font-size:var(--text-h3); }
 .page-header { background: rgb(10 29 43 / .94); border-bottom: 1px solid rgb(255 255 255 / .09); box-shadow: none; backdrop-filter: blur(18px); }
 .page-header__inner { min-height: 4.75rem; padding-block: var(--space-3); }
 .page-header__brand { font-family:var(--font-family-base); font-size:1.125rem; font-weight:var(--font-weight-bold); letter-spacing:-.025em; }
-.page-header__brand-light { color: #d6a35d; }
-.page-header__mark { display:grid; place-items:center; width:2rem; height:2rem; border:1px solid rgb(214 163 93 / .8); border-radius:50%; color:var(--color-accent); font-family:var(--font-family-base); font-size:var(--text-label); font-weight:var(--font-weight-bold); }
 .nav-bar { gap: .25rem; }
 .nav-bar__link { color:#c5d1d7; font-size:var(--text-label); font-weight:var(--font-weight-medium); padding:.6rem .7rem; }
 .nav-bar__link--active { background: rgb(255 255 255 / .1); box-shadow: inset 0 -2px 0 var(--color-accent); }

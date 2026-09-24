@@ -41,6 +41,18 @@
   text-decoration: none;
 }
 
+.page-header__logo {
+  display: block;
+  height: 2.1rem;
+  width: auto;
+  max-width: 14rem;
+  object-fit: contain;
+  background: #d6d8d6;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
 .page-header__title {
   margin-bottom: 0;
   font-size: 1.15rem;

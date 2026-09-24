@@ -6,12 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up — Study Planner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon-64.png') }}">
 </head>
 
 <body class="auth-page">
     {% include '_toast.html' %}
     <main class="auth-card">
         <header class="auth-card__banner">
+            <img class="auth-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Study Planner">
             <h1>Study Planner</h1>
             <p>Create your account</p>
         </header>

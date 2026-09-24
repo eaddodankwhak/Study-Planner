@@ -4,7 +4,8 @@ const SHELL = [
   "/static/js/session.js",
   "/static/js/palette.js",
   "/static/manifest.json",
-  "/static/icon.svg"
+  "/static/icon-192.png",
+  "/static/img/logo.png"
 ];
 
 self.addEventListener("install", (event) => {

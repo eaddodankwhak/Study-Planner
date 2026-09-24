@@ -18,7 +18,8 @@
 <body class="compact">
     <header class="page-header">
         <div class="container page-header__inner">
-            <a class="page-header__brand" href="{{ url_for('home') }}">Study Planner</a>
+            <a class="page-header__brand" href="{{ url_for('home') }}"><img class="page-header__logo"
+                    src="{{ url_for('static', filename='img/logo.png') }}" alt="Study Planner"></a>
             <div class="page-header__user">
                 <span class="page-header__welcome">{{ user.name if user else 'Student' }}</span>
                 <nav class="nav-bar">

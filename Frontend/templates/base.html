@@ -7,6 +7,7 @@
     <title>{% block title %}Study Planner{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ai.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon-64.png') }}">
     <meta name="user-id" content="{{ user.id if user else '' }}">
     {% block head %}{% endblock %}
 </head>
@@ -19,8 +20,7 @@
     <header class="page-header">
         <div class="container page-header__inner">
             <a class="page-header__brand" href="{{ url_for('home') }}" aria-label="Study Planner home">
-                <span class="page-header__mark" aria-hidden="true">S</span>
-                <span>Study<span class="page-header__brand-light">Planner</span></span>
+                <img class="page-header__logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Study Planner">
             </a>
             <div class="page-header__user">
                 <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>

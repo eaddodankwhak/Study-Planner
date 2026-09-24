@@ -240,6 +240,16 @@
   margin: 0;
 }
 
+.auth-logo {
+  display: block;
+  max-width: 13rem;
+  height: auto;
+  margin: 0 auto var(--space-4);
+  background: #d6d8d6;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
 .auth-card__body {
   padding: var(--space-6);
 }
