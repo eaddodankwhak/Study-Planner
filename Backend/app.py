@@ -552,11 +552,20 @@ def logout():
 # ---------------------------------------------------------------------------
 
 def get_google_client_id():
-    return (db.get_app_config("google_client_id") or "").strip()
+    """Google OAuth Client ID. Deployed apps set GOOGLE_CLIENT_ID in the
+    hosting environment (e.g. Render dashboard) so every user gets sign-in
+    with no in-app setup; the DB value is a local-development fallback."""
+    return (os.environ.get("GOOGLE_CLIENT_ID") or db.get_app_config("google_client_id") or "").strip()
 
 
 def get_google_client_secret():
-    return (db.get_app_config("google_client_secret") or "").strip()
+    """Google OAuth Client Secret, mirroring get_google_client_id()."""
+    return (os.environ.get("GOOGLE_CLIENT_SECRET") or db.get_app_config("google_client_secret") or "").strip()
+
+
+def google_configured_via_env():
+    """True when the deployment configures Google sign-in via env vars."""
+    return bool((os.environ.get("GOOGLE_CLIENT_ID") or "").strip())
 
 
 @app.get("/oauth/google/start")
@@ -671,7 +680,19 @@ def settings_password():
 @app.post("/settings/signin")
 @login_required
 def settings_signin():
-    """Save or remove the Google OAuth Client ID + secret (app-level setup)."""
+    """Save or remove the Google OAuth Client ID + secret (app-level setup).
+
+    When Google sign-in is configured through the hosting environment
+    (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET), the in-app form is locked so the
+    Render dashboard stays the single source of truth for everyone.
+    """
+    if google_configured_via_env():
+        flash(
+            "Google sign-in is managed in your hosting environment "
+            "(GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) — update those there.",
+            "error",
+        )
+        return redirect(url_for("settings"))
     client_id = (request.form.get("google_client_id") or "").strip()
     client_secret = (request.form.get("google_client_secret") or "").strip()
     remove = request.form.get("remove") == "1"
@@ -716,6 +737,7 @@ def settings():
         ai_connections_by_provider={c["provider"]: c for c in ai_connections},
         google_client_id=get_google_client_id(),
         google_secret_set=bool(get_google_client_secret()),
+        google_env_configured=google_configured_via_env(),
         google_redirect_uri=google_auth.redirect_uri(request.url_root),
         user_has_password=bool(user.get("password")),
     )

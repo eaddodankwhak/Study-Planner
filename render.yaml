@@ -19,6 +19,14 @@ services:
       # Required
       - key: SECRET_KEY
         generateValue: true
+      # Google sign-in: set both here (Render Dashboard -> Environment) so the
+      # app shows "Continue with Google" for everyone with no in-app setup.
+      # Create a Web application OAuth client and register
+      # https://<your-app>.onrender.com/oauth/google/callback as a redirect URI.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
       # Paste your Neon connection string here in the Render dashboard
       # (Set "Value" -> "needs manual value") and click "Save".
       - key: DATABASE_URL

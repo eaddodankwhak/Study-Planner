@@ -27,7 +27,7 @@ CLIENT_ID = "1234567890-test.apps.googleusercontent.com"
 
 
 def _reset():
-    for email in (GOOGLE_EMAIL, "manual@example.com", "linked@example.com", "cfg@example.com"):
+    for email in (GOOGLE_EMAIL, "manual@example.com", "linked@example.com", "cfg@example.com", "cfg-env@example.com"):
         db._execute("DELETE FROM users WHERE email = ?", (email,))
     db._execute("DELETE FROM app_config WHERE key = 'google_client_id'")
     db._execute("DELETE FROM app_config WHERE key = 'google_client_secret'")
@@ -325,6 +325,60 @@ class SigninConfigTest(unittest.TestCase):
         )
         self.assertIn("valid Google OAuth Client Secret", r.get_data(as_text=True))
         self.assertEqual(db.get_app_config("google_client_id"), "")
+
+
+class EnvConfigTest(unittest.TestCase):
+    """Deployments configure Google sign-in via env vars (Render dashboard)."""
+
+    def setUp(self):
+        _reset()
+        import app as app_mod
+
+        self.app_mod = app_mod
+        self._restore = mock.patch.dict(os.environ, {}, clear=False)
+        self._restore.start()
+
+    def tearDown(self):
+        self._restore.stop()
+        _reset()
+
+    def test_env_id_and_secret_override_db(self):
+        db.set_app_config("google_client_id", CLIENT_ID)
+        db.set_app_config("google_client_secret", "db-secret")
+        with mock.patch.dict(
+            os.environ,
+            {
+                "GOOGLE_CLIENT_ID": "env-id.apps.googleusercontent.com",
+                "GOOGLE_CLIENT_SECRET": "env-secret",
+            },
+            clear=False,
+        ):
+            self.assertEqual(self.app_mod.get_google_client_id(), "env-id.apps.googleusercontent.com")
+            self.assertEqual(self.app_mod.get_google_client_secret(), "env-secret")
+            self.assertTrue(self.app_mod.google_configured_via_env())
+
+    def test_db_fallback_when_no_env(self):
+        self.assertEqual(self.app_mod.get_google_client_id(), "")
+        self.assertFalse(self.app_mod.google_configured_via_env())
+        db.set_app_config("google_client_id", CLIENT_ID)
+        self.assertEqual(self.app_mod.get_google_client_id(), CLIENT_ID)
+
+    def test_settings_signin_locked_when_env_configured(self):
+        db.create_user("cfg-env", "Cfg", "cfg-env@example.com", "hash")
+        client = google_test_client()
+        with client.session_transaction() as s:
+            s["user_id"] = "cfg-env"
+            s["user_name"] = "Cfg"
+        with mock.patch.dict(
+            os.environ, {"GOOGLE_CLIENT_ID": "env-id.apps.googleusercontent.com"}, clear=False
+        ):
+            r = client.post(
+                "/settings/signin",
+                data={"google_client_id": CLIENT_ID},
+                follow_redirects=True,
+            )
+            self.assertIn("hosting environment", r.get_data(as_text=True))
+            self.assertEqual(db.get_app_config("google_client_id"), "")
 
 
 if __name__ == "__main__":
