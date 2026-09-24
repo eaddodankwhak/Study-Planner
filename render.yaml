@@ -1,0 +1,34 @@
+# Render blueprint: https://render.com/docs/blueprint-spec
+#
+# The Flask app lives in Backend/ and is served with gunicorn. It auto-runs
+# db.init_db() at import time, so the schema is created on the first boot.
+
+services:
+  - type: web
+    name: study-planner
+    runtime: python
+    plan: free
+    rootDir: Backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2
+    healthCheckPath: /
+    envVars:
+      # Required
+      - key: SECRET_KEY
+        generateValue: true
+      # Paste your Neon connection string here in the Render dashboard
+      # (Set "Value" -> "needs manual value") and click "Save".
+      - key: DATABASE_URL
+        sync: false
+      # Optional: enable the AI Hub's server-side provider keys.
+      # Users can still connect their own keys from Settings without these.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_AI_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: COPILOT_GITHUB_TOKEN
+        sync: false
