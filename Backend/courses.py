@@ -111,6 +111,10 @@ def update_course(user_id, course_id, **fields):
         value = (fields.get(key) or "").strip()
         sets.append(f"{key} = ?")
         params.append(value or None)
+    term = (fields.get("term") or "").strip()
+    if term:
+        sets.append("term = ?")
+        params.append(term)
     credits = fields.get("credits")
     if credits is not None:
         try:

@@ -1,0 +1,311 @@
+/* =========================================================================
+ * _dashboard.css — Home dashboard layout, hero decision card, stat tiles,
+ * section grid, and refined subject cards. Loaded LAST (after dark.css) so
+ * these rules own the bottom of the cascade. Everything broader than this
+ * page keeps living in components.css / utilities.css / premium.css.
+ * ========================================================================= */
+
+/* --- Hero becomes identity + decision card ---------------------------- */
+body.home .home-hero {
+  display: grid;
+  grid-template-columns: 1fr minmax(16rem, 22rem);
+  gap: var(--space-6);
+  align-items: center;
+}
+
+body.home .home-hero__status {
+  display: none;
+}
+
+.home-hero__identity {
+  align-items: center;
+}
+
+/* The "answer" card — light chip on navy, per the approved brand device. */
+body.home .home-next {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: rgb(255 255 255 / 0.97);
+  color: #102a3a;
+  box-shadow: var(--shadow-lg);
+}
+
+.home-next__label {
+  display: inline-block;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: rgb(240 153 55 / 0.16);
+  color: #7a4b12;
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.home-next__link {
+  display: block;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 5px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.home-next__link:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.home-next--urgent .home-next__link { border-left-color: var(--priority-critical); }
+.home-next--plan .home-next__link { border-left-color: var(--priority-moderate); }
+.home-next--focus .home-next__link { border-left-color: var(--color-accent); }
+
+.home-next__eyebrow {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-accent-dark, #b3551e);
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.home-next--urgent .home-next__eyebrow { color: var(--priority-critical); }
+.home-next--plan .home-next__eyebrow { color: var(--priority-moderate); }
+
+.home-next__title {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.25;
+}
+
+.home-next__meta {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 58rem) {
+  body.home .home-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Stat tiles: clickable, explained, live-aware --------------------- */
+body.home .stat {
+  min-height: 8.5rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+body.home a.stat {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+}
+
+body.home a.stat:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
+}
+
+body.home a.stat:focus-visible,
+body.home .stat:focus-within {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.stat__hint {
+  display: block;
+  margin-top: auto;
+  padding-top: var(--space-1);
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+.stat__legend {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+.stat.is-stale {
+  border-color: var(--priority-moderate);
+}
+
+.stat.is-stale .stat__value {
+  color: var(--priority-moderate);
+}
+
+/* Availability ring follows the live `--pct` variable. */
+body.home .stat--availability .stat__ring {
+  background: conic-gradient(
+    var(--color-accent) 0 var(--pct),
+    rgb(240 153 55 / 0.18) var(--pct) 100%
+  );
+  transition: background 0.4s ease;
+}
+
+/* --- Section grid ------------------------------------------------------ */
+body.home .home-content {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+body.home .home-section {
+  grid-column: span 6;
+  scroll-margin-top: var(--space-5);
+}
+
+body.home .home-section--plan,
+body.home .home-section--subjects {
+  grid-column: span 12;
+}
+
+body.home .home-section--subjects {
+  grid-column: span 7;
+}
+
+body.home .home-section--workspaces {
+  grid-column: span 5;
+}
+
+@media (max-width: 58rem) {
+  body.home .home-section,
+  body.home .home-section--subjects,
+  body.home .home-section--workspaces {
+    grid-column: span 12;
+  }
+}
+
+/* Highlight flash when a stat tile scrolls you to a section. */
+@keyframes dashboard-highlight {
+  0% { box-shadow: 0 0 0 0 rgb(240 153 55 / 0); }
+  30% { box-shadow: 0 0 0 5px rgb(240 153 55 / 0.45); }
+  100% { box-shadow: 0 0 0 0 rgb(240 153 55 / 0); }
+}
+
+body.home .home-section.is-highlighted {
+  animation: dashboard-highlight 2.4s ease-out;
+  border-color: var(--color-accent);
+}
+
+body.home .home-section.is-error {
+  border-top: 4px solid var(--priority-critical);
+}
+
+.home-section__count {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: rgb(240 153 55 / 0.16);
+  color: var(--color-accent-dark, #b3551e);
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-bold);
+  vertical-align: middle;
+}
+
+.home-section__subhead {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: 0.82rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Task rows inside dashboard sections become focus targets. */
+body.home .task-list .task__link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+}
+
+body.home .task-list .task__link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* --- Differentiated empty states (distinct tone + icon per section) ---- */
+body.home .empty-state--info .empty-state__icon {
+  color: var(--color-primary);
+  background: #eaf1ff;
+}
+
+body.home .empty-state--warm .empty-state__icon {
+  color: var(--priority-moderate);
+  background: #fdf1df;
+}
+
+body.home .empty-state--error .empty-state__icon {
+  color: var(--priority-critical);
+  background: #fdecea;
+}
+
+/* --- Subject cards: typographic hierarchy + hover + next step ----------- */
+body.home .course-grid {
+  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+}
+
+body.home .course-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+body.home .course-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+body.home .course-card__title {
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+}
+
+.course-card__meta-line {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.course-card__instructor {
+  padding: 0 var(--space-3) var(--space-1);
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.course-card__hint {
+  padding: 0 var(--space-3) var(--space-3);
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+.course-card__todo {
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.course-card__todo a {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-accent);
+  border-radius: 999px;
+  color: var(--color-accent-dark, #b3551e);
+  font-size: 0.76rem;
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.course-card__todo a:hover {
+  background: var(--color-accent);
+  color: #2b1b00;
+}

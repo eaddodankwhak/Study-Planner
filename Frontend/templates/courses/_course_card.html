@@ -30,6 +30,12 @@
                         <input id="edit_credits_{{ course.id }}" name="credits" type="number" min="0" max="12"
                             value="{{ course.credits or 0 }}">
                     </div>
+                    <div class="field field--narrow">
+                        <label for="edit_term_{{ course.id }}">Term</label>
+                        <input id="edit_term_{{ course.id }}" name="term"
+                            value="{{ course.term if course.term != 'Fall 2026' or course.term else default_term }}"
+                            placeholder="e.g. Fall 2026">
+                    </div>
                     <div class="field">
                         <label for="edit_schedule_{{ course.id }}">Class schedule</label>
                         <input id="edit_schedule_{{ course.id }}" name="schedule"

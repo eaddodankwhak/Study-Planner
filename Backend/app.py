@@ -20,6 +20,7 @@ import uuid
 from flask import (
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -50,6 +51,11 @@ LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "300"))
 LOGIN_LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "300"))
 _login_track = {}  # key -> {"fails": [(ts,...)], "locked_until": ts}
+
+# Daily-study-hour target used to frame the availability ring on Home: the
+# ring shows the user's stored available_hours out of this goal, with a
+# "planned today" read-out from calendar events next to it.
+DAILY_AVAILABILITY_GOAL = 6.0
 
 
 def _login_key(email, ip):
@@ -1120,22 +1126,178 @@ def landing():
 @app.get("/dashboard")
 @login_required
 def home():
-    """Render the planning dashboard plus the user's subject cards."""
+    """Render the planning dashboard plus the user's subject cards.
+
+    Each data source is pulled independently: a failure in one section fails
+    that section into a visible error state (not a silent "empty"), while the
+    rest of the page still renders. ``home_errors`` keys match the section ids
+    the template uses, so a section can say "we couldn't load this" without
+    looking like a genuine empty state.
+    """
     user = current_user()
-    deadline_list = planner.list_deadlines(user["id"])
-    task_list = planner.list_tasks(user["id"])
-    checkpoint_data = _home_checkpoints(user, deadline_list, task_list)
+    home_errors = {}
+
+    deadline_list = []
+    task_list = []
+    try:
+        deadline_list = planner.list_deadlines(user["id"])
+    except Exception as exc:  # noqa: BLE001 - per-section resilience
+        home_errors["deadlines"] = f"Deadlines couldn't load: {exc}"
+
+    try:
+        task_list = planner.list_tasks(user["id"])
+    except Exception as exc:  # noqa: BLE001
+        home_errors["tasks"] = f"Tasks couldn't load: {exc}"
+
+    checkpoint_data = None
+    if "deadlines" not in home_errors and "tasks" not in home_errors:
+        try:
+            checkpoint_data = _home_checkpoints(user, deadline_list, task_list)
+        except Exception as exc:  # noqa: BLE001
+            home_errors["plan"] = f"Today's plan couldn't load: {exc}"
+
+    subjects = []
+    try:
+        subjects = user_subjects(user)
+    except Exception as exc:  # noqa: BLE001
+        home_errors["subjects"] = f"Your subjects couldn't load: {exc}"
+
+    courses = []
+    try:
+        courses = planner.list_courses(user["id"])
+    except Exception as exc:  # noqa: BLE001
+        home_errors["courses"] = f"Course counts couldn't load: {exc}"
+
+    workspaces = []
+    try:
+        workspaces = (
+            db.collab_workspaces_for(user["id"])
+            if hasattr(db, "collab_workspaces_for") else []
+        )
+    except Exception as exc:  # noqa: BLE001
+        home_errors["workspaces"] = f"Workspaces couldn't load: {exc}"
+
     return render_template(
         "index.html",
         user=user,
         active_nav="home",
-        subjects=user_subjects(user),
-        courses=planner.list_courses(user["id"]),
+        subjects=subjects,
+        courses=courses or subjects,  # count source of truth (same table)
         deadlines=deadline_list,
         tasks=task_list,
         checkpoints=checkpoint_data,
-        workspaces=db.collab_workspaces_for(user["id"]) if hasattr(db, "collab_workspaces_for") else [],
+        next_step=_build_next_step(user, checkpoint_data, deadline_list, task_list, subjects),
+        availability=_home_availability(user),
+        home_errors=home_errors,
+        workspaces=workspaces,
     )
+
+
+def _build_next_step(user, checkpoint_data, deadline_list, task_list, subjects):
+    """The page's one best answer to "what should I do today?".
+
+    Priority order: focus a task that's due now > clear overdue work > repair a
+    behind-schedule deadline > explore subjects > fall back to "clear day".
+    This drives the hero action card so the hero is a decision, not a poster.
+    """
+    if checkpoint_data and checkpoint_data.get("today_tasks"):
+        t = checkpoint_data["today_tasks"][0]
+        return {
+            "kind": "focus",
+            "title": t.get("title") or "Start your next task",
+            "meta": f"Due today · {t.get('estimated_minutes') or 0} min focus",
+            "href": url_for("session_page", task_id=t.get("id") or ""),
+            "cta": "Start focus",
+        }
+    if checkpoint_data and checkpoint_data.get("overdue_tasks"):
+        n = len(checkpoint_data["overdue_tasks"])
+        return {
+            "kind": "urgent",
+            "title": f"{n} overdue {'task' if n == 1 else 'tasks'}",
+            "meta": "One short win gets the day moving again.",
+            "href": url_for("schedule"),
+            "cta": "Review schedule",
+        }
+    if checkpoint_data and checkpoint_data.get("behind"):
+        d = checkpoint_data["behind"][0]
+        return {
+            "kind": "plan",
+            "title": d.get("title") or "A tight deadline",
+            "meta": f"Due {d.get('due_date')} — reverse-plan the remaining steps.",
+            "href": url_for("deadline_plan", deadline_id=d.get("id") or 0),
+            "cta": "Rebuild plan",
+        }
+    if subjects:
+        return {
+            "kind": "subjects",
+            "title": f"Browse your {len(subjects)} course{'s' if len(subjects) != 1 else ''}",
+            "meta": "Open a subject to see resources, notes, and deadlines.",
+            "href": url_for("courses"),
+            "cta": "Open subjects",
+        }
+    return {
+        "kind": "clear",
+        "title": "All clear — the day is yours",
+        "meta": "Open your schedule and block out a focused study hour.",
+        "href": url_for("schedule"),
+        "cta": "Open schedule",
+    }
+
+
+def _home_availability(user):
+    """Context for the availability ring: stored hours vs the daily goal.
+
+    ``planned`` is the sum of this calendar day's event durations (0 when the
+    schedule is empty), so the tile can say "4h free" and explain what that
+    means rather than showing a floating number.
+    """
+    available = float(user.get("available_hours") or 0) if user else 0.0
+    goal = DAILY_AVAILABILITY_GOAL
+    planned = 0.0
+    try:
+        today = planner._today().isoformat()
+        planned = round(
+            sum(
+                int(e.get("duration_minutes") or 0)
+                for e in planner.list_events(user["id"]) if (e.get("start") or "").startswith(today)
+            ) / 60.0, 1,
+        )
+    except Exception:  # noqa: BLE001 - availability is decorative; never block the page
+        planned = 0.0
+    pct = round(min(available / goal, 1.0) * 100) if goal else 0
+    return {
+        "hours": available,
+        "goal": goal,
+        "planned": planned,
+        "pct": pct,
+    }
+
+
+@app.get("/api/home/stats")
+@login_required
+def home_stats_api():
+    """Live JSON snapshot of the Home stat tiles.
+
+    The dashboard tiles are server-rendered (fast first paint); this endpoint
+    lets the page refresh them in place so a course/deadline/task added on
+    another tab shows up without a full reload, and a genuine failure reports
+    an explicit error instead of silently showing "--".
+    """
+    user = current_user()
+    try:
+        deadlines = planner.list_deadlines(user["id"])
+        tasks = planner.list_tasks(user["id"])
+        courses = planner.list_courses(user["id"])
+        return jsonify({
+            "ok": True,
+            "courses": len(courses),
+            "deadlines": len([d for d in deadlines if d.get("status") != "done"]),
+            "tasks": len([t for t in tasks if t.get("status") != "done"]),
+            "available_hours": float(user.get("available_hours") or 0),
+            "user_id": user.get("id"),
+        })
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 
 def _home_checkpoints(user, deadline_list, task_list):
@@ -1647,6 +1809,7 @@ def courses():
         active_nav="courses",
         courses=planner.list_courses(user["id"]),
         colors=courses_mod.COURSE_COLORS,
+        default_term=courses_mod.DEFAULT_TERM,
     )
 
 
@@ -1660,6 +1823,7 @@ def courses_add():
         code=request.form.get("course_code", request.form.get("code", "")),
         title=request.form.get("title", ""),
         lecturer=request.form.get("lecturer", ""),
+        term=request.form.get("term", ""),
         credits=request.form.get("credits", 0),
         description=request.form.get("description", ""),
         schedule=request.form.get("schedule", ""),
@@ -1679,6 +1843,7 @@ def courses_update(course_id):
         course_id,
         title=request.form.get("title", ""),
         lecturer=request.form.get("lecturer", ""),
+        term=request.form.get("term", ""),
         credits=request.form.get("credits", 0),
         description=request.form.get("description", ""),
         schedule=request.form.get("schedule", ""),
