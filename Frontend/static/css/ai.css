@@ -10,6 +10,8 @@
 .ai-launcher {
   position: fixed;
   z-index: var(--z-launcher);
+  bottom: 1rem;
+  right: 1rem;
   width: 3.25rem;
   height: 3.25rem;
   border: none;

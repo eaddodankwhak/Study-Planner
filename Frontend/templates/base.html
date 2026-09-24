@@ -23,7 +23,7 @@
                 <img class="page-header__logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Study Planner">
             </a>
             <div class="page-header__user">
-                <span class="page-header__welcome">Welcome, {{ user.name if user else 'Student' }}</span>
+                <span class="page-header__welcome">Welcome, {{ user.display_name or user.name or 'Student' }}</span>
                 {% include '_nav.html' %}
             </div>
         </div>

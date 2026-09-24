@@ -31,6 +31,22 @@
         gap: var(--space-4);
     }
 
+    .settings-subtitle {
+        margin: var(--space-1) 0 -4px;
+        font-size: 1rem;
+        font-weight: var(--font-weight-semibold, 600);
+    }
+
+    .settings-notice {
+        margin: 0 0 var(--space-4);
+        padding: var(--space-2) var(--space-3);
+        border-left: 3px solid var(--color-accent, #0f62fe);
+        border-radius: var(--radius-sm, 6px);
+        background: var(--color-surface-alt, var(--color-surface));
+        color: var(--color-muted);
+        font-size: 0.9rem;
+    }
+
     .settings-row {
         display: flex;
         align-items: flex-start;
@@ -65,9 +81,48 @@
         line-height: 1.45;
     }
 
-    .settings-row>input[type="checkbox"] {
+    /* One switch component for every binary setting on the page. */
+    .settings-row input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
         flex: 0 0 auto;
-        margin-top: var(--space-1);
+        width: 2.75rem;
+        height: 1.55rem;
+        margin: var(--space-1) 0 0;
+        padding: 0;
+        border: 1px solid var(--color-border-strong, var(--color-border));
+        border-radius: 999px;
+        background: var(--color-border, #cbd4dc);
+        position: relative;
+        cursor: pointer;
+        transition: background var(--dur-base, 0.18s) ease, border-color var(--dur-base, 0.18s) ease;
+    }
+
+    .settings-row input[type="checkbox"]::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: calc(1.55rem - 8px);
+        height: calc(1.55rem - 8px);
+        border-radius: 50%;
+        background: var(--color-surface, #fff);
+        box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 0.24));
+        transition: transform var(--dur-base, 0.18s) ease;
+    }
+
+    .settings-row input[type="checkbox"]:checked {
+        background: var(--color-accent, var(--color-primary, #3985e6));
+        border-color: var(--color-accent, var(--color-primary, #3985e6));
+    }
+
+    .settings-row input[type="checkbox"]:checked::after {
+        transform: translateX(calc(2.75rem - 1.55rem));
+    }
+
+    .settings-row input[type="checkbox"]:focus-visible {
+        outline: 2px solid var(--color-accent, #0f62fe);
+        outline-offset: 2px;
     }
 
     .settings-controls {
@@ -75,6 +130,11 @@
         align-items: center;
         flex-wrap: wrap;
         gap: var(--space-3);
+    }
+
+    .settings-controls .form-input[data-ai-key] {
+        flex: 1 1 15rem;
+        min-width: 0;
     }
 
     .settings-inline {
@@ -111,9 +171,35 @@
         object-fit: cover;
     }
 
+    .settings-avatar__placeholder {
+        display: grid;
+        place-items: center;
+        flex: 0 0 9rem;
+        width: 9rem;
+        height: 9rem;
+        border-radius: 50%;
+        background: var(--color-accent);
+        color: var(--color-text-inverse, #fff);
+        font-size: 3rem;
+        font-weight: 700;
+    }
+
     .settings-avatar__actions {
         display: grid;
         gap: var(--space-2);
+        align-items: start;
+        justify-items: start;
+    }
+
+    .settings-avatar__drop {
+        outline: 2px dashed transparent;
+        outline-offset: 3px;
+        transition: outline-color var(--dur-base, 0.18s) ease, background var(--dur-base, 0.18s) ease;
+    }
+
+    .settings-avatar__drop.is-dragging {
+        outline-color: var(--color-accent, #0f62fe);
+        background: var(--color-surface-alt, var(--color-surface));
     }
 
     .settings-disabled {
@@ -137,11 +223,63 @@
         border-bottom: 1px solid var(--color-border);
     }
 
-    .photo-modal[hidden] {
+    .settings-membership strong,
+    .settings-membership small {
+        display: block;
+    }
+
+    .settings-membership__actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        justify-content: flex-end;
+    }
+
+    .settings-membership__actions form {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .settings-membership__edit {
+        width: 100%;
+    }
+
+    /* Unsaved-changes affordance: chips fade in per form once edited. */
+    .unsaved-chip {
+        display: none;
+        align-items: center;
+        gap: var(--space-1);
+        color: var(--color-accent, #0f62fe);
+        font-size: 0.8rem;
+        font-weight: var(--font-weight-medium, 600);
+    }
+
+    .unsaved-chip::before {
+        content: "";
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: currentColor;
+    }
+
+    .settings-form[data-dirty] .unsaved-chip {
+        display: inline-flex;
+    }
+
+    .settings-form[data-dirty] .button--primary {
+        box-shadow: 0 0 0 2px var(--color-surface, #fff), 0 0 0 4px var(--color-accent, #0f62fe);
+    }
+
+    .photo-modal[hidden],
+    .confirm-modal[hidden] {
         display: none;
     }
 
-    .photo-modal {
+    .photo-modal,
+    .confirm-modal {
         position: fixed;
         inset: 0;
         z-index: var(--z-modal);
@@ -151,11 +289,12 @@
         background: rgb(7 33 48 / 0.82);
     }
 
-    .photo-modal__dialog {
+    .photo-modal__dialog,
+    .confirm-modal__dialog {
         position: relative;
         max-width: min(32rem, 90vw);
         max-height: 90vh;
-        padding: var(--space-3);
+        padding: var(--space-5) var(--space-5) var(--space-6);
         background: var(--color-surface);
         border-radius: var(--radius);
         box-shadow: var(--shadow-lg);
@@ -187,6 +326,18 @@
         line-height: 1;
     }
 
+    .confirm-modal__title {
+        margin: 0 0 var(--space-2);
+        color: var(--color-error);
+    }
+
+    .confirm-modal__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-3);
+        margin-top: var(--space-5);
+    }
+
     .visually-hidden {
         position: absolute;
         width: 1px;
@@ -197,11 +348,6 @@
         clip: rect(0, 0, 0, 0);
         white-space: nowrap;
         border: 0;
-    }
-
-    .settings-membership strong,
-    .settings-membership small {
-        display: block;
     }
 
     @media (max-width: 42rem) {
@@ -223,6 +369,11 @@
             align-items: flex-start;
             flex-direction: column;
         }
+
+        .settings-membership__actions {
+            width: 100%;
+            justify-content: flex-start;
+        }
     }
 
     /* AI connect feedback: loud enough to be noticed under the row. */
@@ -242,7 +393,7 @@
 <div class="settings-grid">
     <section class="card settings-panel" aria-labelledby="account-heading">
         <div class="settings-panel__header">
-            <h3 class="card__title" id="account-heading">Account</h3><span class="badge badge--open">Personal</span>
+            <h3 class="card__title" id="account-heading">Account</h3>
         </div>
         <p class="settings-panel__intro">Your profile is shown to classmates and used to personalize your planner.
         </p>
@@ -253,16 +404,15 @@
                 <img class="settings-avatar__image" src="{{ url_for('profile_avatar', filename=user.avatar_path) }}"
                     alt="Current profile photo">
             </button>
-            {% else %}<div class="settings-avatar__image" aria-hidden="true">{{ (user.display_name or
+            {% else %}<div class="settings-avatar__placeholder" aria-hidden="true">{{ (user.display_name or
                 user.name)[0]|upper }}</div>{% endif %}
             <div class="settings-avatar__actions">
-                <form method="post" action="{{ url_for('settings_avatar') }}" enctype="multipart/form-data"
-                    class="settings-controls">
-                    <label class="button button--ghost" for="avatar">Choose photo</label>
+                <form method="post" action="{{ url_for('settings_avatar') }}" enctype="multipart/form-data">
+                    <label class="button button--primary settings-avatar__drop" for="avatar">Upload photo</label>
                     <input id="avatar" name="avatar" type="file" accept="image/*" hidden>
-                    <button class="button button--primary" type="submit">Upload photo</button>
+                    <small>JPG, PNG, GIF, or WebP · up to 5 MB. Photos are cropped to a centered square
+                        automatically.</small>
                 </form>
-                <small>JPG, PNG, GIF, or WebP. Maximum 5 MB. Crop the image before uploading if needed.</small>
                 {% if user.avatar_path %}<form method="post" action="{{ url_for('settings_avatar') }}"><input
                         type="hidden" name="remove" value="1"><button class="button button--ghost button--small"
                         type="submit" data-confirm="Remove your profile photo?">Remove photo</button></form>{% endif
@@ -280,7 +430,7 @@
             </div>
         </div>
         {% endif %}
-        <form method="post" action="{{ url_for('settings_profile') }}" class="settings-form">
+        <form method="post" action="{{ url_for('settings_profile') }}" class="settings-form" data-settings-form>
             <div class="settings-inline">
                 <div class="form-field"><label class="form-label" for="name">Full name</label><input class="form-input"
                         id="name" name="name" value="{{ user.name }}" required></div>
@@ -290,9 +440,10 @@
             </div>
             <div class="form-field"><label class="form-label" for="email">Email</label><input class="form-input"
                     id="email" name="email" type="email" value="{{ user.email }}" required><small
-                    class="text-muted">Changing email is saved immediately in this local app; email verification is
-                    not configured yet.</small></div>
-            <div class="form-actions"><button class="button button--primary" type="submit">Save profile</button>
+                    class="text-muted">This is the address you use to sign in and receive account
+                    notifications.</small></div>
+            <div class="form-actions"><span class="unsaved-chip">Unsaved changes</span><button
+                    class="button button--primary" type="submit">Save profile</button>
             </div>
         </form>
     </section>
@@ -310,7 +461,8 @@
                     password — change it below, or keep using Google.{% else %}Your account was created with Google and
                     has no password yet — set one to also sign in manually.{% endif %}</small></div>
         </div>
-        <form method="post" action="{{ url_for('settings_password') }}" class="settings-form">
+        <h4 class="settings-subtitle">{% if user_has_password %}Change password{% else %}Set a password{% endif %}</h4>
+        <form method="post" action="{{ url_for('settings_password') }}" class="settings-form" data-settings-form>
             {% if user_has_password %}
             <div class="form-field"><label class="form-label" for="current_password">Current password</label><input
                     class="form-input" id="current_password" name="current_password" type="password"
@@ -324,68 +476,28 @@
                         password</label><input class="form-input" id="confirm_password" name="confirm_password"
                         type="password" minlength="8" autocomplete="new-password" required></div>
             </div>
-            <button class="button button--primary" type="submit">{% if user_has_password %}Change
-                password{% else %}Set a password{% endif %}</button>
+            <div class="form-actions"><span class="unsaved-chip">Unsaved changes</span><button
+                    class="button button--primary" type="submit">{% if user_has_password %}Change
+                    password{% else %}Set a password{% endif %}</button></div>
         </form>
 
         <hr class="settings-rule">
 
         <div class="settings-row">
-            <div class="settings-row__copy"><strong>Google</strong><small>{% if google_env_configured and google_secret_set %}Connected — "Continue
-                    with Google" is live for everyone. Configured on the server via
-                    <code>GOOGLE_CLIENT_ID</code> + <code>GOOGLE_CLIENT_SECRET</code>.{% elif google_env_configured %}Client ID set on the
-                    server, but the Client Secret is missing — add
-                    <code>GOOGLE_CLIENT_SECRET</code> to your deployment environment.{% elif google_client_id and google_secret_set %}Connected (stored in
-                    this app) — "Continue with Google" is live for everyone.{% elif google_client_id %}Almost ready — add the Client Secret below so Google
-                    accepts the sign-in.{% else %}Not set up — add the Client ID and Secret to your deployment environment, or
-                    paste them below for local use.{% endif %}</small></div>
+            <div class="settings-row__copy"><strong>Google</strong><small>{% if google_secret_set %}Connected — you can
+                    sign in with your Google account.{% else %}Not available yet — you can still sign in with your email
+                    and password.{% endif %}</small></div>
         </div>
-        {% if not google_env_configured %}
-        <form method="post" action="{{ url_for('settings_signin') }}" class="settings-form">
-            <div class="settings-inline">
-                <div class="form-field"><label class="form-label" for="google_client_id">Google OAuth Client ID</label><input
-                        class="form-input" id="google_client_id" name="google_client_id"
-                        value="{{ google_client_id or '' }}" placeholder="xxxx.apps.googleusercontent.com"
-                        autocomplete="off"><small class="text-muted">Google Cloud Console → APIs &amp; Services →
-                        Credentials → Create OAuth Client ID → application type <em>Web application</em>. Paste the Client
-                        ID here.</small></div>
-                <div class="form-field"><label class="form-label" for="google_client_secret">Client Secret</label><input
-                        class="form-input" id="google_client_secret" name="google_client_secret"
-                        value="" type="password" placeholder="Paste from Credentials → Client Secret"
-                        autocomplete="off">{% if google_secret_set %}<small class="text-muted">A secret is saved (it is
-                        never shown back). Clear &gt; Save saves a new one.</small>{% else %}<small class="text-muted">Web
-                        application clients need the secret. Copy it from the same Credentials row that shows your Client
-                        ID. (Local testing can leave this blank.)</small>{% endif %}</div>
-            </div>
-            <div class="form-actions">
-                <button class="button button--primary" type="submit">Save Google sign-in</button>
-                {% if google_client_id %}<button class="button button--ghost" type="submit" name="remove"
-                    value="1">Remove</button>{% endif %}
-            </div>
-        </form>
-        {% else %}
-        <p class="settings-panel__intro">This app reads Google credentials from the server environment, so there is
-            nothing to paste here. Set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> in your Render
-            Dashboard (Environment) and redeploy.</p>
-        {% endif %}
-        <p class="settings-panel__intro">One Google Cloud check before it goes live for everyone: (1) make sure the
-            client is a <em>Web application</em> with <code>{{ google_redirect_uri }}</code> in its <em>Authorized
-                redirect URIs</em>; (2) open OAuth consent screen and set the app status to <em>In production</em> —
-            otherwise only your test users can sign in, and new visitors see the "unverified app" screen.</p>
     </section>
 
     <section class="card settings-panel" aria-labelledby="notifications-heading">
         <div class="settings-panel__header">
-            <h3 class="card__title" id="notifications-heading">Notifications</h3><span class="text-muted">Saved with
-                this form</span>
+            <h3 class="card__title" id="notifications-heading">Notifications</h3>
         </div>
         <p class="settings-panel__intro">Choose which study signals reach you and where they appear.</p>
-        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form">
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form" data-settings-form>
             <input type="hidden" name="notify_digest" value="legacy-compatible">
-            {% for key, label, help in [('deadlines','Deadline reminders','Get advance notice before important due
-            dates.'),('weekly_digest','Weekly digest','A weekly summary of deadlines, tasks, and study
-            load.'),('ai_suggestions','AI tutor suggestions','Helpful prompts based on your study
-            activity.'),('workspace_activity','Group/workspace activity','Updates from your shared workspaces.')] %}
+            {% for key, label, help in [('deadlines','Deadline reminders','Get advance notice before important due dates.'),('weekly_digest','Weekly digest','A weekly summary of deadlines, tasks, and study load.'),('ai_suggestions','AI tutor suggestions','Helpful prompts based on your study activity.'),('workspace_activity','Group/workspace activity','Updates from your shared workspaces.')] %}
             <label class="settings-row"><span class="settings-row__copy"><strong>{{ label }}</strong><small>{{ help
                         }}</small></span><input type="checkbox" name="{{ key }}" {% if settings.notifications[key]
                     %}checked{% endif %}></label>
@@ -407,7 +519,8 @@
                     <option value="push" {% if settings.notifications.channel=='push' %}selected{% endif %}>Push
                     </option>
                 </select></div>
-            <button class="button button--primary" type="submit">Save notification settings</button>
+            <div class="form-actions"><span class="unsaved-chip">Unsaved changes</span><button
+                    class="button button--primary" type="submit">Save notification settings</button></div>
         </form>
     </section>
 
@@ -416,11 +529,14 @@
         <p class="settings-panel__intro">Set the defaults your planner uses when making suggestions.</p>
         <div class="settings-notice">Adaptive planning suggests; you can always override an individual change before
             it affects your schedule.</div>
-        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form">
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form" data-settings-form>
             <div class="settings-inline">
-                <div class="form-field"><label class="form-label" for="weekly_hours">Weekly availability
-                        (hours)</label><input class="form-input" id="weekly_hours" name="weekly_hours" type="number"
-                        min="1" max="80" value="{{ settings.study.weekly_hours }}"></div>
+                <div class="form-field"><label class="form-label" for="available_hours">Daily availability
+                        (hours)</label><input class="form-input" id="available_hours" name="available_hours" type="number"
+                        min="1" max="12" step="0.5"
+                        value="{{ '%.1f'|format(user.available_hours|float) if user.available_hours else 4 }}"><small
+                        class="text-muted">Used to plan realistic daily study sessions and shown on your
+                        dashboard.</small></div>
                 <div class="form-field"><label class="form-label" for="focus_minutes">Focus session
                         length</label><select class="form-input" id="focus_minutes" name="focus_minutes">{% for n in
                         [15,25,45,60,90] %}<option value="{{ n }}" {% if settings.study.focus_minutes==n %}selected{%
@@ -443,18 +559,20 @@
                         <option value="proactive">Proactive</option>
                     </select></div>
             </div>
-            <button class="button button--primary" type="submit">Save study preferences</button>
+            <div class="form-actions"><span class="unsaved-chip">Unsaved changes</span><button
+                    class="button button--primary" type="submit">Save study preferences</button></div>
         </form>
     </section>
 
     <section class="card settings-panel" aria-labelledby="ai-accounts-heading">
         <div class="settings-panel__header">
-            <h3 class="card__title" id="ai-accounts-heading">AI accounts</h3><span class="badge badge--open">Your own</span>
+            <h3 class="card__title" id="ai-accounts-heading">AI accounts</h3>
         </div>
         <p class="settings-panel__intro">Connect your own Claude, ChatGPT, Gemini, DeepSeek, or GitHub Copilot
-            account so your AI chats use your own key for that model. Click <strong>Connect</strong> to open the
-            provider's key page, then paste the key you create there and click <strong>Connect</strong> again to verify
-            it. Keys are stored obfuscated in your local database — they never leave this device.</p>
+            account so your AI chats use your key for that model. Keys are encrypted, stored with your account, and
+            only ever sent to the provider when you send a message — they are never shown back to you or anyone
+            else.</p>
+        {% set short_placeholders = {'anthropic': 'Paste Claude API key', 'openai': 'Paste ChatGPT (OpenAI) API key', 'google': 'Paste Gemini API key', 'deepseek': 'Paste DeepSeek API key', 'copilot': 'Paste GitHub token (Copilot chat requests)'} %}
         {% for provider, label, key_url, key_label in [
         ('anthropic','Claude','https://platform.claude.com/settings/keys','Claude API key'),
         ('openai','ChatGPT','https://platform.openai.com/api-keys','ChatGPT (OpenAI) API key'),
@@ -462,40 +580,63 @@
         ('deepseek','DeepSeek','https://platform.deepseek.com/api_keys','DeepSeek API key'),
         ('copilot','Copilot','https://github.com/settings/personal-access-tokens','GitHub token with the Copilot requests permission')] %}
         {% set conn = ai_connections_by_provider.get(provider) %}
-        <div class="settings-membership">
+        <div class="settings-membership" data-ai-row="{{ provider }}">
             <div>
                 <strong>{{ label }}</strong>
                 {% if conn %}
                 <small class="text-muted">Connected{% if conn.key_hint %} · key ends {{ conn.key_hint }}{% endif %}</small>
                 {% else %}
-                <small class="text-muted">Not connected — {{ label }} model chats fall back to the demo provider.</small>
+                <small class="text-muted">Not connected — {{ label }} chats use the built-in assistant instead.</small>
                 {% endif %}
             </div>
             {% if conn %}
-            <button class="button button--ghost button--small" type="button" data-ai-disconnect="{{ provider }}">Disconnect</button>
+            <div class="settings-membership__actions">
+                <button class="button button--ghost button--small" type="button"
+                    data-ai-change="{{ provider }}">Change key</button>
+                <button class="button button--ghost button--small" type="button" data-ai-disconnect="{{ provider }}">Disconnect</button>
+            </div>
+            <form class="settings-membership__edit settings-form" data-ai-edit="{{ provider }}" hidden>
+                <div class="settings-controls">
+                    <input class="form-input" type="password" data-ai-key="{{ provider }}"
+                        placeholder="{{ short_placeholders[provider] }}" value="" autocomplete="off">
+                    <button class="button button--primary button--small" type="submit"
+                        data-ai-connect="{{ provider }}" data-ai-key-url="{{ key_url }}"
+                        data-ai-key-label="{{ key_label }}">Save key</button>
+                    <button class="button button--ghost button--small" type="button"
+                        data-ai-cancel="{{ provider }}">Cancel</button>
+                </div>
+            </form>
             {% else %}
-            <div class="settings-controls">
-                <input class="form-input" type="password" data-ai-key="{{ provider }}" placeholder="Paste {{ key_label }}" autocomplete="off">
-                <button class="button button--primary button--small" type="button" data-ai-connect="{{ provider }}"
-                    data-ai-key-url="{{ key_url }}" data-ai-key-label="{{ key_label }}">Connect</button>
+            <div class="settings-membership__actions">
+                <form class="settings-form settings-membership__edit" data-ai-edit="{{ provider }}">
+                    <div class="settings-controls">
+                        <input class="form-input" type="password" data-ai-key="{{ provider }}"
+                            placeholder="{{ short_placeholders[provider] }}" value="" autocomplete="off">
+                        <button class="button button--primary button--small" type="submit"
+                            data-ai-connect="{{ provider }}" data-ai-key-url="{{ key_url }}"
+                            data-ai-key-label="{{ key_label }}">Connect</button>
+                    </div>
+                </form>
             </div>
             {% endif %}
+            <p class="text-muted" data-ai-error="{{ provider }}" hidden
+                style="margin-top: calc(var(--space-2) * -1); flex-basis: 100%;"></p>
         </div>
-        <p class="text-muted" data-ai-error="{{ provider }}" hidden style="margin-top: calc(var(--space-2) * -1);"></p>
         {% endfor %}
         <div class="settings-row">
-            <div class="settings-row__copy"><strong>How it works</strong><small>Click Connect and a new tab opens the
-                    provider's official key page — create a key there, copy it, paste it back here, and connect.
-                    <em>GitHub Copilot</em> has no API keys: create a fine-grained personal access token with the
-                    <em>Copilot requests</em> permission. Once connected, your chat uses that model family with your key,
-                    no server key needed. Disconnect anytime.</small></div>
+            <div class="settings-row__copy"><strong>How it works</strong><small>Click <strong>Connect</strong> and a
+                    new tab opens the provider's official key page — create a key there, copy it, paste it back here,
+                    and connect. <em>GitHub Copilot</em> has no API keys: create a fine-grained personal access token
+                    with the <em>Copilot requests</em> permission. Once connected, your chat uses that model family with
+                    your key, no server key needed. Disconnect anytime.</small></div>
         </div>
     </section>
 
     <section class="card settings-panel" aria-labelledby="appearance-heading">
         <h3 class="card__title" id="appearance-heading">Appearance &amp; Accessibility</h3>
         <p class="settings-panel__intro">Make the interface easier and more comfortable to use. Changes apply immediately as you preview — <strong>Save accessibility settings</strong> to keep them. Press <kbd>?</kbd> on any page to view keyboard shortcuts.</p>
-        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form" id="appearance-form">
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form" id="appearance-form"
+            data-settings-form>
             <div class="settings-inline">
                 <div class="form-field"><label class="form-label" for="theme">Theme</label><select class="form-input"
                         id="theme" name="theme">
@@ -518,8 +659,9 @@
             </div><label class="settings-row"><span class="settings-row__copy"><strong>Reduce
                         motion</strong><small>Disables non-essential animation, including the landing-page hero
                         effect.</small></span><input type="checkbox" name="reduce_motion" {% if
-                    settings.appearance.reduce_motion %}checked{% endif %}></label><button
-                class="button button--primary" type="submit">Save accessibility settings</button>
+                    settings.appearance.reduce_motion %}checked{% endif %}></label><div class="form-actions"><span
+                    class="unsaved-chip">Unsaved changes</span><button class="button button--primary" type="submit">Save
+                    accessibility settings</button></div>
         </form>
     </section>
 
@@ -527,7 +669,7 @@
         <h3 class="card__title" id="privacy-heading">Privacy &amp; AI Controls</h3>
         <p class="settings-panel__intro">Decide how your learning data is used. Your choices are stored with your
             account.</p>
-        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form"><label
+        <form method="post" action="{{ url_for('settings_preferences') }}" class="settings-form" data-settings-form><label
                 class="settings-row"><span class="settings-row__copy"><strong>Allow AI tutor and adaptive planning
                         to use activity data</strong><small>This includes your study sessions, quiz results, and
                         planner patterns to make suggestions more relevant.</small></span><input type="checkbox"
@@ -538,9 +680,10 @@
                         %}>Workspace members</option>
                     <option value="private" {% if settings.privacy.workspace_visibility=='private' %}selected{% endif
                         %}>Keep my activity private</option>
-                </select></div><button class="button button--primary" type="submit">Save privacy settings</button>
+                </select></div><div class="form-actions"><span class="unsaved-chip">Unsaved changes</span><button
+                    class="button button--primary" type="submit">Save privacy settings</button></div>
         </form>
-        <div class="form-actions"><a class="button button--ghost" href="{{ url_for('export_data') }}">Export my
+        <div class="form-actions"><a class="button button--secondary" href="{{ url_for('export_data') }}">Export my
                 data</a></div>
     </section>
 
@@ -549,41 +692,63 @@
         <p class="settings-panel__intro">Protect your account and review access.</p>
         <div class="settings-row">
             <div class="settings-row__copy"><strong>Current browser session</strong><small>Active now on this
-                    device.</small></div><a class="button button--ghost" href="{{ url_for('logout') }}">Log out</a>
+                    device.</small></div><a class="button button--ghost button--small" href="{{ url_for('logout') }}">Log
+                out</a>
         </div>
         <div class="settings-row settings-disabled">
-            <div class="settings-row__copy"><strong>Other devices</strong><small>Multi-device session tracking is
-                    not configured in this local Flask deployment.</small></div><button class="button button--ghost"
-                type="button" disabled>Unavailable</button>
+            <div class="settings-row__copy"><strong>Other devices</strong><small>See which devices can access your
+                    account. A full device list is coming soon.</small></div><button class="button button--ghost"
+                type="button" disabled>Coming soon</button>
         </div>
         <div class="settings-row settings-disabled">
-            <div class="settings-row__copy"><strong>Two-factor authentication</strong><small>Requires an identity
-                    provider or secure TOTP service.</small></div><button class="button button--ghost" type="button"
+            <div class="settings-row__copy"><strong>Two-factor authentication</strong><small>Add a second verification
+                    step when you sign in. Coming soon.</small></div><button class="button button--ghost" type="button"
                 disabled>Coming soon</button>
         </div>
     </section>
 
     <section class="card settings-panel" aria-labelledby="groups-heading">
-        <h3 class="card__title" id="groups-heading">Groups &amp; Workspaces</h3>
+        <div class="settings-panel__header">
+            <h3 class="card__title" id="groups-heading">Groups &amp; Workspaces</h3><a
+                class="button button--ghost button--small"
+                href="{{ url_for('collab.workspace_list') }}">Create a workspace</a>
+        </div>
         <p class="settings-panel__intro">Review the shared spaces connected to your account.</p>{% if workspaces
         %}{% for workspace in workspaces %}<div class="settings-membership">
             <div><strong>{{ workspace.name }}</strong><small class="text-muted">{{ workspace.member_count }} members
                     · {{ workspace.num_tasks }} tasks</small></div><a class="button button--ghost button--small"
                 href="{{ url_for('collab.workspace_detail', workspace_id=workspace.id) }}">Open workspace</a>
-        </div>{% endfor %}{% else %}<p class="text-muted">You have not joined a group workspace yet.</p>{% endif %}
+        </div>{% endfor %}{% else %}<p class="text-muted">You have not joined a group workspace yet — create one to
+            stay on track together.</p>{% endif %}
     </section>
 
     <section class="card settings-panel settings-danger" aria-labelledby="danger-heading">
         <h3 class="card__title" id="danger-heading">Danger Zone</h3>
         <p>This permanently removes your account, planner data, notes, sessions, memberships, and AI history.</p>
-        <form method="post" action="{{ url_for('delete_account') }}" class="settings-form">
+        <form method="post" action="{{ url_for('delete_account') }}" class="settings-form" data-delete-form>
             <div class="form-field"><label class="form-label" for="delete_confirmation">Type your account email or
                     DELETE to confirm</label><input class="form-input" id="delete_confirmation" name="confirmation"
-                    required autocomplete="off"></div><button class="button" type="submit"
-                style="background:var(--color-error);" disabled data-delete-submit>Delete account
-                permanently</button>
+                    required autocomplete="off"></div><button class="button" type="button"
+                style="background:var(--color-error);" disabled data-delete-submit
+                data-confirm-open="delete">Delete account permanently</button>
         </form>
     </section>
+</div>
+
+<div class="confirm-modal" data-confirm-modal="delete" hidden>
+    <div class="confirm-modal__dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"
+        aria-describedby="confirm-desc">
+        <h4 class="confirm-modal__title" id="confirm-title">Delete your account permanently?</h4>
+        <p id="confirm-desc">This action cannot be undone. It removes your planner data, notes, sessions, memberships,
+            and AI history forever.</p>
+        <div class="form-field"><label class="form-label" for="confirm_destructive">Type DELETE to continue</label><input
+                class="form-input" id="confirm_destructive" type="text" autocomplete="off"></div>
+        <div class="confirm-modal__actions">
+            <button class="button button--ghost" type="button" data-confirm-cancel="delete">Cancel</button>
+            <button class="button" type="button" style="background:var(--color-error);" data-confirm-go
+                disabled>Yes, delete my account</button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -591,66 +756,118 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var avatarInput = document.getElementById('avatar');
-        var avatarPreview = document.querySelector('.settings-avatar__image');
-        if (avatarInput) avatarInput.addEventListener('change', function () {
-            var file = avatarInput.files[0];
-            if (!file) return;
-            if (file.size > 5 * 1024 * 1024) {
-                avatarInput.value = '';
-                window.alert('Please choose an image smaller than 5 MB.');
-                return;
-            }
-            var reader = new FileReader();
-            reader.onload = function () { if (avatarPreview && avatarPreview.tagName === 'IMG') avatarPreview.src = reader.result; };
-            reader.readAsDataURL(file);
-        });
         var avatarForm = avatarInput && avatarInput.closest('form');
-        if (avatarForm) avatarForm.addEventListener('submit', function (event) {
-            var file = avatarInput.files[0];
-            if (!file || !window.createImageBitmap) return;
-            event.preventDefault();
-            createImageBitmap(file).then(function (image) {
-                var side = Math.min(image.width, image.height);
-                var canvas = document.createElement('canvas');
-                canvas.width = 512; canvas.height = 512;
-                canvas.getContext('2d').drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 512, 512);
-                canvas.toBlob(function (blob) {
-                    var cropped = new File([blob], file.name, { type: file.type });
+        var avatarDrop = document.querySelector('.settings-avatar__drop');
+
+        if (!(window.FileReader && window.File)) return finishSetup();
+
+        function finishSetup() {
+            wireAvatar();
+            wireDirtyForms();
+            wireDeleteFlow();
+            wireAi();
+            wirePhotoModal();
+        }
+
+        /* --------------------------------------------------- avatar */
+        function wireAvatar() {
+            if (!avatarInput || !avatarForm) return;
+            [avatarDrop, avatarInput.parentElement].forEach(function (zone) {
+                if (!zone) return;
+                zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('is-dragging'); });
+                zone.addEventListener('dragleave', function () { zone.classList.remove('is-dragging'); });
+                zone.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    zone.classList.remove('is-dragging');
+                    if (e.dataTransfer && e.dataTransfer.files.length) {
+                        avatarInput.files = e.dataTransfer.files;
+                        uploadAvatar();
+                    }
+                });
+            });
+            avatarInput.addEventListener('change', uploadAvatar);
+            function uploadAvatar() {
+                var file = avatarInput.files[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                    avatarInput.value = '';
+                    window.alert('Please choose an image smaller than 5 MB.');
+                    return;
+                }
+                var submitCropped = function (blob) {
+                    var cropped = new File([blob], file.name, { type: blob.type || file.type });
                     var transfer = new DataTransfer();
                     transfer.items.add(cropped);
                     avatarInput.files = transfer.files;
                     avatarForm.submit();
-                }, file.type, 0.9);
-            });
-        });
-        var input = document.getElementById('delete_confirmation');
-        var submit = document.querySelector('[data-delete-submit]');
-        var photoModal = document.querySelector('[data-photo-modal]');
-        var photoOpen = document.querySelector('[data-photo-open]');
-        var photoClose = document.querySelector('[data-photo-close]');
-        var lastPhotoFocus;
-        function closePhoto() {
-            if (!photoModal) return;
-            photoModal.hidden = true;
-            if (lastPhotoFocus) lastPhotoFocus.focus();
-        }
-        if (photoOpen && photoModal) photoOpen.addEventListener('click', function () {
-            lastPhotoFocus = document.activeElement;
-            photoModal.hidden = false;
-            photoClose.focus();
-        });
-        if (photoClose) photoClose.addEventListener('click', closePhoto);
-        if (photoModal) photoModal.addEventListener('click', function (event) { if (event.target === photoModal) closePhoto(); });
-        document.addEventListener('keydown', function (event) {
-            if (!photoModal || photoModal.hidden) return;
-            if (event.key === 'Escape') closePhoto();
-            if (event.key === 'Tab') {
-                event.preventDefault();
-                photoClose.focus();
+                };
+                if (!window.createImageBitmap) { avatarForm.submit(); return; }
+                createImageBitmap(file).then(function (image) {
+                    var side = Math.min(image.width, image.height);
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 512; canvas.height = 512;
+                    canvas.getContext('2d').drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 512, 512);
+                    canvas.toBlob(function (blob) {
+                        if (blob) submitCropped(blob); else avatarForm.submit();
+                    }, file.type, 0.9);
+                }).catch(function () { avatarForm.submit(); });
             }
-        });
-        if (input && submit) input.addEventListener('input', function () { submit.disabled = !['{{ user.email|e }}', 'DELETE'].includes(input.value.trim()); });
+        }
 
+        /* ------------------------------------- unsaved changes state */
+        function wireDirtyForms() {
+            document.querySelectorAll('form[data-settings-form]').forEach(function (form) {
+                form.addEventListener('input', markDirty);
+                form.addEventListener('change', function () { if (form.querySelector('select, [type="checkbox"]')) markDirty(); });
+                form.addEventListener('submit', function () { form.removeAttribute('data-dirty'); });
+            });
+            function markDirty() { this.dataset.dirty = 'true'; }
+        }
+
+        /* ---------------------------------------------- delete flow */
+        function wireDeleteFlow() {
+            var field = document.getElementById('delete_confirmation');
+            var submit = document.querySelector('[data-delete-submit]');
+            var modal = document.querySelector('[data-confirm-modal="delete"]');
+            var confirmInput = document.getElementById('confirm_destructive');
+            var go = document.querySelector('[data-confirm-go]');
+            var cancel = document.querySelector('[data-confirm-cancel="delete"]');
+            var lastFocus;
+            if (!field || !submit || !modal) return;
+
+            var matches = function (value) { var t = value.trim(); return t === '{{ user.email|e }}' || t === 'DELETE'; };
+            field.addEventListener('input', function () { submit.disabled = !matches(field.value); });
+
+            submit.addEventListener('click', function () {
+                if (submit.disabled || !matches(field.value)) return;
+                lastFocus = document.activeElement;
+                modal.hidden = false;
+                go.disabled = true;
+                confirmInput.value = '';
+                confirmInput.focus();
+            });
+            function closeModal() {
+                modal.hidden = true;
+                if (lastFocus) lastFocus.focus();
+            }
+            cancel.addEventListener('click', closeModal);
+            modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+            confirmInput.addEventListener('input', function () { go.disabled = confirmInput.value.trim() !== 'DELETE'; });
+            go.addEventListener('click', function () {
+                if (go.disabled) return;
+                document.querySelector('[data-delete-form]').submit();
+            });
+            document.addEventListener('keydown', function (e) {
+                if (modal.hidden) return;
+                if (e.key === 'Escape') closeModal();
+                if (e.key === 'Tab' && modal.hidden === false) {
+                    e.preventDefault();
+                    (e.shiftKey ? cancel : go).focus();
+                }
+            });
+        }
+
+        /* -------------------------------------------------------- ai */
         function aiShowError(provider, message) {
             var el = document.querySelector('[data-ai-error="' + provider + '"]');
             if (!el) return;
@@ -659,71 +876,126 @@
             el.hidden = false;
             el.setAttribute('role', 'alert');
         }
-        document.querySelectorAll('[data-ai-connect]').forEach(function (btn) {
-            var provider = btn.getAttribute('data-ai-connect');
-            var keyInput = document.querySelector('[data-ai-key="' + provider + '"]');
-            if (keyInput) keyInput.addEventListener('input', function () {
-                var el = document.querySelector('[data-ai-error="' + provider + '"]');
-                if (el) {
-                    el.textContent = '';
-                    el.classList.remove('ai-connect-note');
-                    el.removeAttribute('role');
-                    el.hidden = true;
-                }
-            });
-            btn.addEventListener('click', async function () {
+        function clearError(provider) {
+            var el = document.querySelector('[data-ai-error="' + provider + '"]');
+            if (el) {
+                el.textContent = '';
+                el.classList.remove('ai-connect-note');
+                el.removeAttribute('role');
+                el.hidden = true;
+            }
+        }
+        function wireAi() {
+            var connectable = document.querySelectorAll('[data-ai-connect]');
+            connectable.forEach(function (btn) {
                 var provider = btn.getAttribute('data-ai-connect');
-                var input = document.querySelector('[data-ai-key="' + provider + '"]');
-                var apiKey = input ? input.value.trim() : '';
-                if (!apiKey) {
-                    // First click: open the provider's official key page so the
-                    // user can create/copy a key, then guide them back here.
-                    var keyUrl = btn.getAttribute('data-ai-key-url');
-                    if (keyUrl) window.open(keyUrl, '_blank', 'noopener');
-                    if (input) input.focus();
-                    aiShowError(provider, 'Create ' + (btn.getAttribute('data-ai-key-label') || (btn.textContent.trim() + ' key')) +
-                        ' on the page that just opened, paste it above, then click Connect again to verify and save it.');
-                    return;
-                }
-                btn.disabled = true;
-                try {
-                    var resp = await fetch('/api/ai/connections', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ provider: provider, apiKey: apiKey })
-                    });
-                    var data = await resp.json().catch(function () { return {}; });
-                    if (!resp.ok) {
-                        aiShowError(provider, (data && data.error) || 'Connection failed.');
-                        btn.disabled = false;
+                var form = btn.closest('form[data-ai-edit]');
+                var keyInput = form && form.querySelector('[data-ai-key="' + provider + '"]');
+                form.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    var apiKey = keyInput ? keyInput.value.trim() : '';
+                    if (!apiKey) {
+                        var keyUrl = btn.getAttribute('data-ai-key-url');
+                        if (keyUrl) window.open(keyUrl, '_blank', 'noopener');
+                        if (keyInput) keyInput.focus();
+                        aiShowError(provider, 'Create ' + (btn.getAttribute('data-ai-key-label') || 'a key') +
+                            ' on the page that just opened, paste it above, then click Connect again to verify and save it.');
                         return;
                     }
-                    window.location.reload();
-                } catch (err) {
-                    aiShowError(provider, 'Could not reach the server.');
-                    btn.disabled = false;
-                }
-            });
-        });
-        document.querySelectorAll('[data-ai-disconnect]').forEach(function (btn) {
-            btn.addEventListener('click', async function () {
-                var provider = btn.getAttribute('data-ai-disconnect');
-                btn.disabled = true;
-                try {
-                    var resp = await fetch('/api/ai/connections/' + encodeURIComponent(provider), { method: 'DELETE' });
-                    var data = await resp.json().catch(function () { return {}; });
-                    if (!resp.ok) {
-                        aiShowError(provider, (data && data.error) || 'Could not disconnect.');
+                    btn.disabled = true;
+                    try {
+                        var resp = await fetch('/api/ai/connections', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ provider: provider, apiKey: apiKey })
+                        });
+                        var data = await resp.json().catch(function () { return {}; });
+                        if (!resp.ok) {
+                            aiShowError(provider, (data && data.error) || 'Connection failed.');
+                            btn.disabled = false;
+                            return;
+                        }
+                        window.location.reload();
+                    } catch (err) {
+                        aiShowError(provider, 'Could not reach the server.');
                         btn.disabled = false;
-                        return;
                     }
-                    window.location.reload();
-                } catch (err) {
-                    aiShowError(provider, 'Could not reach the server.');
+                });
+            });
+
+            document.querySelectorAll('[data-ai-disconnect]').forEach(function (btn) {
+                btn.addEventListener('click', async function () {
+                    var provider = btn.getAttribute('data-ai-disconnect');
+                    btn.disabled = true;
+                    try {
+                        var resp = await fetch('/api/ai/connections/' + encodeURIComponent(provider), { method: 'DELETE' });
+                        var data = await resp.json().catch(function () { return {}; });
+                        if (!resp.ok) {
+                            aiShowError(provider, (data && data.error) || 'Could not disconnect.');
+                            btn.disabled = false;
+                            return;
+                        }
+                        window.location.reload();
+                    } catch (err) {
+                        aiShowError(provider, 'Could not reach the server.');
+                        btn.disabled = false;
+                    }
+                });
+            });
+
+            document.querySelectorAll('[data-ai-change]').forEach(function (btn) {
+                var provider = btn.getAttribute('data-ai-change');
+                var row = document.querySelector('[data-ai-row="' + provider + '"]');
+                var edit = row && row.querySelector('[data-ai-edit="' + provider + '"]');
+                var cancel = row && row.querySelector('[data-ai-cancel="' + provider + '"]');
+                if (!row || !edit || !cancel) return;
+                btn.addEventListener('click', function () {
+                    edit.hidden = false;
+                    btn.disabled = true;
+                    cancel.focus();
+                });
+                cancel.addEventListener('click', function () {
+                    edit.hidden = true;
                     btn.disabled = false;
+                    var keyInput = row.querySelector('[data-ai-key="' + provider + '"]');
+                    if (keyInput) keyInput.value = '';
+                    clearError(provider);
+                });
+            });
+
+            document.querySelectorAll('[data-ai-key]').forEach(function (input) {
+                var provider = input.getAttribute('data-ai-key');
+                input.addEventListener('input', function () { clearError(provider); });
+            });
+        }
+
+        /* ------------------------------------------- photo modal */
+        function wirePhotoModal() {
+            var photoModal = document.querySelector('[data-photo-modal]');
+            var photoOpen = document.querySelector('[data-photo-open]');
+            var photoClose = document.querySelector('[data-photo-close]');
+            var lastPhotoFocus;
+            if (!photoModal || !photoOpen || !photoClose) return;
+            function closePhoto() {
+                photoModal.hidden = true;
+                if (lastPhotoFocus) lastPhotoFocus.focus();
+            }
+            photoOpen.addEventListener('click', function () {
+                lastPhotoFocus = document.activeElement;
+                photoModal.hidden = false;
+                photoClose.focus();
+            });
+            photoClose.addEventListener('click', closePhoto);
+            photoModal.addEventListener('click', function (event) { if (event.target === photoModal) closePhoto(); });
+            document.addEventListener('keydown', function (event) {
+                if (photoModal.hidden) return;
+                if (event.key === 'Escape') closePhoto();
+                if (event.key === 'Tab') {
+                    event.preventDefault();
+                    photoClose.focus();
                 }
             });
-        });
+        }
     });
 
     (function () {

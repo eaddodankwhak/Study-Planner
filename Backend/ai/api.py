@@ -189,7 +189,7 @@ def list_connections():
 
 @ai_api.post("/connections")
 def add_connection():
-    """Validate a BYOK key against the provider, then store it (obfuscated).
+    """Validate a BYOK key against the provider, then store it encrypted.
 
     Keys are verified live before saving so invalid keys never reach the db.
     """

@@ -802,11 +802,13 @@ def _connection_secret():
 
 
 def _encrypt_connection_key(api_key):
-    """Obfuscate an API key before storage.
+    """Encrypt an API key at rest.
 
-    Not a real KDF-envelope (that would need a dedicated secrets store), but
-    XOR with a keyed PRF stream plus an HMAC tag means a raw db dump never
-    contains the plaintext key. Format: base64(nonce).base64(tag).base64(cipher).
+    Authenticated, random-nonce streaming cipher: a random 12-byte nonce seeds
+    an HMAC-SHA256 keystream (CTR mode) and a keyed HMAC tag authenticates the
+    ciphertext, so a raw database dump never contains the plaintext key and any
+    tampering is detected. The key is derived from the app SECRET_KEY via
+    PBKDF2. Format: base64(nonce).base64(tag).base64(cipher).
     """
     key, _ = _connection_secret()
     nonce = os.urandom(12)
@@ -952,7 +954,6 @@ DEFAULT_SETTINGS = {
         "channel": "in-app",
     },
     "study": {
-        "weekly_hours": 4,
         "focus_minutes": 25,
         "spaced_repetition": "balanced",
         "planning_aggressiveness": "balanced",

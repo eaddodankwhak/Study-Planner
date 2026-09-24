@@ -785,14 +785,14 @@ def settings_preferences():
     notification_keys = {"deadlines", "weekly_digest", "ai_suggestions", "workspace_activity", "deadline_days", "channel"}
     if notification_keys.intersection(request.form):
         updates["notifications"] = notifications
-    if {"weekly_hours", "focus_minutes", "spaced_repetition", "planning_aggressiveness"}.intersection(request.form):
+    if {"available_hours", "focus_minutes", "spaced_repetition", "planning_aggressiveness"}.intersection(request.form):
         try:
-            weekly_hours = max(1, min(80, int(request.form.get("weekly_hours", 4))))
+            available_hours = max(1.0, min(12.0, float(request.form.get("available_hours", 4))))
             focus_minutes = max(5, min(120, int(request.form.get("focus_minutes", 25))))
         except (TypeError, ValueError):
-            weekly_hours, focus_minutes = 4, 25
+            available_hours, focus_minutes = 4.0, 25
+        db.update_user(user["id"], {"available_hours": available_hours})
         updates["study"] = {
-            "weekly_hours": weekly_hours,
             "focus_minutes": focus_minutes,
             "spaced_repetition": request.form.get("spaced_repetition", "balanced"),
             "planning_aggressiveness": request.form.get("planning_aggressiveness", "balanced"),

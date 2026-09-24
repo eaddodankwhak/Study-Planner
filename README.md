@@ -118,6 +118,26 @@ Then:
 4. Land on your **dashboard** (`/dashboard`) and click any subject card to explore it, or use the
    **Courses / Calendar / Deadlines / Tasks / Progress** links to plan your work.
 
+### Google sign-in (production)
+
+Google sign-in needs a confidential OAuth Web client. Create one in Google Cloud Console (APIs &
+Services &rarr; Credentials &rarr; Create credentials &rarr; OAuth client ID &rarr; **Web application**),
+add your redirect URL `https://YOUR_HOST/auth/google/callback` (or
+`http://127.0.0.1:5000/auth/google/callback` for local dev) under **Authorized redirect URIs**, publish
+the OAuth consent screen, and note the Client ID **and** Client Secret.
+
+The app reads them from environment variables, so they stay out of the UI and out of the repo:
+
+```powershell
+$env:GOOGLE_CLIENT_ID = "….apps.googleusercontent.com"
+$env:GOOGLE_CLIENT_SECRET = "XXXXX"
+```
+
+On Render, set both under **Dashboard &rarr; your service &rarr; Environment** (they are also declared in
+`render.yaml`) and redeploy. Until the secret is set, the Settings page shows Google as
+*Not available yet* and the login page falls back to email/password. Without a secret, Google rejects
+the sign-in attempt.
+
 > User, collaboration and AI data live in the SQLite database at
 > `Database/instance/study_planner.db` (created automatically on first run), with uploads on disk
 > under `Database/uploads/`. The planning features (courses, calendar, deadlines, tasks) use their
