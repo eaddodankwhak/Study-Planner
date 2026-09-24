@@ -341,9 +341,9 @@
                         class="form-input" id="google_client_id" name="google_client_id"
                         value="{{ google_client_id or '' }}" placeholder="xxxx.apps.googleusercontent.com"
                         autocomplete="off"><small class="text-muted">Free to create: Google Cloud Console → APIs &
-                        Services → Credentials → Create OAuth Client ID → <em>Desktop app</em> → copy the Client ID. The
-                        callback URL this app uses is
-                        http://localhost:PORT/oauth/google/callback.</small></div>
+                        Services → Credentials → Create OAuth Client ID → <em>Web application</em> → copy the Client ID.
+                        Under "Authorized redirect URIs" add exactly
+                        <code>{{ google_redirect_uri }}</code>.</small></div>
             </div>
             <div class="form-actions">
                 <button class="button button--primary" type="submit">Save Google client ID</button>

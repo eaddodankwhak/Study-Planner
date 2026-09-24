@@ -79,7 +79,7 @@ MODELS = [
         "google",
         "Gemini",
         "Useful for multimodal and broad study tasks.",
-        model_api_id=os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"),
+        model_api_id=os.getenv("GOOGLE_MODEL", "gemini-3.8-flash"),
         context_window=1000000,
         capabilities=["TEXT", "CODE", "MATH", "IMAGE", "PDF", "FILES", "LONG_CONTEXT"],
     ),

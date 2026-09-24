@@ -692,6 +692,7 @@ def settings():
         ai_connections=ai_connections,
         ai_connections_by_provider={c["provider"]: c for c in ai_connections},
         google_client_id=get_google_client_id(),
+        google_redirect_uri=google_auth.redirect_uri(request.url_root),
         user_has_password=bool(user.get("password")),
     )
 
