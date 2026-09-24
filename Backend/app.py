@@ -1031,6 +1031,19 @@ def onboarding():
 _STEP_REQUIRED = {1: "school", 2: "program", 3: "courses", 4: "goals"}
 
 
+def _prev(user, key):
+    """Read a draft field from the persisted user row, as a string ("" if absent).
+
+    A browser wizard form only submits the visible fieldset plus the hidden
+    step/action inputs, so the final step and "save and finish later" would
+    never see earlier answers unless we fall back to the saved draft.
+    """
+    if not user:
+        return ""
+    val = user.get(key)
+    return "" if val is None else str(val)
+
+
 @app.post("/onboarding")
 @login_required
 def onboarding_post():
@@ -1038,12 +1051,24 @@ def onboarding_post():
     user = current_user()
     user_id = user["id"]
 
-    school = request.form.get("school", "").strip()
-    program = request.form.get("program", "").strip()
-    courses = [c.strip() for c in request.form.get("courses", "").split(",") if c.strip()]
-    goals = request.form.get("goals", "").strip()
+    school = request.form.get("school", _prev(user, "school")).strip()
+    program = request.form.get("program", _prev(user, "program")).strip()
 
-    available_hours = request.form.get("available_hours", "4").strip()
+    courses_raw = request.form.get("courses", "").strip()
+    if courses_raw:
+        courses = [c.strip() for c in courses_raw.split(",") if c.strip()]
+    else:
+        prior_courses = (user or {}).get("courses")
+        if isinstance(prior_courses, str):
+            courses = [c.strip() for c in prior_courses.split(",") if c.strip()]
+        elif isinstance(prior_courses, list):
+            courses = [c for c in prior_courses if c and str(c).strip()]
+        else:
+            courses = []
+
+    goals = request.form.get("goals", _prev(user, "goals")).strip()
+
+    available_hours = request.form.get("available_hours", _prev(user, "available_hours") or "4").strip()
     try:
         available_hours = float(available_hours)
     except ValueError:
@@ -1061,6 +1086,7 @@ def onboarding_post():
 
     action = request.form.get("action", "continue")
     if action == "finish-later":
+        flash("Progress saved — you can pick up right where you left off.", "success")
         return redirect(url_for("home"))
 
     try:

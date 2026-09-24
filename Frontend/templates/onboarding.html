@@ -28,6 +28,7 @@
 
     <section class="card onboarding" id="onboarding-card">
         <nav class="onboarding-stepper" aria-label="Onboarding progress">
+            <span class="onboarding-stepper__progress" data-progress aria-hidden="true"></span>
             <ol class="onboarding-stepper__list">
                 {% for s in steps %}
                     <li class="onboarding-stepper__item
@@ -76,16 +77,28 @@
 
             <fieldset class="onboard-step" id="step-1" {% if current_step != 1 %}hidden{% endif %}
                       data-title="{{ steps[0].title }}" data-desc="{{ steps[0].desc }}">
-                <div class="form-field" data-required>
-                    <label class="form-label" for="school">School / Institution</label>
-                    <input class="form-input" type="text" id="school" name="school"
-                           placeholder="e.g. University of Ghana"
-                           value="{{ user.school if user and user.school }}"
-                           autocomplete="organization" required>
-                    <p class="onboarding-card__error" hidden>Please enter your school so we can keep things relevant to you.</p>
+                <div class="school-field" data-required data-school-field>
+                    <div class="school-field__control">
+                        <svg class="school-field__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M22 10 12 5 2 10l10 5 10-5Z"/>
+                            <path d="M6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5"/>
+                            <path d="M22 10v6"/>
+                        </svg>
+                        <input class="school-field__input" id="school" name="school" type="text"
+                               placeholder=" "
+                               value="{{ user.school if user and user.school }}"
+                               autocomplete="off"
+                               role="combobox" aria-expanded="false" aria-controls="school-listbox"
+                               aria-autocomplete="list" aria-describedby="school-hint school-error" required>
+                        <label class="school-field__label" for="school">School / Institution</label>
+                        <span class="school-field__status" data-status aria-hidden="true"></span>
+                    </div>
+                    <ul class="school-field__listbox" id="school-listbox" role="listbox" aria-label="Institution suggestions" hidden></ul>
+                    <p class="school-field__hint" id="school-hint" aria-live="polite" hidden></p>
+                    <p class="onboarding-card__error" id="school-error" hidden>Please enter your school so we can keep things relevant to you.</p>
                 </div>
                 <div class="onboard-actions">
-                    <button type="button" class="button onboard-actions__continue" data-continue>Continue &rarr;</button>
+                    <button type="button" class="button onboard-actions__continue" data-continue disabled>Continue <span class="onboard-actions__arrow" aria-hidden="true">&rarr;</span></button>
                 </div>
             </fieldset>
 
@@ -146,7 +159,7 @@
                 </div>
                 <div class="onboard-actions">
                     <button type="button" class="onboard-actions__back" data-back="4">&larr; Back</button>
-                    <button type="button" class="button button--primary onboard-actions__continue" data-continue>Finish setup &rarr;</button>
+                    <button type="button" class="button button--accent onboard-actions__continue" data-continue>Finish setup &rarr;</button>
                 </div>
             </fieldset>
         </form>
@@ -161,6 +174,7 @@
 
 {% block scripts %}
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/schools.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('onboarding-form');
@@ -170,6 +184,7 @@
             const headerSub = document.querySelector('[data-subtitle]');
             const eyebrow = document.querySelector('[data-eyebrow]');
             const fill = document.querySelector('[data-fill]');
+            const progressFill = document.querySelector('[data-progress]');
             const compactText = document.querySelector('[data-compact-text]');
             const stepInput = form.querySelector('input[name="step"]');
             const actionInput = form.querySelector('input[name="action"]');
@@ -177,6 +192,10 @@
 
             const stepNum = (fieldset) => Number(fieldset.id.split('-')[1]);
             const visibleFieldset = () => fieldsets.find(f => !f.hidden);
+            const requiredInput = (step) => {
+                const group = step.querySelector('[data-required]');
+                return group ? group.querySelector('input, textarea') : null;
+            };
 
             function renderHeader(step) {
                 if (headerTitle) headerTitle.textContent = step.dataset.title;
@@ -184,6 +203,7 @@
                 if (eyebrow) eyebrow.textContent = `Step ${stepNum(step)} of ${totalSteps}`;
                 if (compactText) compactText.textContent = `Step ${stepNum(step)} of ${totalSteps}`;
                 if (fill) fill.style.width = `${Math.floor((stepNum(step) / totalSteps) * 100)}%`;
+                if (progressFill) progressFill.style.transform = `scaleX(${(stepNum(step) - 1) / (totalSteps - 1)})`;
             }
 
             function focusFirstInput(step) {
@@ -206,6 +226,7 @@
                 const target = fieldsets.find(f => stepNum(f) === stepNo);
                 renderHeader(target);
                 focusFirstInput(target);
+                syncContinue();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
 
@@ -215,6 +236,14 @@
                 group.classList.toggle('is-invalid', invalid);
                 const err = group.querySelector('.onboarding-card__error');
                 if (err) err.hidden = !invalid;
+            }
+
+            function syncContinue() {
+                const current = visibleFieldset();
+                const input = requiredInput(current);
+                form.querySelectorAll('[data-continue]').forEach(btn => {
+                    btn.disabled = Boolean(input && !input.value.trim());
+                });
             }
 
             form.addEventListener('submit', (e) => {
@@ -237,15 +266,16 @@
             form.querySelectorAll('[data-continue]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const current = visibleFieldset();
-                    const group = current.querySelector('[data-required]');
-                    const input = group ? group.querySelector('input, textarea') : null;
-                    if (group && input && !input.value.trim()) {
+                    const input = requiredInput(current);
+                    if (input && !input.value.trim()) {
                         markInvalid(current, true);
                         input.focus();
                         return;
                     }
                     markInvalid(current, false);
-                    form.requestSubmit(btn);
+                    stepInput.value = String(stepNum(current));
+                    actionInput.value = 'continue';
+                    form.requestSubmit();
                 });
             });
 
@@ -254,15 +284,200 @@
             });
 
             form.querySelectorAll('[data-finish-later]').forEach(btn => {
-                btn.addEventListener('click', () => form.requestSubmit(btn));
+                btn.addEventListener('click', () => {
+                    if (window.StudyPlannerToast) {
+                        window.StudyPlannerToast.info('Progress saved — you can pick up right where you left off.');
+                    }
+                    const current = visibleFieldset();
+                    stepInput.value = String(stepNum(current));
+                    actionInput.value = 'finish-later';
+                    window.setTimeout(() => form.submit(), 350);
+                });
             });
 
             form.querySelectorAll('input, textarea').forEach(field => {
                 field.addEventListener('input', () => {
+                    const step = visibleFieldset();
                     const group = field.closest('[data-required]');
-                    if (group) markInvalid(fieldsets.find(f => !f.hidden), !field.value.trim());
+                    if (group) markInvalid(step, !field.value.trim());
+                    syncContinue();
                 });
             });
+
+            /* --- Step 1: school autocomplete (combobox). Suggestions are local
+                 and instant, so "searching" is a fast debounce — never a server
+                 round-trip. Free text remains valid for any institution. --- */
+            const schoolField = document.querySelector('[data-school-field]');
+            if (schoolField) {
+                const SCHOOLS = Array.isArray(window.STUDY_SCHOOLS) ? window.STUDY_SCHOOLS : [];
+                const schoolInput = schoolField.querySelector('input[name="school"]');
+                const listbox = schoolField.querySelector('[data-listbox]');
+                const hint = schoolField.querySelector('[data-hint]');
+                const statusSlot = schoolField.querySelector('[data-status]');
+                const CHECK_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+                let searchTimer = null;
+                let activeIndex = -1;
+                let hasResults = false;
+
+                function setStatus(markup, cls) {
+                    if (!statusSlot) return;
+                    statusSlot.innerHTML = markup || '';
+                    statusSlot.className = 'school-field__status' + (cls ? ' ' + cls : '');
+                }
+
+                function closeList() {
+                    hasResults = false;
+                    activeIndex = -1;
+                    if (listbox) {
+                        listbox.hidden = true;
+                        listbox.innerHTML = '';
+                    }
+                    schoolInput.setAttribute('aria-expanded', 'false');
+                    schoolInput.removeAttribute('aria-activedescendant');
+                }
+
+                function clearSearchState() {
+                    if (searchTimer) { window.clearTimeout(searchTimer); searchTimer = null; }
+                    schoolField.classList.remove('is-search');
+                }
+
+                function selectName(name) {
+                    schoolInput.value = name;
+                    closeList();
+                    clearSearchState();
+                    schoolField.classList.add('is-confirmed');
+                    setStatus(CHECK_SVG, 'is-check');
+                    if (hint) hint.hidden = true;
+                    markInvalid(visibleFieldset(), false);
+                    syncContinue();
+                }
+
+                function setActive(index) {
+                    const options = listbox.querySelectorAll('[role="option"]');
+                    if (!options.length) return;
+                    if (index >= options.length) index = options.length - 1;
+                    if (index < 0) index = 0;
+                    activeIndex = index;
+                    options.forEach((opt, i) => {
+                        opt.classList.toggle('is-active', i === index);
+                        if (i === index) {
+                            opt.setAttribute('aria-selected', 'true');
+                            schoolInput.setAttribute('aria-activedescendant', opt.id);
+                        } else {
+                            opt.removeAttribute('aria-selected');
+                        }
+                    });
+                }
+
+                function renderOptions(matches) {
+                    hasResults = matches.length > 0;
+                    schoolField.classList.remove('is-search');
+                    if (!hasResults) {
+                        listbox.hidden = true;
+                        listbox.innerHTML = '';
+                        if (hint) {
+                            hint.textContent = 'No known institutions match — you can type any school or institution.';
+                            hint.hidden = false;
+                        }
+                        return;
+                    }
+                    if (hint) hint.hidden = true;
+                    listbox.innerHTML = '';
+                    const fragment = document.createDocumentFragment();
+                    matches.forEach((name, i) => {
+                        const option = document.createElement('li');
+                        option.id = 'school-opt-' + i;
+                        option.setAttribute('role', 'option');
+                        option.setAttribute('data-index', String(i));
+                        option.textContent = name;
+                        fragment.appendChild(option);
+                    });
+                    listbox.appendChild(fragment);
+                    listbox.hidden = false;
+                    activeIndex = -1;
+                    schoolInput.setAttribute('aria-expanded', 'true');
+                }
+
+                function runSearch(query) {
+                    schoolField.classList.remove('is-confirmed');
+                    if (query.trim().length < 2) {
+                        clearSearchState();
+                        setStatus('');
+                        closeList();
+                        return;
+                    }
+                    clearSearchState();
+                    schoolField.classList.add('is-search');
+                    setStatus('', 'is-spin');
+                    if (hint) { hint.textContent = 'Searching institutions\u2026'; hint.hidden = false; }
+                    const term = query.trim().toLowerCase();
+                    searchTimer = window.setTimeout(() => {
+                        if (schoolInput.value.trim().toLowerCase() !== term) return;
+                        const matches = SCHOOLS
+                            .filter(s => s.toLowerCase().includes(term))
+                            .sort((a, b) => {
+                                const aStarts = a.toLowerCase().startsWith(term) ? 0 : 1;
+                                const bStarts = b.toLowerCase().startsWith(term) ? 0 : 1;
+                                return aStarts - bStarts || a.localeCompare(b);
+                            })
+                            .slice(0, 8);
+                        setStatus('');
+                        renderOptions(matches);
+                    }, 220);
+                }
+
+                schoolInput.addEventListener('input', () => {
+                    setStatus('');
+                    syncContinue();
+                    runSearch(schoolInput.value);
+                });
+
+                schoolInput.addEventListener('keydown', (e) => {
+                    if (hasResults && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                        e.preventDefault();
+                        const options = listbox.querySelectorAll('[role="option"]');
+                        const next = activeIndex + (e.key === 'ArrowDown' ? 1 : -1);
+                        setActive(Math.max(0, Math.min(options.length - 1, next)));
+                        return;
+                    }
+                    if (e.key === 'Enter' && hasResults && activeIndex >= 0) {
+                        e.preventDefault();
+                        const active = listbox.querySelector('.is-active');
+                        if (active) selectName(active.textContent);
+                        return;
+                    }
+                    if (e.key === 'Escape') {
+                        clearSearchState();
+                        setStatus('');
+                        if (hint) hint.hidden = true;
+                        closeList();
+                    }
+                });
+
+                schoolInput.addEventListener('blur', () => {
+                    window.setTimeout(() => {
+                        clearSearchState();
+                        setStatus('');
+                        if (hint) hint.hidden = true;
+                        closeList();
+                    }, 140);
+                });
+
+                listbox.addEventListener('mousedown', (e) => e.preventDefault());
+                listbox.addEventListener('click', (e) => {
+                    const option = e.target.closest('[role="option"]');
+                    if (option) selectName(option.textContent);
+                });
+
+                const preset = schoolInput.value.trim();
+                if (preset) {
+                    if (SCHOOLS.includes(preset)) {
+                        schoolField.classList.add('is-confirmed');
+                        setStatus(CHECK_SVG, 'is-check');
+                    }
+                    syncContinue();
+                }
+            }
 
             const initial = visibleFieldset() || fieldsets[0];
             focusFirstInput(initial);

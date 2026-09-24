@@ -728,14 +728,33 @@
    more craft and motion budget than any daily surface (motion rules: rare /
    first-time moments may use delight). All animation respects
    prefers-reduced-motion via the global collapse in base.css. */
-.onboarding {
-  max-width: 35rem;
+.card.onboarding {
+  max-width: 34rem;
   margin-inline: auto;
-  padding: var(--space-8) var(--space-6);
+  padding: clamp(1.5rem, 4vw, 2.25rem);
   box-shadow: var(--shadow-md);
 }
 
 /* --- Step indicator: connects the whole flow into "where am I?" --- */
+.onboarding-stepper {
+  position: relative;
+}
+
+/* Live hairline that fills in bead-by-bead as the student advances. Rides
+   the same lane as the track (::before) in the stepper list. */
+.onboarding-stepper__progress {
+  position: absolute;
+  top: 15px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--color-accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform var(--dur-slow) var(--ease-out);
+  z-index: 1;
+}
+
 .onboarding-stepper__list {
   position: relative;
   display: flex;
@@ -778,6 +797,10 @@
   color: var(--color-muted);
   font-weight: var(--font-weight-medium);
   font-size: 0.9rem;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
 .onboarding-stepper__item--active .onboarding-stepper__dot {
@@ -785,6 +808,7 @@
   border-color: var(--color-accent);
   color: #2b1b00;
   box-shadow: 0 0 0 4px rgb(240 153 55 / 0.22);
+  animation: sp-step-pulse 1.6s var(--ease-in-out) infinite;
 }
 
 .onboarding-stepper__item--done .onboarding-stepper__dot {
@@ -807,6 +831,18 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* Gentle "we're here" breathing ring on the active dot. */
+@keyframes sp-step-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgb(240 153 55 / 0.22);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgb(240 153 55 / 0.12);
+  }
+}
+
 /* Compact progress callout — replaces the five dots on small screens. */
 .onboarding-stepper__compact {
   display: none;
@@ -819,23 +855,31 @@
 }
 
 .onboarding-header__eyebrow {
-  font-size: 0.8125rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.6875rem;
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.11em;
   color: var(--color-accent-dark);
-  margin-bottom: var(--space-1);
+  background: rgb(240 153 55 / 0.14);
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  margin-bottom: var(--space-3);
 }
 
 .onboarding-header__title {
-  font-size: 1.75rem;
+  font-size: clamp(1.5rem, 4vw, 1.75rem);
   font-weight: var(--font-display-weight);
   letter-spacing: var(--font-display-tracking);
+  color: var(--color-primary);
   margin-bottom: var(--space-2);
 }
 
 .onboarding-header__subtitle {
   color: var(--color-muted);
+  max-width: 26rem;
   margin: 0;
 }
 
@@ -873,13 +917,184 @@
   border-color: var(--color-error);
 }
 
+/* --- Step 1 premium school field: icon input + floating label + combobox --- */
+.school-field {
+  position: relative;
+  margin-bottom: var(--space-4);
+}
+
+.school-field__control {
+  position: relative;
+}
+
+.school-field__icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  translate: 0 -50%;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--color-muted);
+  pointer-events: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.school-field__input {
+  height: 3.25rem;
+  width: 100%;
+  padding: 0 3rem 0 3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: 1rem;
+  color: var(--color-text);
+  transition: border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.school-field__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgb(240 153 55 / 0.22);
+}
+
+.school-field__label {
+  position: absolute;
+  left: 3rem;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: top var(--dur-fast) var(--ease-out),
+    translate var(--dur-fast) var(--ease-out),
+    font-size var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.school-field__input:focus + .school-field__label,
+.school-field__input:not(:placeholder-shown) + .school-field__label {
+  top: 0.6875rem;
+  translate: 0 0;
+  font-size: 0.65625rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent-dark);
+}
+
+.school-field__status {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  color: var(--color-success);
+}
+
+.school-field__status.is-check {
+  animation: sp-check-pop var(--dur-slow) var(--ease-out) both;
+}
+
+.school-field__status.is-spin {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  animation: sp-field-spin 0.7s linear infinite;
+}
+
+@keyframes sp-field-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Confirmed pick: settled, success state. */
+.school-field.is-confirmed .school-field__input {
+  border-color: var(--color-success);
+}
+
+.school-field.is-confirmed .school-field__icon {
+  color: var(--color-success);
+}
+
+/* Required-field error state (arrives via the wizard's markInvalid). */
+.school-field.is-invalid .school-field__input {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgb(198 40 40 / 0.15);
+}
+
+.school-field__listbox {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.school-field__listbox[hidden] {
+  display: none;
+}
+
+.school-field__listbox [role="option"] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.school-field__listbox [role="option"]::before {
+  content: "";
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: var(--color-accent);
+  opacity: 0.35;
+  flex: none;
+}
+
+.school-field__listbox [role="option"].is-active,
+.school-field__listbox [role="option"]:hover {
+  background: rgb(15 58 82 / 0.08);
+}
+
+.school-field__listbox [role="option"].is-active {
+  font-weight: var(--font-weight-medium);
+}
+
+.school-field__hint {
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.school-field__hint[hidden] {
+  display: none;
+}
+
 /* --- Step actions --- */
 .onboard-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-3);
-  margin-top: var(--space-6);
+  margin-top: var(--space-5);
 }
 
 .onboard-actions__back {
@@ -895,9 +1110,37 @@
   color: var(--color-text);
 }
 
+.onboard-actions__continue {
+  flex: 1;
+  justify-content: center;
+  padding-block: var(--space-3);
+  font-size: 1rem;
+  transition: transform var(--dur-instant) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.onboard-actions__continue:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.onboard-actions__continue:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
 .onboard-actions__continue:active,
 .onboard-save__button:active {
   transform: scale(0.97);
+}
+
+.onboard-actions__arrow {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.onboard-actions__continue:hover:not(:disabled) .onboard-actions__arrow {
+  transform: translateX(3px);
 }
 
 /* "Save and finish later" — subtle, always available, keeps progress. */
@@ -924,11 +1167,15 @@
 }
 
 @media (max-width: 40rem) {
-  .onboarding {
+  .card.onboarding {
     padding: var(--space-6) var(--space-5);
   }
 
   .onboarding-stepper__list {
+    display: none;
+  }
+
+  .onboarding-stepper__progress {
     display: none;
   }
 
