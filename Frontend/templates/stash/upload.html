@@ -17,9 +17,7 @@
 </header>
 
 {% if not hints.configured %}
-<div class="stash-notice">No Claude key is configured yet. Uploads are queued and
-    cards are generated as soon as a key is available (server
-    <code>ANTHROPIC_API_KEY</code> or your own AI Hub key).</div>
+<div class="stash-notice">{{ hints.hint }}</div>
 {% endif %}
 
 <form class="stash-upload" id="stash-upload-form" method="post" enctype="multipart/form-data">
@@ -45,6 +43,20 @@
         </select>
         <button class="button button--primary" id="stash-submit" type="submit" disabled>Upload &amp; generate</button>
     </div>
+    {% if hints.providers|length > 1 %}
+    <div class="stash-upload__row">
+        <label for="stash-ai-pick">Generate cards with
+            <select name="ai_pick" id="stash-ai-pick">
+                {% for opt in hints.providers %}
+                <option value="{{ opt.provider }}:{{ opt.model }}"
+                    {{ 'selected' if opt.provider == hints.providerId and opt.model == hints.modelId else '' }}>
+                    {{ opt.providerName }} · {{ opt.modelName }}{% if opt.source == 'server' %} · server key{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+    </div>
+    {% endif %}
     <p class="stash-upload__hint text-muted mb-0" id="stash-upload-msg">
         Stash reads the file, splits it into chapters, and writes idea cards — then you read, save, highlight and quiz.
     </p>

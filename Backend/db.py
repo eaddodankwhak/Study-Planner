@@ -447,6 +447,9 @@ CREATE TABLE IF NOT EXISTS stash_documents (
     total_cards        INTEGER NOT NULL DEFAULT 0,
     prompt_version     TEXT,
     model_used         TEXT,
+    provider_used      TEXT,
+    preferred_provider TEXT,
+    preferred_model    TEXT,
     input_tokens       INTEGER NOT NULL DEFAULT 0,
     output_tokens      INTEGER NOT NULL DEFAULT 0,
     created_at         TEXT NOT NULL DEFAULT (datetime('now')),
@@ -584,11 +587,13 @@ CREATE INDEX IF NOT EXISTS idx_stash_jobs_queue ON stash_jobs (status, run_after
 CREATE INDEX IF NOT EXISTS idx_stash_jobs_doc ON stash_jobs (document_id);
 
 CREATE TABLE IF NOT EXISTS stash_usage (
-    id            TEXT PRIMARY KEY,
-    user_id       TEXT NOT NULL,
-    day           TEXT NOT NULL,
-    input_tokens  INTEGER NOT NULL DEFAULT 0,
-    output_tokens INTEGER NOT NULL DEFAULT 0,
+    id                  TEXT PRIMARY KEY,
+    user_id             TEXT NOT NULL,
+    day                 TEXT NOT NULL,
+    input_tokens        INTEGER NOT NULL DEFAULT 0,
+    output_tokens       INTEGER NOT NULL DEFAULT 0,
+    server_input_tokens INTEGER NOT NULL DEFAULT 0,
+    server_output_tokens INTEGER NOT NULL DEFAULT 0,
     UNIQUE (user_id, day)
 );
 
@@ -752,6 +757,47 @@ def _migrate_add_columns(conn):
             "ALTER TABLE stash_card_states ADD COLUMN updated_at TEXT"
             " NOT NULL DEFAULT (datetime('now'))"
         )
+
+    # Stash provider support: store which provider actually generated cards and
+    # the user's preferred provider/model (registry ids). server_* token buckets
+    # on stash_usage keep the daily cap scoped to requests the server key pays
+    # for (personal BYOK generation never counts against the cap).
+    if using_postgres():
+        doc_cols = {
+            r["column_name"] for r in _query_all(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = 'stash_documents'"
+            )
+        }
+    else:
+        doc_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(stash_documents)").fetchall()
+        }
+    for col, ddl in (
+        ("provider_used", "TEXT"),
+        ("preferred_provider", "TEXT"),
+        ("preferred_model", "TEXT"),
+    ):
+        if col not in doc_cols:
+            conn.execute(f"ALTER TABLE stash_documents ADD COLUMN {col} {ddl}")
+
+    if using_postgres():
+        usage_cols = {
+            r["column_name"] for r in _query_all(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = 'stash_usage'"
+            )
+        }
+    else:
+        usage_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(stash_usage)").fetchall()
+        }
+    for col, ddl in (
+        ("server_input_tokens", "INTEGER NOT NULL DEFAULT 0"),
+        ("server_output_tokens", "INTEGER NOT NULL DEFAULT 0"),
+    ):
+        if col not in usage_cols:
+            conn.execute(f"ALTER TABLE stash_usage ADD COLUMN {col} {ddl}")
 
 
 def normalize_course_code(value):

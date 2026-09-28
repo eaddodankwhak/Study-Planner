@@ -26,6 +26,10 @@ class OpenAIProvider(AIProvider):
             "max_tokens": request.get("max_tokens", 1500),
             "stream": False,
         }
+        if request.get("temperature") is not None:
+            payload["temperature"] = request["temperature"]
+        if request.get("response_format") is not None:
+            payload["response_format"] = request["response_format"]
         data = post_json(f"{self.base_url}/chat/completions", self._headers(), payload)
         content = data["choices"][0]["message"]["content"]
         usage = data.get("usage", {})
@@ -37,6 +41,25 @@ class OpenAIProvider(AIProvider):
             },
         }
 
+    def generate_json(self, request):
+        """Structured output via OpenAI's response_format json_schema (strict).
+
+        The response_schema must be a strict-compliant JSON Schema (all
+        properties required, additionalProperties false at every level).
+        """
+        if not request.get("response_schema"):
+            return self.generate(request)
+        req = dict(request)
+        req["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "structured_response",
+                "strict": True,
+                "schema": request["response_schema"],
+            },
+        }
+        return self.generate(req)
+
     def stream(self, request):
         payload = {
             "model": request["model"],
@@ -44,6 +67,10 @@ class OpenAIProvider(AIProvider):
             "max_tokens": request.get("max_tokens", 1500),
             "stream": True,
         }
+        if request.get("temperature") is not None:
+            payload["temperature"] = request["temperature"]
+        if request.get("response_format") is not None:
+            payload["response_format"] = request["response_format"]
         for data in stream_json_lines(f"{self.base_url}/chat/completions", self._headers(), payload):
             choices = data.get("choices") or []
             if choices:

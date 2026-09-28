@@ -44,7 +44,7 @@ class DuplicateDocumentError(StashServiceError):
         self.existing = existing
 
 
-def create_document(uid, filename, blob, course_id=None):
+def create_document(uid, filename, blob, course_id=None, provider=None, model=None):
     """Validate an upload, persist it, and enqueue processing."""
     ext, kind = security.classify(filename or "", blob)
     title = security.safe_title(filename or "document")
@@ -66,6 +66,8 @@ def create_document(uid, filename, blob, course_id=None):
         storage_key="",
         file_sha256=sha,
         course_id=course_id,
+        preferred_provider=provider or None,
+        preferred_model=model or None,
     )
     if StashConfig.keep_source_files:
         key = security.save_source(blob, uid, doc["id"], ext)
@@ -83,11 +85,19 @@ def delete_document(doc_id):
     repository.delete_document(doc_id)
 
 
-def regenerate(doc_id, section_indexes=None):
+def regenerate(doc_id, section_indexes=None, provider=None, model=None):
     """Re-queue processing for selected sections (or the whole document).
 
-    section_indexes lists 1-based section positions as shown in the TOC.
+    section_indexes lists 1-based section positions as shown in the TOC. When a
+    provider/model pick is supplied it is stored as the new preference so the
+    re-run resolves through that provider.
     """
+    if provider or model:
+        repository.update_document(
+            doc_id,
+            preferred_provider=provider or None,
+            preferred_model=model or None,
+        )
     if section_indexes:
         sections = repository.list_sections(doc_id)
         targets = [s for s in sections if s["position"] in section_indexes]
@@ -136,17 +146,20 @@ def process_document(doc_id):
                       "on in Settings → Privacy to use Stash.")
         raise PermanentError("privacy block")
     try:
-        provider, model_used = client.resolve_provider(uid)
-        del provider
+        generation = client.resolve_generation(
+            uid, preferred=_preferred_pick(doc)
+        )
     except (client.NoProviderError, client.StashAIError) as exc:
         _fail(doc_id, str(exc))
         raise PermanentError(str(exc)) from exc
+
+    chunk_target, chunk_max = _chunk_caps(generation)
 
     chunks = repository.list_chunks(doc_id)
     if not chunks:
         try:
             repository.clear_structure(doc_id)  # drop any partial leftovers
-            chunks = _preprocess(doc)
+            chunks = _preprocess(doc, chunk_target, chunk_max)
         except PermanentError as exc:
             _fail(doc_id, str(exc))
             raise
@@ -171,7 +184,7 @@ def process_document(doc_id):
         )
         try:
             cards, (input_tokens, output_tokens) = client.generate_chunk_cards(
-                uid, doc, section, chunk
+                uid, generation, doc, section, chunk
             )
         except client.DailyLimitError:
             limit_hit = True
@@ -189,7 +202,10 @@ def process_document(doc_id):
         rows = [_db_card(c, section, chunk) for c in cards]
         repository.append_cards(doc_id, rows)
         repository.update_chunk(chunk["id"], status="done")
-        repository.add_usage(uid, input_tokens, output_tokens)
+        repository.add_usage(
+            uid, input_tokens, output_tokens,
+            server_paid=generation["paid_by"] == "server",
+        )
         token_in += input_tokens
         token_out += output_tokens
         done_ok += 1
@@ -197,14 +213,14 @@ def process_document(doc_id):
 
     if not limit_hit:
         try:
-            _generate_recaps(uid, doc_id, doc, chunks)
+            _generate_recaps(uid, doc_id, doc, chunks, generation)
         except client.DailyLimitError:
             limit_hit = True
 
-    return _finalize(doc_id, limit_hit, model_used, token_in, token_out)
+    return _finalize(doc_id, limit_hit, generation, token_in, token_out)
 
 
-def _preprocess(doc):
+def _preprocess(doc, chunk_target, chunk_max):
     """Parse the source file and persist sections + chunks for the first time."""
     data = security.load_source(doc.get("storage_key")) if doc.get("storage_key") else None
     if data is None:
@@ -223,7 +239,9 @@ def _preprocess(doc):
             f"Documents over {limit} pages/slides are not supported yet."
         )
 
-    pages, structure = build_structure(parsed)
+    pages, structure = build_structure(
+        parsed, chunk_target=chunk_target, chunk_max=chunk_max
+    )
     if not structure["chunks"] or not structure["sections"]:
         raise PermanentError(
             "No readable text could be extracted from this document."
@@ -262,7 +280,7 @@ def _preprocess(doc):
     return repository.list_chunks(doc_id)
 
 
-def _generate_recaps(uid, doc_id, doc, chunks):
+def _generate_recaps(uid, doc_id, doc, chunks, generation):
     """Append one recap card for every section that produced cards."""
     fresh = {s["id"]: s for s in repository.list_sections(doc_id)}
     for section in fresh.values():
@@ -276,16 +294,48 @@ def _generate_recaps(uid, doc_id, doc, chunks):
         if not sec_text.strip():
             continue
         recap, (input_tokens, output_tokens) = client.generate_recap_card(
-            uid, doc, section, sec_text
+            uid, generation, doc, section, sec_text
         )
         if recap:
             repository.append_cards(doc_id, [_db_card(recap, section, None)])
-            repository.add_usage(uid, input_tokens, output_tokens)
+            repository.add_usage(
+                uid, input_tokens, output_tokens,
+                server_paid=generation["paid_by"] == "server",
+            )
 
 
-def _finalize(doc_id, limit_hit, model_used, token_in, token_out):
+def _chunk_caps(generation):
+    """Derive readability-safe chunk caps from the resolved model's budget.
+
+    Chunks are sized so a section's text fits inside the model's context window
+    minus its max output (with a small prompt-overhead buffer), estimated at ~4
+    characters per token. The configured STASH_CHUNK_* caps still bind first so
+    unchanged deployments see identical behaviour.
+    """
+    model = generation["model"]
+    context = int(model.get("context_window") or 8000)
+    max_out = int(model.get("max_output") or 8192)
+    budget_chars = max(1, (context - max_out - 600) * 4)
+    return (
+        min(StashConfig.chunk_target_chars, budget_chars),
+        min(StashConfig.chunk_max_chars, budget_chars),
+    )
+
+
+def _preferred_pick(doc):
+    """Registry-id provider/model pick stored on the document, if any."""
+    provider = (doc or {}).get("preferred_provider")
+    model = (doc or {}).get("preferred_model")
+    if provider and model:
+        return {"provider": provider, "model": model}
+    return None
+
+
+def _finalize(doc_id, limit_hit, generation, token_in, token_out):
     total_cards = repository.count_cards(doc_id)
     repository.renumber_positions(doc_id)
+    provider_used = generation["provider_id"]
+    model_used = generation["model_id"]
 
     if limit_hit:
         message = (
@@ -297,7 +347,8 @@ def _finalize(doc_id, limit_hit, model_used, token_in, token_out):
                 doc_id, status="ready", total_cards=total_cards,
                 progress_percent=100, error_message=message,
                 input_tokens=token_in, output_tokens=token_out,
-                model_used=model_used, prompt_version=StashConfig.prompt_version,
+                model_used=model_used, provider_used=provider_used,
+                prompt_version=StashConfig.prompt_version,
             )
         else:
             repository.update_document(
@@ -312,7 +363,8 @@ def _finalize(doc_id, limit_hit, model_used, token_in, token_out):
             doc_id, status="ready", total_cards=total_cards,
             progress_percent=100, error_message=None,
             input_tokens=token_in, output_tokens=token_out,
-            model_used=model_used, prompt_version=StashConfig.prompt_version,
+            model_used=model_used, provider_used=provider_used,
+            prompt_version=StashConfig.prompt_version,
         )
     else:
         pending = repository.count_chunks(doc_id) - repository.count_done_chunks(doc_id)

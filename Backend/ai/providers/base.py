@@ -31,6 +31,21 @@ class AIProvider(abc.ABC):
         """
         raise NotImplementedError
 
+    def generate_json(self, request):
+        """Return a structured JSON response for a request dict.
+
+        Same shape as generate() plus an optional "response_schema" key holding
+        a JSON Schema dict describing the expected output object. Returns the
+        same result shape as generate(), where "content" is the raw JSON text
+        (the caller is responsible for parsing and validating it).
+
+        The default implementation delegates to generate() and relies on a
+        prompt that asks for JSON; providers with a native JSON / structured
+        output mode override this method to constrain the response shape at the
+        API level (e.g. OpenAI's json_schema, DeepSeek's json_object).
+        """
+        return self.generate(request)
+
     def stream(self, request):
         """Yield text chunks progressively for a request dict.
 

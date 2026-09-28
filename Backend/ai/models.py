@@ -45,6 +45,7 @@ def _model(model_id, provider, display_name, description, **kw):
         "description": description,
         "availability": kw.pop("availability", "unavailable"),
         "context_window": kw.pop("context_window", 8000),
+        "max_output": kw.pop("max_output", 8192),
         "supports_images": "IMAGE" in caps,
         "supports_files": "FILES" in caps,
         "supports_streaming": "STREAMING" in caps,
@@ -63,6 +64,7 @@ MODELS = [
         "Deep reasoning and clear explanations.",
         model_api_id=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
         context_window=200000,
+        max_output=8192,
         capabilities=["TEXT", "CODE", "MATH", "PDF", "FILES", "LONG_CONTEXT"],
     ),
     _model(
@@ -72,6 +74,7 @@ MODELS = [
         "Versatile general-purpose study assistant.",
         model_api_id=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
         context_window=128000,
+        max_output=16384,
         capabilities=["TEXT", "CODE", "MATH", "IMAGE", "FILES", "LONG_CONTEXT"],
     ),
     _model(
@@ -81,6 +84,7 @@ MODELS = [
         "Useful for multimodal and broad study tasks.",
         model_api_id=os.getenv("GOOGLE_MODEL", "gemini-3.8-flash"),
         context_window=1000000,
+        max_output=8192,
         capabilities=["TEXT", "CODE", "MATH", "IMAGE", "PDF", "FILES", "LONG_CONTEXT"],
     ),
     _model(
@@ -90,6 +94,7 @@ MODELS = [
         "Fast and affordable reasoning model.",
         model_api_id=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         context_window=128000,
+        max_output=8192,
         capabilities=["TEXT", "CODE", "MATH", "LONG_CONTEXT"],
     ),
     _model(
@@ -99,6 +104,7 @@ MODELS = [
         "GitHub Copilot assistant.",
         model_api_id=os.getenv("COPILOT_MODEL", "gpt-5-mini"),
         context_window=128000,
+        max_output=16384,
         capabilities=["TEXT", "CODE", "MATH"],
     ),
 ]
@@ -111,11 +117,11 @@ def enabled_provider_ids():
         ids.add("openai")
     if os.getenv("ANTHROPIC_API_KEY"):
         ids.add("anthropic")
-    if os.getenv("GOOGLE_AI_API_KEY"):
+    if os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY"):
         ids.add("google")
     if os.getenv("DEEPSEEK_API_KEY"):
         ids.add("deepseek")
-    if os.getenv("COPILOT_GITHUB_TOKEN"):
+    if os.getenv("COPILOT_GITHUB_TOKEN") or os.getenv("GH_TOKEN"):
         ids.add("copilot")
     return ids
 
@@ -137,6 +143,11 @@ def get_model(model_id):
         if m["id"] == model_id:
             return m
     return None
+
+
+def get_models_for_provider(provider_id):
+    """Return the model descriptors backed by a provider id (registry order)."""
+    return [m for m in MODELS if m["provider"] == provider_id]
 
 
 def model_supports(model_id, capability):

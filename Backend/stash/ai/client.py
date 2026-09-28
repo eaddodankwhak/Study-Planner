@@ -1,9 +1,13 @@
 """AI generation client for Stash.
 
-Resolves a real provider for generation (server env key or the user's BYOK
-connection — never the mock provider), enforces the privacy toggle and the
-per-user daily token cap, then generates + validates cards with retry/backoff
-and one error-feedback retry per chunk.
+Resolves a real provider for generation — the user's BYOK connection first,
+then the server's configured keys in a fixed fallback order — never the mock
+provider. Enforces the privacy toggle, applies the per-user daily token cap only
+when the server key pays (personal keys never burn the cap), and generates +
+validates cards with retry/backoff plus one error-feedback retry per chunk.
+Structured JSON output flows through the shared provider layer's
+ai.providers.generate_json() so every provider uses its JSON/structured-output
+mode where one exists.
 """
 
 import os
@@ -35,7 +39,7 @@ class StashAIError(Exception):
 
 
 class NoProviderError(StashAIError):
-    """No usable Anthropic key exists (server env or user BYOK)."""
+    """No usable AI key exists (server env or user BYOK)."""
 
 
 class DailyLimitError(StashAIError):
@@ -47,8 +51,28 @@ class PrivacyBlockedError(StashAIError):
 
 
 HINT = (
-    "Stash needs a real Claude key. Add ANTHROPIC_API_KEY to the server or "
-    "connect your own Claude account in Settings → AI Settings, then retry."
+    "Stash needs an AI key to generate cards. Connect your own key in the AI "
+    "Hub (Claude, OpenAI, Gemini and more), or ask the admin to add one to the "
+    "server."
+)
+
+#: Human-friendly provider labels for pickers and banners.
+_PROVIDER_LABELS = {
+    "anthropic": "Claude",
+    "openai": "GPT",
+    "google": "Gemini",
+    "deepseek": "DeepSeek",
+    "copilot": "Copilot",
+}
+
+#: Server key fallback order for generation when the user has no BYOK/priority
+#: pick. Each provider lists its accepted env names; any one set enables it.
+_SERVER_KEYS = (
+    ("anthropic", ("ANTHROPIC_API_KEY",)),
+    ("openai", ("OPENAI_API_KEY",)),
+    ("google", ("GOOGLE_AI_API_KEY", "GEMINI_API_KEY")),
+    ("deepseek", ("DEEPSEEK_API_KEY",)),
+    ("copilot", ("COPILOT_GITHUB_TOKEN", "GH_TOKEN")),
 )
 
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
@@ -63,65 +87,186 @@ def privacy_allows(uid):
         return True
 
 
-def resolve_provider(uid):
-    """Return (provider, model_api_id) using server key or user BYOK key.
+def _build_generation(provider_id, model_id, uid):
+    """Return a Generation dict for (provider, model) or None when unusable.
 
-    Explicitly rejects the mock provider: Silently returning invented content
-    for a paid feature would be worse than failing loudly.
+    A Generation is {"provider": adapter, "provider_id", "model": registry
+    descriptor, "model_id": API model id, "paid_by": "personal"|"server"}. The
+    adapter is built fresh so a personal BYOK key (when present) is used for
+    that provider; otherwise the server env key applies. The mock provider is
+    never accepted — happily inventing card content would be worse than failing.
     """
-    model = model_registry.get_model(StashConfig.model) or model_registry.get_model("claude")
-    provider_id = model["provider"]
+    model = model_registry.get_model(model_id)
+    if not model or model["provider"] != provider_id:
+        return None
     personal_key = db.get_ai_connection_key(uid, provider_id)
     provider = get_provider(provider_id, api_key=personal_key)
     if getattr(provider, "is_mock", False):
-        raise NoProviderError(HINT)
-    return provider, model["model_id"]
+        return None
+    return {
+        "provider": provider,
+        "provider_id": provider_id,
+        "model": model,
+        "model_id": model["model_id"],
+        "paid_by": "personal" if personal_key else "server",
+    }
 
 
-def generate_chunk_cards(uid, document, section, chunk):
-    """Generate validated cards for one chunk; returns (cards, usage_tokens)."""
+def _server_envs(provider_id):
+    for pid, envs in _SERVER_KEYS:
+        if pid == provider_id:
+            return envs
+    return ()
+
+
+def _server_key_set(provider_id):
+    return any(os.getenv(e) for e in _server_envs(provider_id))
+
+
+def _connected_providers(uid):
+    return {c["provider"] for c in db.get_ai_connections(uid)}
+
+
+def usable_providers(uid):
+    """Return the distinct (provider, model) options Stash can generate with.
+
+    Each entry: {"provider", "providerName", "model", "modelName", "modelApiId",
+    "source": "personal"|"server", "contextWindow", "maxOutput"}. Personal
+    (BYOK) options come first; a provider the user is connected to is listed
+    once, using their key. Server options follow in the fallback order.
+    """
+    options = []
+    seen = set()
+    personal = _connected_providers(uid)
+
+    for m in model_registry.MODELS:
+        pid, mid = m["provider"], m["id"]
+        if (pid, mid) in seen:
+            continue
+        if pid in personal and db.get_ai_connection_key(uid, pid):
+            seen.add((pid, mid))
+            options.append(_option_entry(uid, pid, mid, "personal"))
+    for pid, _envs in _SERVER_KEYS:
+        first = next(iter(model_registry.get_models_for_provider(pid)), None)
+        if not first or (pid, first["id"]) in seen:
+            continue
+        if _server_key_set(pid):
+            seen.add((pid, first["id"]))
+            options.append(_option_entry(uid, pid, first["id"], "server"))
+    return options
+
+
+def _option_entry(uid, provider_id, model_id, source):
+    model = model_registry.get_model(model_id)
+    return {
+        "provider": provider_id,
+        "providerName": _PROVIDER_LABELS.get(provider_id, provider_id),
+        "model": model["id"],
+        "modelName": model["displayName"],
+        "modelApiId": model["model_id"],
+        "source": source,
+        "contextWindow": model["context_window"],
+        "maxOutput": model["max_output"],
+    }
+
+
+def resolve_generation(uid, preferred=None):
+    """Resolve a usable Generation for a user, in priority order.
+
+    preferred: {"provider": registry provider id, "model": registry model id}
+    — normally the document's stored picks.
+
+    Priority: explicit preferred pick → the user's AI Hub preference model →
+    any BYOK-connected provider (registry order) → server env keys in the fixed
+    fallback order (ANTHROPIC → OPENAI → GEMINI → DEEPSEEK → COPILOT). Raises
+    NoProviderError when nothing usable exists.
+    """
+    if preferred:
+        gen = _build_generation(
+            preferred.get("provider"), preferred.get("model"), uid
+        )
+        if gen:
+            return gen
+
+    try:
+        hub_model = (db.get_user(uid) or {}).get("ai_model") or StashConfig.model
+    except Exception:  # noqa: BLE001 - preference read failures fall through
+        hub_model = StashConfig.model
+    model = model_registry.get_model(hub_model)
+    if model:
+        gen = _build_generation(model["provider"], model["id"], uid)
+        if gen:
+            return gen
+
+    for m in model_registry.MODELS:
+        if m["provider"] not in _connected_providers(uid):
+            continue
+        gen = _build_generation(m["provider"], m["id"], uid)
+        if gen:
+            return gen
+
+    for pid, _envs in _SERVER_KEYS:
+        first = next(iter(model_registry.get_models_for_provider(pid)), None)
+        if not first or not _server_key_set(pid):
+            continue
+        gen = _build_generation(pid, first["id"], uid)
+        if gen:
+            return gen
+
+    raise NoProviderError(HINT)
+
+
+def _check_privacy(uid):
     if not privacy_allows(uid):
         raise PrivacyBlockedError(
             "AI activity is turned off in your privacy settings. Turn it on in "
             "Settings → Privacy to use Stash."
         )
-    provider, model_id = resolve_provider(uid)
 
-    estimate = estimate_tokens(chunk["text"])
-    if repository.daily_token_total(uid) + estimate > StashConfig.daily_token_cap:
-        raise DailyLimitError(
-            "Your daily Stash AI limit is reached. New requests resume tomorrow."
-        )
+
+def _check_cap(uid, generation, estimate):
+    """Enforce the daily per-user cap only when the server key pays."""
+    if generation.get("paid_by") == "server":
+        if repository.daily_token_total(uid) + estimate > StashConfig.daily_token_cap:
+            raise DailyLimitError(
+                "Your daily Stash AI limit is reached. New requests resume tomorrow."
+            )
+
+
+def generate_chunk_cards(uid, generation, document, section, chunk):
+    """Generate validated cards for one chunk; returns (cards, usage_tokens)."""
+    _check_privacy(uid)
+    _check_cap(uid, generation, estimate_tokens(chunk["text"]))
 
     user_prompt = prompt_builders.build_chunk_prompt(
         document["title"], section["title"], chunk["text"]
     )
-    tokens, content = _request(
-        provider, model_id, user_prompt, describe="cards for a section"
+    tokens, content = _generate_json(
+        generation["provider"], generation["model_id"],
+        user_prompt, describe="cards for a section",
     )
     cards = _validate_with_retry(
-        provider, model_id, user_prompt, content,
+        generation["provider"], generation["model_id"], user_prompt, content,
         default_page=_lookup_page(document.get("page_count"), chunk),
     )
     return cards, tokens
 
 
-def generate_recap_card(uid, document, section, section_text):
+def generate_recap_card(uid, generation, document, section, section_text):
     """Generate the single recap card for a section; returns (card, usage)."""
-    provider, model_id = resolve_provider(uid)
-    estimate = estimate_tokens(section_text) + 200
-    if repository.daily_token_total(uid) + estimate > StashConfig.daily_token_cap:
-        raise DailyLimitError(
-            "Your daily Stash AI limit is reached. New requests resume tomorrow."
-        )
+    _check_privacy(uid)
+    _check_cap(uid, generation, estimate_tokens(section_text) + 200)
+
     user_prompt = prompt_builders.build_recap_prompt(
         document["title"], section["title"], section_text
     )
-    tokens, content = _request(
-        provider, model_id, user_prompt, describe=f'recap for "{section["title"]}"'
+    tokens, content = _generate_json(
+        generation["provider"], generation["model_id"],
+        user_prompt, describe=f'recap for "{section["title"]}"',
     )
     cards = _validate_with_retry(
-        provider, model_id, user_prompt, content, default_page=None
+        generation["provider"], generation["model_id"], user_prompt, content,
+        default_page=None,
     )
     recap = [c for c in cards if c["card_type"] == "recap"]
     if not recap:
@@ -146,7 +291,7 @@ def _validate_with_retry(provider, model_id, user_prompt, content,
                 return cards
             if attempt == 0:
                 user_prompt = prompt_builders.build_fix_prompt(problems, content)
-                _, content = _request(provider, model_id, user_prompt, describe="fixed cards")
+                _, content = _generate_json(provider, model_id, user_prompt, describe="fixed cards")
                 continue
             # Second attempt still imperfect: keep flagged-but-usable cards.
             usable = [c for c in cards if not c.get("problems")]
@@ -159,7 +304,7 @@ def _validate_with_retry(provider, model_id, user_prompt, content,
                 user_prompt = prompt_builders.build_fix_prompt(
                     ["Response was not valid JSON in the required shape."], content
                 )
-                _, content = _request(provider, model_id, user_prompt, describe="fixed cards")
+                _, content = _generate_json(provider, model_id, user_prompt, describe="fixed cards")
                 continue
     raise StashAIError(
         "The generator could not produce valid cards for this section. "
@@ -167,27 +312,30 @@ def _validate_with_retry(provider, model_id, user_prompt, content,
     )
 
 
-def _request(provider, model_id, user_prompt, describe=""):
-    """Run one provider request with retry/backoff; returns (tokens, content)."""
-    request = {
-        "messages": [
-            {"role": "system", "content": prompt_builders.SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        "model": model_id,
-        "max_tokens": StashConfig.max_output_tokens,
-        "temperature": StashConfig.temperature,
-    }
+def _generate_json(provider, model_id, user_prompt, describe=""):
+    """Run one structured provider request with retry/backoff; (tokens, content).
+
+    Requests carry the cards JSON Schema so providers with a native
+    JSON/structured-output mode constrain the reply at the API level; the rest
+    keep the prompt-based default. Content is the raw JSON text.
+    """
     delay = 1.0
     for attempt in range(3):
         try:
-            result = provider.generate(request)
-            usage = result.get("usage") or {}
+            content, usage = ai.providers.generate_json(
+                provider,
+                prompt_builders.SYSTEM_PROMPT,
+                user_prompt,
+                schemas.CARDS_SCHEMA,
+                model_id,
+                max_tokens=StashConfig.max_output_tokens,
+                temperature=StashConfig.temperature,
+            )
             tokens = (
                 int(usage.get("inputTokens", 0) or 0),
                 int(usage.get("outputTokens", 0) or 0),
             )
-            content = (result.get("content") or "").strip()
+            content = (content or "").strip()
             if not content:
                 raise StashAIError(
                     f"The generator returned nothing for {describe or 'this section'}."
@@ -229,9 +377,19 @@ def _lookup_page(page_count, chunk):
 
 
 def describe_provider_availability(uid):
-    """User-facing note about which provider/key Stash will use."""
+    """User-facing note about which provider/key Stash uses, plus picker data."""
+    providers = usable_providers(uid)
     try:
-        provider, model_id = resolve_provider(uid)
-        return {"configured": True, "provider": provider.name, "model": model_id}
+        gen = resolve_generation(uid)
+        return {
+            "configured": True,
+            "provider": _PROVIDER_LABELS.get(gen["provider_id"], gen["provider_id"]),
+            "model": gen["model"]["model_id"],
+            "providerId": gen["provider_id"],
+            "modelId": gen["model"]["id"],
+            "paidBy": gen["paid_by"],
+            "providers": providers,
+            "hint": "",
+        }
     except NoProviderError:
-        return {"configured": False, "hint": HINT}
+        return {"configured": False, "providers": providers, "hint": HINT}

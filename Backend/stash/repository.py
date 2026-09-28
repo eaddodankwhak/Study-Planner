@@ -21,6 +21,9 @@ DOCUMENT_UPDATEABLE = {
     "total_cards",
     "page_count",
     "model_used",
+    "provider_used",
+    "preferred_provider",
+    "preferred_model",
     "input_tokens",
     "output_tokens",
     "prompt_version",
@@ -43,17 +46,20 @@ def _commit(conn):
 # --------------------------------------------------------------- documents
 
 def create_document(user_id, *, title, original_filename, file_type, file_size_bytes,
-                    storage_key, file_sha256, course_id=None):
+                    storage_key, file_sha256, course_id=None,
+                    preferred_provider=None, preferred_model=None):
     doc_id = new_id()
     conn = _conn()
     try:
         conn.execute(
             "INSERT INTO stash_documents "
             "(id, user_id, course_id, title, original_filename, file_type,"
-            " file_size_bytes, storage_key, file_sha256, status)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')",
+            " file_size_bytes, storage_key, file_sha256, status,"
+            " preferred_provider, preferred_model)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)",
             (doc_id, user_id, course_id, title, original_filename, file_type,
-             file_size_bytes, storage_key, file_sha256),
+             file_size_bytes, storage_key, file_sha256,
+             preferred_provider, preferred_model),
         )
         _commit(conn)
     finally:
@@ -815,24 +821,46 @@ def today_usage(user_id):
     return {"inputTokens": row["input_tokens"], "outputTokens": row["output_tokens"]}
 
 
-def add_usage(user_id, input_tokens, output_tokens):
+def add_usage(user_id, input_tokens, output_tokens, server_paid=True):
+    """Record token usage for a user's day bucket.
+
+    server_paid marks usage that the server's AI key pays for (as opposed to a
+    personal BYOK key). Only server-paid usage counts against the per-user daily
+    cap and the server cost footprint; personal keys never burn the cap.
+    """
+    server_in = input_tokens if server_paid else 0
+    server_out = output_tokens if server_paid else 0
     conn = _conn()
     try:
         conn.execute(
-            "INSERT INTO stash_usage (id, user_id, day, input_tokens, output_tokens)"
-            " VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO stash_usage (id, user_id, day, input_tokens, output_tokens,"
+            " server_input_tokens, server_output_tokens)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)"
             " ON CONFLICT (user_id, day) DO UPDATE SET"
             " input_tokens = input_tokens + excluded.input_tokens,"
-            " output_tokens = output_tokens + excluded.output_tokens",
-            (new_id(), user_id, day_key(), input_tokens, output_tokens),
+            " output_tokens = output_tokens + excluded.output_tokens,"
+            " server_input_tokens = server_input_tokens + excluded.server_input_tokens,"
+            " server_output_tokens = server_output_tokens + excluded.server_output_tokens",
+            (new_id(), user_id, day_key(), input_tokens, output_tokens, server_in, server_out),
         )
         _commit(conn)
     finally:
         conn.close()
 
 
+def today_server_tokens(user_id):
+    row = db._query_one(
+        "SELECT server_input_tokens, server_output_tokens FROM stash_usage"
+        " WHERE user_id = ? AND day = ?",
+        (user_id, day_key()),
+    )
+    if not row:
+        return {"inputTokens": 0, "outputTokens": 0}
+    return {"inputTokens": row["server_input_tokens"], "outputTokens": row["server_output_tokens"]}
+
+
 def daily_token_total(user_id):
-    usage = today_usage(user_id)
+    usage = today_server_tokens(user_id)
     return usage["inputTokens"] + usage["outputTokens"]
 
 

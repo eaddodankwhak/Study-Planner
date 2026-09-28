@@ -14,9 +14,19 @@ def parse_document(data, ext):
     raise ValueError(f"unsupported stash source type: {ext}")
 
 
-def build_structure(parsed):
-    """Full structure pipeline from a parse*() result."""
+def build_structure(parsed, chunk_target=None, chunk_max=None):
+    """Full structure pipeline from a parse*() result.
+
+    chunk_target/chunk_max size the generated chunks; defaults come from the
+    chunker's constants when omitted.
+    """
     from .cleaner import identify_boilerplate, strip_boilerplate
 
     pages = strip_boilerplate(parsed["pages"], identify_boilerplate(parsed["pages"]))
-    return pages, chunker.build_structure(pages, parsed.get("outline"), parsed["kind"])
+    return pages, chunker.build_structure(
+        pages,
+        parsed.get("outline"),
+        parsed["kind"],
+        chunk_target=chunk_target if chunk_target is not None else chunker.CHUNK_TARGET,
+        chunk_max=chunk_max if chunk_max is not None else chunker.CHUNK_MAX,
+    )

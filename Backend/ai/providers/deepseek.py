@@ -8,6 +8,7 @@ Model IDs (2026): deepseek-v4-flash / deepseek-v4-pro. The legacy
 deepseek-chat / deepseek-reasoner IDs were retired in July 2026.
 """
 
+import json
 import os
 
 from ._http import ProviderHTTPError, post_json
@@ -20,6 +21,33 @@ class DeepSeekProvider(OpenAIProvider):
     def __init__(self, api_key=None):
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
         self.base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+
+    def generate_json(self, request):
+        """DeepSeek JSON mode: json_object + the schema embedded in the prompt.
+
+        DeepSeek's OpenAI-compatible surface only offers `json_object` (no
+        json_schema), so the expected shape is spelled out in the user prompt
+        and the response is constrained to be a single JSON object.
+        """
+        if not request.get("response_schema"):
+            return self.generate(request)
+        system = "".join(m["content"] for m in request.get("messages", []) if m["role"] == "system")
+        user = "".join(m["content"] for m in request.get("messages", []) if m["role"] != "system")
+        schema_text = json.dumps(request["response_schema"])
+        req = dict(request)
+        req["messages"] = [
+            {"role": "system", "content": system},
+            {
+                "role": "user",
+                "content": (
+                    f"{user}\n\nReturn ONLY a single JSON object that conforms to "
+                    f"this JSON schema, with no markdown fences and no commentary:\n"
+                    f"{schema_text}"
+                ),
+            },
+        ]
+        req["response_format"] = {"type": "json_object"}
+        return self.generate(req)
 
     def verify(self, api_key=None):
         """Validate a key by asking for a 1-token reply.

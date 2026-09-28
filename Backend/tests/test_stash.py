@@ -33,6 +33,7 @@ import db  # noqa: E402
 db.init_db()
 
 from app import app  # noqa: E402
+import ai.models as model_registry  # noqa: E402
 from stash import quiz, repository, schemas, security, service  # noqa: E402
 from stash.ai import client, validator  # noqa: E402
 from stash.parsing import build_structure, parse_document  # noqa: E402
@@ -101,13 +102,12 @@ class FakeProvider:
         self.mode = mode
         self.usage = usage or {"inputTokens": 1200, "outputTokens": 800}
 
-    def generate(self, request):
+    def reply(self, prompt):
         import json as _json
 
-        prompt = (request["messages"][-1]["content"] or "")
         if self.mode == "badjson":
-            return {"content": "This is not JSON at all.", "usage": self.usage}
-        if "recap" in prompt[:400]:
+            return "This is not JSON at all."
+        if "recap" in (prompt or "")[:400]:
             cards = [_ok_card(
                 "Chapter recap",
                 "This chapter ties together the key concepts that were introduced and explains the main steps clearly for revision purposes.",
@@ -125,7 +125,7 @@ class FakeProvider:
                     "Cells spend most of their cycle in interphase quietly preparing to divide which is why most dividing tissue looks calm under observation.",
                     "key_takeaway", confidence=0.7),
             ]
-        return {"content": _json.dumps({"cards": cards}), "usage": self.usage}
+        return _json.dumps({"cards": cards})
 
 
 PAGES_2_SECTIONS = [
@@ -138,8 +138,21 @@ PAGES_2_SECTIONS = [
 ]
 
 
-_REAL_RESOLVE_PROVIDER = client.resolve_provider
+_REAL_RESOLVE_GENERATION = client.resolve_generation
+_REAL_GENERATE_JSON = client._generate_json
 _REAL_PRIVACY_ALLOWS = client.privacy_allows
+_REAL_USABLE_PROVIDERS = client.usable_providers
+
+_ANTHROPIC_OPTION = {
+    "provider": "anthropic",
+    "providerName": "Claude",
+    "model": "claude",
+    "modelName": "Claude",
+    "modelApiId": "claude-sonnet-4-5",
+    "source": "server",
+    "contextWindow": 200000,
+    "maxOutput": 8192,
+}
 
 
 class StashTestBase(unittest.TestCase):
@@ -153,8 +166,10 @@ class StashTestBase(unittest.TestCase):
         db.create_user(self.UID_B, "Stash B", self.UID_B + "@example.com", "hash")
 
     def tearDown(self):
-        client.resolve_provider = _REAL_RESOLVE_PROVIDER
+        client.resolve_generation = _REAL_RESOLVE_GENERATION
+        client._generate_json = _REAL_GENERATE_JSON
         client.privacy_allows = _REAL_PRIVACY_ALLOWS
+        client.usable_providers = _REAL_USABLE_PROVIDERS
         for uid in (self.UID_A, self.UID_B):
             db.delete_user(uid)
 
@@ -172,9 +187,27 @@ class StashTestBase(unittest.TestCase):
         if row:
             repository.update_job(row["id"], status="done")
 
-    def patch_provider(self, mode="ok", usage=None):
-        client.resolve_provider = lambda u: (
-            FakeProvider(mode=mode, usage=usage), "claude-3-5-sonnet"
+    def patch_provider(self, mode="ok", usage=None, paid_by="server"):
+        """Stub generation resolution + provider HTTP so the pipeline is hermetic.
+
+        `paid_by` controls whether usage counts against the daily cap: the stub
+        defaults to "server" so cap behaviour matches the existing suite.
+        """
+        fake = FakeProvider(mode=mode, usage=usage)
+        model = dict(model_registry.get_model("claude"))
+        model["model_id"] = "claude-3-5-sonnet"
+        client.resolve_generation = lambda uid, preferred=None: {
+            "provider": fake,
+            "provider_id": "anthropic",
+            "model": model,
+            "model_id": "claude-3-5-sonnet",
+            "paid_by": paid_by,
+        }
+        client._generate_json = (
+            lambda provider, model_id, user_prompt, describe="": (
+                (int(fake.usage["inputTokens"]), int(fake.usage["outputTokens"])),
+                fake.reply(user_prompt),
+            )
         )
 
     def client(self, uid=None):
@@ -292,6 +325,9 @@ class StashPipelineTest(StashTestBase):
         ready = repository.get_document(doc["id"])
         self.assertEqual(ready["status"], "ready")
         self.assertEqual(ready["model_used"], "claude-3-5-sonnet")
+        self.assertEqual(ready["provider_used"], "anthropic")
+        self.assertIsNone(ready.get("preferred_provider"))
+        self.assertIsNone(ready.get("preferred_model"))
         self.assertEqual(ready["prompt_version"], "stash-cards-v1")
         self.assertEqual(ready["page_count"], 6)
         self.assertEqual(ready["progress_percent"], 100)
@@ -371,16 +407,16 @@ class StashPipelineTest(StashTestBase):
         self.assertIn("AI activity is turned off", blocked["error_message"])
 
     def test_no_provider_key_fails_loudly(self):
-        def raiser(uid):
+        def raiser(uid, preferred=None):
             raise client.NoProviderError(client.HINT)
 
-        client.resolve_provider = raiser
+        client.resolve_generation = raiser
         doc, _ = self.make_doc()
         with self.assertRaises(service.PermanentError):
             service.process_document(doc["id"])
         failed = repository.get_document(doc["id"])
         self.assertEqual(failed["status"], "error")
-        self.assertIn("Claude key", failed["error_message"])
+        self.assertIn("AI key", failed["error_message"])
 
     def test_regenerate_selected_section_then_process(self):
         doc, _ = self.make_doc()
@@ -403,6 +439,113 @@ class StashPipelineTest(StashTestBase):
         service.process_document(doc["id"])
         with self.assertRaises(service.PermanentError):
             service.regenerate(doc["id"], section_indexes={99})
+
+
+class StashProviderTest(StashTestBase):
+    """Provider resolution: fixed key fallback order, env aliases, picker data."""
+
+    _ENVS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_AI_API_KEY",
+             "GEMINI_API_KEY", "DEEPSEEK_API_KEY", "COPILOT_GITHUB_TOKEN",
+             "GH_TOKEN")
+
+    def setUp(self):
+        super().setUp()
+        self._saved_env = {name: os.environ.get(name) for name in self._ENVS}
+        for name in self._ENVS:
+            os.environ.pop(name, None)
+
+    def tearDown(self):
+        for name, value in self._saved_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        super().tearDown()
+
+    def _clear_keys(self):
+        for name in self._ENVS:
+            os.environ.pop(name, None)
+
+    def test_server_fallback_order(self):
+        os.environ["ANTHROPIC_API_KEY"] = "k"
+        os.environ["GEMINI_API_KEY"] = "k"  # later alias must not win
+        gen = client.resolve_generation(self.UID_A)
+        self.assertEqual(gen["provider_id"], "anthropic")
+        self.assertEqual(gen["model"]["id"], "claude")
+        self.assertEqual(gen["paid_by"], "server")
+
+        self._clear_keys()
+        os.environ["OPENAI_API_KEY"] = "k"
+        self.assertEqual(client.resolve_generation(self.UID_A)["provider_id"], "openai")
+
+        self._clear_keys()
+        os.environ["DEEPSEEK_API_KEY"] = "k"
+        self.assertEqual(client.resolve_generation(self.UID_A)["provider_id"], "deepseek")
+
+        self._clear_keys()
+        os.environ["COPILOT_GITHUB_TOKEN"] = "k"
+        self.assertEqual(client.resolve_generation(self.UID_A)["provider_id"], "copilot")
+
+    def test_gemini_env_alias_is_accepted(self):
+        os.environ["GEMINI_API_KEY"] = "k"
+        gen = client.resolve_generation(self.UID_A)
+        self.assertEqual(gen["provider_id"], "google")
+        self.assertEqual(gen["model"]["id"], "gemini")
+        self.assertEqual(gen["paid_by"], "server")
+
+        self._clear_keys()
+        os.environ["GOOGLE_AI_API_KEY"] = "k"
+        self.assertEqual(client.resolve_generation(self.UID_A)["provider_id"], "google")
+
+    def test_github_token_alias_is_accepted(self):
+        os.environ["GH_TOKEN"] = "k"
+        self.assertEqual(client.resolve_generation(self.UID_A)["provider_id"], "copilot")
+
+    def test_mock_provider_is_never_usable(self):
+        options = client.usable_providers(self.UID_A)
+        self.assertEqual(options, [])
+        with self.assertRaises(client.NoProviderError):
+            client.resolve_generation(self.UID_A)
+
+    def test_usable_providers_report_source_and_picker_fields(self):
+        os.environ["OPENAI_API_KEY"] = "k"
+        os.environ["DEEPSEEK_API_KEY"] = "k"
+        options = client.usable_providers(self.UID_A)
+        self.assertEqual(
+            [o["provider"] for o in options], ["openai", "deepseek"]
+        )
+        entry = options[0]
+        self.assertEqual(entry["source"], "server")
+        self.assertEqual(entry["provider"], "openai")
+        self.assertEqual(entry["model"], "gpt")
+        self.assertIn("providerName", entry)
+        self.assertIn("modelName", entry)
+        self.assertIn("contextWindow", entry)
+        self.assertIn("maxOutput", entry)
+
+    def test_cap_applies_only_to_server_paid_generation(self):
+        original_cap = client.StashConfig.daily_token_cap
+        client.StashConfig.daily_token_cap = 0
+        try:
+            self.patch_provider(paid_by="personal")
+            doc, _ = self.make_doc()
+            service.process_document(doc["id"])  # personal keys are never capped
+            ready = repository.get_document(doc["id"])
+            self.assertEqual(ready["status"], "ready")
+            server = repository.today_server_tokens(self.UID_A)
+            self.assertEqual(server["inputTokens"], 0)
+            self.assertEqual(server["outputTokens"], 0)
+        finally:
+            client.StashConfig.daily_token_cap = original_cap
+
+    def test_describe_provider_availability_offers_picker_input(self):
+        os.environ["OPENAI_API_KEY"] = "k"
+        hints = client.describe_provider_availability(self.UID_A)
+        self.assertTrue(hints["configured"])
+        self.assertEqual(hints["providerId"], "openai")
+        self.assertEqual(hints["modelId"], "gpt")
+        self.assertEqual(len(hints["providers"]), 1)
+        self.assertEqual(hints["providers"][0]["source"], "server")
 
 
 class StashApiTest(StashTestBase):
@@ -530,6 +673,51 @@ class StashApiTest(StashTestBase):
         self.assertEqual(prog["cards_seen"], 1)
         self.assertEqual(prog["cards_got_it"], 1)
 
+    def test_upload_and_regenerate_register_provider_pick(self):
+        c = self.client(self.UID_A)
+        self.patch_provider()
+        client.usable_providers = lambda uid: [_ANTHROPIC_OPTION]
+        blob = build_pdf(PAGES_2_SECTIONS)
+
+        r = c.post(
+            "/api/stash/documents",
+            data={
+                "file": (io.BytesIO(blob), "sample.pdf"),
+                "provider": "anthropic",
+                "model": "claude",
+            },
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(r.status_code, 201, r.data)
+        doc = r.get_json()["document"]
+        self.assertEqual(doc["preferred_provider"], "anthropic")
+        self.assertEqual(doc["preferred_model"], "claude")
+
+        row = db._query_one("SELECT id FROM stash_jobs WHERE document_id = ?", (doc["id"],))
+        repository.update_job(row["id"], status="done")
+        regen = c.post(
+            "/api/stash/documents/%s/regenerate" % doc["id"],
+            json={"provider": "anthropic", "model": "claude"},
+        )
+        self.assertEqual(regen.status_code, 200, regen.data)
+        self.assertEqual(regen.get_json()["document"]["preferred_provider"], "anthropic")
+
+    def test_upload_rejects_unknown_provider_pick(self):
+        c = self.client(self.UID_A)
+        client.usable_providers = lambda uid: []
+        blob = build_pdf(PAGES_2_SECTIONS)
+        r = c.post(
+            "/api/stash/documents",
+            data={
+                "file": (io.BytesIO(blob), "sample.pdf"),
+                "provider": "anthropic",
+                "model": "claude",
+            },
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("isn't available", r.get_json()["error"])
+
     def test_search_and_delete_documents(self):
         c = self.client(self.UID_A)
         doc, _ = self.make_doc()
@@ -590,7 +778,7 @@ class StashUploadTest(StashTestBase):
     def test_upload_page_explains_when_no_key_is_configured(self):
         c = self.client(self.UID_A)
         html = c.get("/stash/upload").get_data(as_text=True)
-        self.assertIn("No Claude key is configured yet.", html)
+        self.assertIn("Stash needs an AI key", html)
         self.assertIn('data-max-mb="50"', html)
 
 

@@ -11,13 +11,43 @@ class GoogleProvider(AIProvider):
     name = "google"
 
     def __init__(self, api_key=None):
-        self.api_key = api_key or os.getenv("GOOGLE_AI_API_KEY")
+        # Accept the legacy Gemini env name as an alias; GOOGLE_AI_API_KEY wins.
+        self.api_key = api_key or os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY")
         self.base_url = os.getenv("GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
 
     def _url(self, model, stream=False):
         endpoint = "streamGenerateContent" if stream else "generateContent"
         qs = urllib.parse.urlencode({"key": self.api_key, "alt": "sse"} if stream else {"key": self.api_key})
         return f"{self.base_url}/models/{model}:{endpoint}?{qs}"
+
+    def _google_schema(self, schema):
+        """Convert a JSON Schema dict into a Gemini responseSchema.
+
+        Gemini's responseSchema accepts a small OpenAPI-style subset: no type
+        unions like ["string", "null"] (those become type + nullable), and no
+        $schema/$defs. Returns None when the schema is unusable so callers can
+        fall back to plain JSON mode.
+        """
+        if not isinstance(schema, dict):
+            return None
+        out = {}
+        for key, value in schema.items():
+            if key == "type" and isinstance(value, list):
+                non_null = [t for t in value if t != "null"]
+                out["type"] = (non_null or ["string"])[0]
+                if len(non_null) != len(value):
+                    out["nullable"] = True
+            elif key == "properties" and isinstance(value, dict):
+                out["properties"] = {
+                    k: self._google_schema(v) for k, v in value.items()
+                }
+            elif key in ("required", "additionalProperties", "items", "enum"):
+                out[key] = value
+            elif key in ("const", "default", "examples"):
+                continue
+            else:
+                out[key] = value
+        return out
 
     def _payload(self, request):
         contents = []
@@ -30,6 +60,12 @@ class GoogleProvider(AIProvider):
             contents.append({"role": role, "parts": [{"text": m["content"]}]})
         # Build generationConfig with token cap.
         generation_config = {"maxOutputTokens": request.get("max_tokens", 1500)}
+        if request.get("response_schema"):
+            # Constrain the reply to structured JSON at the API level.
+            generation_config["responseMimeType"] = "application/json"
+            transformed = self._google_schema(request["response_schema"])
+            if transformed:
+                generation_config["responseSchema"] = transformed
         system_instruction = None
         sys_text = " ".join(m["content"] for m in request.get("messages", []) if m["role"] == "system")
         if sys_text:

@@ -104,6 +104,20 @@
     </div>
     <p class="text-muted">Re-running generation costs your daily AI token budget. Choose whole document, or pick
         chapters below to redo just those.</p>
+    {% if hints.providers|length > 1 %}
+    <div class="stash-regen__picker">
+        <label for="regen-ai-pick">Provider / model
+            <select id="regen-ai-pick">
+                {% for opt in hints.providers %}
+                <option value="{{ opt.provider }}:{{ opt.model }}"
+                    {{ 'selected' if opt.provider == hints.providerId and opt.model == hints.modelId else '' }}>
+                    {{ opt.providerName }} · {{ opt.modelName }}{% if opt.source == 'server' %} · server key{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+    </div>
+    {% endif %}
     <div class="stash-regen__chapters" data-regen-chapters></div>
     <div class="stash-modal__actions">
         <button class="button button--primary button--sm" type="button" data-regen-all>Regenerate everything</button>

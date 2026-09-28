@@ -42,6 +42,7 @@ class StashConfig:
         self.max_pptx_slides = _env_int("STASH_MAX_PPTX_SLIDES", 200)
 
         # Generation preferences.
+        self.provider = os.getenv("STASH_PROVIDER", "anthropic")
         self.model = os.getenv("STASH_MODEL", "claude")
         self.prompt_version = os.getenv("STASH_PROMPT_VERSION", "stash-cards-v1")
         self.max_output_tokens = _env_int("STASH_MAX_OUTPUT_TOKENS", 3000)

@@ -40,13 +40,19 @@ CONNECTABLE_PROVIDERS = {
 }
 
 #: Server-level env key -> provider id used for the /meta serverKeys list.
+#: A provider may list several env names (aliases); any one set enables it.
 _SERVER_KEY_ENVS = (
-    ("openai", "OPENAI_API_KEY"),
-    ("anthropic", "ANTHROPIC_API_KEY"),
-    ("google", "GOOGLE_AI_API_KEY"),
-    ("deepseek", "DEEPSEEK_API_KEY"),
-    ("copilot", "COPILOT_GITHUB_TOKEN"),
+    ("openai", ("OPENAI_API_KEY",)),
+    ("anthropic", ("ANTHROPIC_API_KEY",)),
+    ("google", ("GOOGLE_AI_API_KEY", "GEMINI_API_KEY")),
+    ("deepseek", ("DEEPSEEK_API_KEY",)),
+    ("copilot", ("COPILOT_GITHUB_TOKEN", "GH_TOKEN")),
 )
+
+
+def _server_env_set(envs):
+    """True when any of the given server env names holds a value."""
+    return any(os.getenv(env) for env in envs)
 
 UPLOAD_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -128,7 +134,7 @@ def _material_text(material_id, user_id):
 
 def _server_provider_keys_available():
     """True when any real provider key is configured at the server level."""
-    return any(os.getenv(env) for _pid, env in _SERVER_KEY_ENVS)
+    return any(_server_env_set(env) for _pid, env in _SERVER_KEY_ENVS)
 
 
 def _verify_provider_key(provider, api_key):
@@ -163,7 +169,7 @@ def meta():
     used, limit = _sample_usage()
     connections = db.get_ai_connections(uid)
     connected_providers = {c["provider"] for c in connections}
-    server_keys = [pid for pid, env in _SERVER_KEY_ENVS if os.getenv(env)]
+    server_keys = [pid for pid, env in _SERVER_KEY_ENVS if _server_env_set(env)]
     mock_mode = not _server_provider_keys_available() and not connected_providers
     return jsonify({
         "models": model_registry.models_available(),

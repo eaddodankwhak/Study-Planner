@@ -24,9 +24,7 @@
 </header>
 
 {% if not hints.configured %}
-<div class="stash-notice">Stash needs a Claude API key to generate cards.
-    Add <code>ANTHROPIC_API_KEY</code> to the server, or connect your own key in
-    the AI Hub. You can still upload — cards are queued until a key is present.</div>
+<div class="stash-notice">{{ hints.hint }} You can still upload — cards are queued until a key is present.</div>
 {% elif hints.configured %}
 <div class="stash-notice stash-notice--ok">Cards will be generated with <strong>{{ hints.provider }}</strong>
     ({{ hints.model }}).</div>

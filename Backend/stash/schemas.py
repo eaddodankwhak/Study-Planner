@@ -39,6 +39,47 @@ MAX_BODY_WORDS = 80
 #: Below this confidence a card is still stored but flagged for review.
 FLAG_CONFIDENCE = 0.6
 
+#: JSON Schema for a Stash generation response (mirrors the shape described in
+#: the build prompt). Strict-compliant so structured-output modes that require
+#: every property to be listed (OpenAI json_schema strict) can enforce it;
+#: optional fields are nullable and still required so the emitter is lossless.
+CARDS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "cards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string"},
+                    "title": {"type": "string"},
+                    "content": {"type": "string"},
+                    "example": {"type": ["string", "null"]},
+                    "key_term": {"type": ["string", "null"]},
+                    "key_term_definition": {"type": ["string", "null"]},
+                    "confidence": {"type": "number"},
+                    "source_page": {"type": ["integer", "null"]},
+                    "source_slide": {"type": ["integer", "null"]},
+                },
+                "required": [
+                    "type",
+                    "title",
+                    "content",
+                    "example",
+                    "key_term",
+                    "key_term_definition",
+                    "confidence",
+                    "source_page",
+                    "source_slide",
+                ],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["cards"],
+    "additionalProperties": False,
+}
+
 
 def count_words(text):
     """Return the number of whitespace-separated words in a string."""

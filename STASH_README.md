@@ -47,16 +47,30 @@ settings."
 
 Stash explicitly **never uses the mock provider** — silently returning invented
 content for a paid feature would be worse than failing loudly. It resolves a
-real Claude key in this order during processing:
+real provider + key in this order during processing:
 
-1. The user's own connected key (`db.get_ai_connection_key`) — set in
+1. The user's explicit pick for the document (provider/model chosen on the
+   upload or regenerate dialogs).
+2. The user's AI Hub preference (`STASH_MODEL`, or the default provider in
+   **Settings -> AI Settings**).
+3. The user's own connected key (`db.get_ai_connection_key`) — set in
    **Settings -> AI Settings**.
-2. The server key (`ANTHROPIC_API_KEY`, via `STASH_MODEL`'s provider).
+4. The server keys, checked in this fixed order: `ANTHROPIC_API_KEY` ->
+   `OPENAI_API_KEY` -> `GOOGLE_AI_API_KEY` (alias `GEMINI_API_KEY`) ->
+   `DEEPSEEK_API_KEY` -> `COPILOT_GITHUB_TOKEN` (alias `GH_TOKEN`).
+
+`STASH_PROVIDER` sets which provider the server prefers before checking this
+order. Every provider goes through the same `generate_json` interface: one
+high-quality card per request with a schema-enforced response (OpenAI and Gemini
+use their native structured-output modes). Per-model context windows size the
+chunks; model choices and unverified activity are recorded on the document and
+shown in the reader.
 
 Without a usable key the document fails with a hint to add a key; the upload
 page and library show the same hint. Per-user generation respects a daily
-token cap (`STASH_DAILY_TOKEN_CAP`); once reached, processing stops and the
-rest queues for the next day.
+token cap (`STASH_DAILY_TOKEN_CAP`); only requests paid for by the **server's**
+key count toward the cap — a user's own key is never capped. Once the cap is
+reached, server-paid processing stops and the rest queues for the next day.
 
 ## Environment variables
 
@@ -68,7 +82,8 @@ Set before the app imports `stash` (all have documented defaults in
 | `STASH_MAX_FILE_BYTES` | 52428800 | Upload size cap (50 MB) |
 | `STASH_MAX_PDF_PAGES` | 600 | Max PDF pages |
 | `STASH_MAX_PPTX_SLIDES` | 200 | Max PPTX slides |
-| `STASH_MODEL` | claude | Model registry id used for generation |
+| `STASH_MODEL` | claude | Default model registry id used for generation |
+| `STASH_PROVIDER` | anthropic | Default provider registry id used for generation |
 | `STASH_MAX_OUTPUT_TOKENS` | 3000 | Max tokens per provider request |
 | `STASH_TEMPERATURE` | 0.2 | Generation temperature |
 | `STASH_DAILY_TOKEN_CAP` | 250000 | Per-user/day soft cap |

@@ -88,6 +88,14 @@
       data.append("file", file, file.name);
       var course = frm.querySelector("select[name=course_id]");
       if (course && course.value) data.append("course_id", course.value);
+      var pick = frm.querySelector("select[name=ai_pick]");
+      if (pick && pick.value) {
+        var parts = String(pick.value).split(":");
+        if (parts.length === 2) {
+          data.append("provider", parts[0]);
+          data.append("model", parts[1]);
+        }
+      }
 
       fetch("/api/stash/documents", { method: "POST", body: data, credentials: "same-origin" })
         .then(json)

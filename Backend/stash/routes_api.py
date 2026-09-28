@@ -22,6 +22,7 @@ from . import quiz  # noqa: E402
 from . import repository  # noqa: E402
 from . import security  # noqa: E402
 from . import service  # noqa: E402
+from .ai import client  # noqa: E402
 from .config import StashConfig  # noqa: E402
 from .worker import ensure_worker  # noqa: E402
 
@@ -54,8 +55,27 @@ def _public_doc(doc):
         "course_id": doc.get("course_id"),
         "course_title": doc.get("course_title"),
         "model_used": doc.get("model_used"),
+        "provider_used": doc.get("provider_used"),
+        "preferred_provider": doc.get("preferred_provider"),
+        "preferred_model": doc.get("preferred_model"),
         "created_at": doc.get("created_at"),
     }
+
+
+def _pick_from_request(uid, provider, model):
+    """Validate a provider/model pick against what the user can actually use.
+
+    Returns a clean (provider, model) pair of registry ids, or (None, None)
+    when the request carried no pick. Raises ValueError for a bogus pick.
+    """
+    if not provider and not model:
+        return None, None
+    if not provider or not model:
+        raise ValueError("Choose both the AI provider and the model.")
+    for option in client.usable_providers(uid):
+        if option["provider"] == provider and option["model"] == model:
+            return provider, model
+    raise ValueError("That AI provider or model isn't available for your account.")
 
 
 def _public_card(card):
@@ -96,8 +116,20 @@ def upload_document():
         return jsonify({"ok": False, "error": "That course is not yours."}), 400
 
     try:
+        provider, model = _pick_from_request(
+            uid,
+            (request.form.get("provider") or "").strip() or None,
+            (request.form.get("model") or "").strip() or None,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+    try:
         blob = security.read_upload(uploaded)
-        doc = service.create_document(uid, uploaded.filename, blob, course_id=course_id)
+        doc = service.create_document(
+            uid, uploaded.filename, blob,
+            course_id=course_id, provider=provider, model=model,
+        )
     except security.StashSecurityError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except service.DuplicateDocumentError as exc:
@@ -153,11 +185,23 @@ def regenerate_document(doc_id):
     body = request.get_json(silent=True) or {}
     chapters = body.get("chapters")
     try:
+        provider, model = _pick_from_request(
+            uid,
+            (body.get("provider") or "").strip() or None,
+            (body.get("model") or "").strip() or None,
+        )
         if chapters:
             indexes = [int(v) for v in chapters]
-            doc = service.regenerate(doc_id, section_indexes=set(indexes))
+            doc = service.regenerate(
+                doc_id, section_indexes=set(indexes),
+                provider=provider, model=model,
+            )
         else:
-            doc = service.regenerate(doc_id)
+            doc = service.regenerate(
+                doc_id, provider=provider, model=model
+            )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
     except service.PermanentError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     ensure_worker()
@@ -254,9 +298,11 @@ def usage():
     if not uid:
         return jsonify({"ok": False, "error": "Sign in."}), 401
     used = repository.daily_token_total(uid)
+    total = repository.today_usage(uid)
     return jsonify({
         "ok": True,
         "used": used,
+        "total": total["inputTokens"] + total["outputTokens"],
         "cap": StashConfig.daily_token_cap,
         "remaining": max(0, StashConfig.daily_token_cap - used),
     })

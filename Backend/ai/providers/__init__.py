@@ -94,3 +94,33 @@ def list_providers():
                 "available": bool(probe.api_key),
             })
     return result
+
+
+def generate_json(provider, system, user, schema, model, max_tokens=None, temperature=None):
+    """Request a structured (JSON) response from a provider adapter.
+
+    provider: an already-keyed provider adapter instance (use get_provider with
+    the correct api_key for BYOK, or a fresh instance for a server key).
+    schema: a JSON Schema dict describing the expected output object; adapters
+    with a structured-output mode pass it to the API, others embed it in the
+    prompt.
+    Returns (content, usage): content is the raw JSON text; usage mirrors the
+    generate() result shape ({"inputTokens", "outputTokens"}).
+
+    This is the single entry point Stash-style structured generation uses so
+    every provider flows through the same request shape.
+    """
+    request = {
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "model": model,
+        "response_schema": schema,
+    }
+    if max_tokens is not None:
+        request["max_tokens"] = max_tokens
+    if temperature is not None:
+        request["temperature"] = temperature
+    result = provider.generate_json(request)
+    return result["content"], result["usage"]

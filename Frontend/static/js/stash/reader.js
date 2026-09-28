@@ -739,6 +739,14 @@
         function (el) { return parseInt(el.value, 10); }
       );
       var body = chosen.length ? { chapters: chosen } : {};
+      var pick = document.getElementById("regen-ai-pick");
+      if (pick && pick.value) {
+        var parts = String(pick.value).split(":");
+        if (parts.length === 2) {
+          body.provider = parts[0];
+          body.model = parts[1];
+        }
+      }
       post("/api/stash/documents/" + encodeURIComponent(docId) + "/regenerate", body)
         .then(function (res) {
           if (!res.ok) { toast.error(res.error || "Couldn't start regeneration."); return; }

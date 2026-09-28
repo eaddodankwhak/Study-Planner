@@ -18,16 +18,19 @@ CHUNK_TARGET = 1700
 CHUNK_MAX = 2100
 
 
-def build_structure(pages, outline=None, kind="pdf"):
+def build_structure(pages, outline=None, kind="pdf",
+                    chunk_target=CHUNK_TARGET, chunk_max=CHUNK_MAX):
     """Return {"sections": [...], "chunks": [...]}.
 
     Sections: [{"title", "level", "page_start", "page_end"}]
     Chunks:   [{"section_index", "text", "page_start", "page_end"}]
     section_index refers to the position of the section inside the sections
     list so the caller can resolve ids after persisting the sections.
+    chunk_target/chunk_max size chunks; callers may lower them to fit the AI
+    model's context window.
     """
     sections = _sections(pages, outline or [], kind)
-    chunks = _chunk_sections(pages, sections, CHUNK_TARGET, CHUNK_MAX)
+    chunks = _chunk_sections(pages, sections, chunk_target, chunk_max)
 
     # Drop sections with almost no extractable text (scanned/empty pages).
     kept = [
