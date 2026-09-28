@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Stash Library — Study Planner{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stash.css') }}">
+{% endblock %}
+
+{% block main %}
+<header class="stash-header">
+    <div>
+        <h1>Stash</h1>
+        <p class="text-muted mb-0">Upload a PDF or PowerPoint and Stash turns it into bite-size idea cards.</p>
+    </div>
+    <div class="stash-header__actions">
+        <a class="button button--ghost" href="{{ url_for('stash.saved') }}">
+            Saved cards{% if saved_count %} ({{ saved_count }}){% endif %}
+        </a>
+        <a class="button button--primary" href="{{ url_for('stash.upload') }}">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            Upload document
+        </a>
+    </div>
+</header>
+
+{% if not hints.configured %}
+<div class="stash-notice">Stash needs a Claude API key to generate cards.
+    Add <code>ANTHROPIC_API_KEY</code> to the server, or connect your own key in
+    the AI Hub. You can still upload — cards are queued until a key is present.</div>
+{% elif hints.configured %}
+<div class="stash-notice stash-notice--ok">Cards will be generated with <strong>{{ hints.provider }}</strong>
+    ({{ hints.model }}).</div>
+{% endif %}
+
+<div class="stash-toolbar">
+    <form class="stash-toolbar__search" action="{{ url_for('stash.library') }}" method="get" role="search">
+        <label class="sr-only" for="stash-search">Search your documents</label>
+        <input id="stash-search" name="q" type="search" value="{{ search }}" placeholder="Search documents…"
+            autocomplete="off">
+        <button class="button button--ghost" type="submit">Search</button>
+    </form>
+    <form action="{{ url_for('stash.library') }}" method="get">
+        <label class="sr-only" for="stash-course-filter">Filter by course</label>
+        <select id="stash-course-filter" name="course_id" onchange="this.form.submit()">
+            <option value="">All courses</option>
+            {% for course in courses %}
+            <option value="{{ course.id }}" {{ 'selected' if course_id == course.id|string else '' }}>{{ course.title }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<section class="stash-grid">
+    {% for doc in documents %}
+    <article class="stash-card" data-doc-id="{{ doc.id }}">
+        <div class="stash-card__type">
+            {% if doc.file_type == 'pdf' %}PDF{% else %}PPTX{% endif %}{% if doc.course_title %} · {{ doc.course_title }}{% endif %}
+        </div>
+        <h2 class="stash-card__title">{{ doc.title or doc.original_filename }}</h2>
+        <p class="stash-card__meta text-muted">
+            {{ doc.original_filename }} ·
+            {% if doc.page_count %} {{ doc.page_count }} {{ 'pages' if doc.file_type == 'pdf' else 'slides' }} ·{% endif %}
+            {{ doc.total_cards }} cards
+        </p>
+
+        {% if doc.status == 'error' and doc.error_message %}
+        <p class="stash-card__error" role="alert">{{ doc.error_message }}</p>
+        {% elif doc.status in ('queued', 'processing') %}
+        <div class="stash-progress" aria-label="Generating cards">
+            <div class="stash-progress__bar" style="width: {{ doc.progress_percent }}%"></div>
+        </div>
+        <p class="stash-card__meta text-muted">Generating… {{ doc.progress_percent }}%</p>
+        {% endif %}
+
+        <div class="stash-card__actions">
+            {% if doc.status == 'ready' %}
+            <a class="button button--primary button--sm" href="{{ url_for('stash.reader', doc_id=doc.id) }}">Open reader</a>
+            <button class="button button--ghost button--sm" type="button" data-stash-regenerate="{{ doc.id }}" title="Regenerate cards">Regenerate</button>
+            {% elif doc.status in ('queued', 'processing') %}
+            <a class="button button--ghost button--sm" href="{{ url_for('stash.processing') }}">See progress</a>
+            {% else %}
+            <button class="button button--ghost button--sm" type="button" data-stash-redeploy="{{ doc.id }}" title="Regenerate cards">Retry</button>
+            {% endif %}
+            <button class="button button--ghost button--sm stash-card__delete" type="button"
+                data-stash-delete="{{ doc.id }}" data-stash-title="{{ doc.title or doc.original_filename }}">Delete</button>
+        </div>
+    </article>
+    {% else %}
+    <div class="stash-empty">
+        <h2>No documents yet</h2>
+        <p>Upload a PDF or PowerPoint — Stash reads it, splits it into chapters, and generates idea cards you can save,
+            highlight, and quiz yourself on.</p>
+        <a class="button button--primary" href="{{ url_for('stash.upload') }}">Upload your first document</a>
+    </div>
+    {% endfor %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stash/library.js') }}" defer></script>
+{% endblock %}

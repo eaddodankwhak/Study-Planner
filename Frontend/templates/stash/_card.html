@@ -1,0 +1,42 @@
+{% set stash_labels = {
+    'concept': 'Concept', 'definition': 'Definition', 'process_step': 'Process step',
+    'formula': 'Formula', 'example': 'Example', 'key_takeaway': 'Key takeaway',
+    'warning': 'Warning', 'recap': 'Chapter recap'
+} -%}
+<article class="stash-item" data-card-id="{{ card.id }}"
+    data-card-type="{{ card.card_type }}"
+    data-section-id="{{ card.section_id or '' }}"
+    data-source-page="{{ card.source_page_start or '' }}"
+    data-source-slide="{{ card.source_slide or '' }}"
+    data-saved="{{ card.saved or 0 }}"
+    data-status="{{ card.status or '' }}">
+    <header class="stash-item__head">
+        <span class="stash-item__badge">{{ stash_labels.get(card.card_type, card.card_type) }}</span>
+        {% if card.is_flagged %}
+        <span class="stash-item__flag" title="Generated with low confidence — review against the source">For review</span>
+        {% endif %}
+        <span class="stash-item__source">
+            {% if card.source_slide %}slide {{ card.source_slide }}
+            {% elif card.source_page_start %}{% if document.file_type == 'pdf' %}p.{% else %}slide {% endif %}{{ card.source_page_start }}{% endif %}
+        </span>
+    </header>
+    <h2 class="stash-item__title">{{ card.title }}</h2>
+    <div class="stash-item__body"><span class="stash-item__highlightable">{{ card.body }}</span></div>
+    {% if card.example %}
+    <div class="stash-item__example"><strong>Example</strong> — {{ card.example }}</div>
+    {% endif %}
+    {% if card.key_term %}
+    <div class="stash-item__term"><strong>{{ card.key_term }}</strong>{% if card.key_term_definition %} — {{ card.key_term_definition }}{% endif %}</div>
+    {% endif %}
+    <footer class="stash-item__actions">
+        <button class="stash-item__act stash-item__act--save" type="button" data-save aria-pressed="{{ 'true' if card.saved else 'false' }}">
+            {{ 'Saved' if card.saved else 'Save' }}</button>
+        <button class="stash-item__act stash-item__act--gotit" type="button" data-gotit aria-pressed="{{ 'true' if card.status == 'got_it' else 'false' }}">
+            {{ "I've got it" if card.status == 'got_it' else "I got it" }}</button>
+        <button class="stash-item__act" type="button" data-review>Review again</button>
+        <button class="stash-item__act" type="button" data-note>Note{{ ' •' if notes.get(card.id) else '' }}</button>
+        <button class="stash-item__act" type="button" data-ask>Ask about this</button>
+        <button class="stash-item__act" type="button" data-highlight>Highlight</button>
+        <button class="stash-item__act" type="button" data-source>Source</button>
+    </footer>
+</article>

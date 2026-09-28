@@ -1,0 +1,630 @@
+/*
+ * Stash — turn PDFs & PowerPoints into bite-size idea cards.
+ * Follows the app's tokens (variables.css) and mirrors component conventions.
+ */
+
+/* ---------------------------------------------------------------- library */
+
+.stash-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+}
+
+.stash-header__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.stash-notice {
+  background: var(--wash-orange);
+  border: 1px solid color-mix(in srgb, var(--deco-orange) 35%, transparent);
+  color: var(--color-text);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  font-size: var(--text-body);
+}
+
+.stash-notice code {
+  font-family: var(--font-monospace);
+  background: rgb(255 255 255 / 0.55);
+  padding: 0 0.3em;
+  border-radius: var(--radius-sm);
+}
+
+.stash-notice--ok {
+  background: var(--wash-green);
+  border-color: color-mix(in srgb, var(--deco-green) 35%, transparent);
+}
+
+.stash-toolbar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.stash-toolbar__search {
+  display: flex;
+  gap: var(--space-2);
+  flex: 1 1 16rem;
+}
+
+.stash-toolbar__search input {
+  flex: 1;
+}
+
+.stash-toolbar select {
+  max-width: 20rem;
+}
+
+.stash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.stash-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-primary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stash-card__type {
+  font-size: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--color-primary-light);
+}
+
+.stash-card__title {
+  font-size: var(--text-h3);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.stash-card__meta {
+  font-size: var(--text-body);
+  margin: 0;
+}
+
+.stash-card__error {
+  font-size: var(--text-body);
+  color: var(--color-error);
+  margin: 0;
+}
+
+.stash-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+.stash-card__delete {
+  margin-left: auto;
+  color: var(--color-error);
+}
+
+.stash-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.stash-progress__bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-primary-light);
+  transition: width var(--dur-base) var(--ease-out);
+  width: 0;
+}
+
+.stash-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--space-12) var(--space-4);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+.stash-empty h2 {
+  margin-top: 0;
+}
+
+.stash-empty p {
+  max-width: 34rem;
+  margin-inline: auto;
+  color: var(--color-muted);
+}
+
+/* ------------------------------------------------------------------ upload */
+
+.stash-upload {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 42rem;
+}
+
+.stash-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.stash-drop:hover,
+.stash-drop--drag {
+  border-color: var(--color-primary-light);
+  background: var(--wash-navy);
+}
+
+.stash-drop__icon {
+  color: var(--color-primary-light);
+  display: grid;
+  place-items: center;
+}
+
+.stash-drop__title {
+  font-size: var(--text-h3);
+}
+
+.stash-drop__sub {
+  color: var(--color-muted);
+}
+
+.stash-upload__row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stash-upload__row select {
+  flex: 1 1 12rem;
+}
+
+.stash-upload__hint,
+.stash-upload__error {
+  margin-top: 0;
+}
+
+/* --------------------------------------------------------------- processing */
+
+.stash-queue {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+/* ----------------------------------------------------------------- reader */
+
+.stash-reader {
+  margin: calc(-1 * var(--space-4)) 0;
+}
+
+.stash-reader__topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.stash-reader__title {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.stash-reader__title h1 {
+  font-size: var(--text-h3);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stash-reader__toolbar {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.stash-reader__progress {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+
+.stash-reader__progress-bar {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width var(--dur-base) var(--ease-out);
+  width: 0;
+}
+
+.stash-reader__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.stash-toc {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.stash-toc h2 {
+  font-size: var(--text-h3);
+  margin: 0 0 var(--space-3);
+}
+
+.stash-toc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.stash-toc__list button {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-text);
+}
+
+.stash-toc__list button:hover {
+  background: var(--wash-navy);
+}
+
+.stash-toc__list button small {
+  color: var(--color-muted);
+  margin-left: var(--space-2);
+}
+
+/* ------------------------------------------------------------------- cards */
+
+.stash-cards {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 52rem;
+}
+
+.stash-cards__sentinel {
+  height: 1px;
+}
+
+.stash-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary-light);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  scroll-margin-top: var(--space-6);
+}
+
+.stash-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.stash-item__badge {
+  background: var(--wash-navy);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 0.2em 0.6em;
+  border-radius: 999px;
+}
+
+.stash-item__flag {
+  color: var(--priority-moderate);
+  border: 1px solid color-mix(in srgb, var(--priority-moderate) 40%, transparent);
+  border-radius: 999px;
+  padding: 0.2em 0.6em;
+}
+
+.stash-item__source {
+  margin-left: auto;
+}
+
+.stash-item__title {
+  font-size: var(--text-h3);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.stash-item__body {
+  font-size: var(--text-body);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.stash-item__example,
+.stash-item__term {
+  font-size: var(--text-body);
+  background: var(--wash-blue);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.stash-item__term {
+  background: var(--wash-violet);
+}
+
+.stash-item__doc {
+  font-size: var(--text-body);
+  margin: 0;
+}
+
+.stash-item__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.stash-item--compact .stash-item__actions {
+  margin-top: 0;
+}
+
+.stash-item__act {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.3em 0.85em;
+  font: inherit;
+  font-size: var(--text-body);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--dur-instant) var(--ease-out),
+    border-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out);
+  text-decoration: none;
+}
+
+a.stash-item__act {
+  display: inline-block;
+}
+
+.stash-item__act:hover {
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.stash-item__act--on,
+.stash-item__act[aria-pressed="true"] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.stash-item__act--saved {
+  background: var(--wash-green);
+  border-color: var(--deco-green);
+  color: var(--status-done);
+}
+
+mark.stash-mark {
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+mark.stash-mark--yellow { background: rgb(252 219 71 / 0.6); }
+mark.stash-mark--green  { background: rgb(126 217 147 / 0.55); }
+mark.stash-mark--blue   { background: rgb(122 178 238 / 0.6); }
+mark.stash-mark--pink   { background: rgb(244 143 177 / 0.5); }
+
+/* focus mode: dim everything except the card in view */
+.stash-reader--focus .stash-item {
+  opacity: 0.35;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.stash-reader--focus .stash-item--focused {
+  opacity: 1;
+}
+
+/* font scaling for card text */
+.stash-reader[data-reader-font="sm"] .stash-item__body { font-size: 0.875rem; }
+.stash-reader[data-reader-font="lg"] .stash-item__body { font-size: 1.0625rem; }
+.stash-reader[data-reader-font="xl"] .stash-item__body { font-size: 1.1875rem; }
+
+/* highlight selection popover */
+.stash-pop {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  padding: var(--space-2);
+  display: flex;
+  gap: var(--space-1);
+}
+
+.stash-pop button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.stash-pop__yellow { background: rgb(252 219 71); }
+.stash-pop__green  { background: rgb(126 217 147); }
+.stash-pop__blue   { background: rgb(122 178 238); }
+.stash-pop__pink   { background: rgb(244 143 177); }
+
+/* ------------------------------------------------------------------- modals */
+
+.stash-modal {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 0;
+  max-width: 38rem;
+  width: min(92vw, 38rem);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.stash-modal::backdrop {
+  background: rgb(10 23 33 / 0.5);
+}
+
+.stash-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stash-modal__head h2 {
+  font-size: var(--text-h3);
+  margin: 0;
+}
+
+.stash-modal__sub {
+  padding: var(--space-4) var(--space-5) 0;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.stash-note-editor {
+  width: calc(100% - 2 * var(--space-5));
+  margin: var(--space-4) var(--space-5);
+  resize: vertical;
+}
+
+.stash-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.stash-modal p {
+  padding: 0 var(--space-5);
+}
+
+.stash-quiz [data-quiz-body] {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  display: grid;
+  gap: var(--space-5);
+}
+
+.stash-quiz__answer {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.stash-quiz__answer label {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  cursor: pointer;
+  display: block;
+}
+
+.stash-quiz__answer label:hover {
+  background: var(--wash-navy);
+}
+
+.stash-quiz__answer input {
+  margin-right: var(--space-2);
+}
+
+.stash-regen__chapters {
+  padding: var(--space-4) var(--space-5) 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.stash-regen__chapters label {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+/* small-screen behaviour */
+@media (max-width: 640px) {
+  .stash-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stash-reader__topbar {
+    align-items: flex-start;
+  }
+
+  .stash-reader__toolbar {
+    width: 100%;
+  }
+}
+
+/* honour the global reduce-motion preference */
+body[data-reduce-motion="true"] .stash-progress__bar,
+body[data-reduce-motion="true"] .stash-reader__progress-bar,
+body[data-reduce-motion="true"] .stash-pop {
+  transition: none;
+}

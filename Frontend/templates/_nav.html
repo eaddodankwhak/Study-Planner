@@ -18,6 +18,8 @@
         href="{{ url_for('progress') }}" data-nav-item>Progress</a>
     <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'ai' else '' }}"
         href="{{ url_for('ai_hub') }}" data-nav-item>AI Hub</a>
+    <a class="nav-bar__link{{ ' nav-bar__link--active' if active_nav == 'stash' else '' }}"
+        href="{{ url_for('stash.library') }}" data-nav-item>Stash</a>
 
     <button class="nav-search" type="button" data-palette-trigger aria-label="Search pages and commands">
         <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
@@ -69,7 +71,7 @@
 
 <!-- Command palette (Ctrl/Cmd+K) -->
 <div class="palette" data-palette aria-hidden="true"
-    data-routes='[{"label":"Home","crumb":"Dashboard","key":"d","url":{{ url_for("home")|tojson }}},{"label":"Courses","crumb":"Browse subjects","key":"c","url":{{ url_for("courses")|tojson }}},{"label":"Schedule","crumb":"Calendar, deadlines & focus","key":"s","url":{{ url_for("schedule")|tojson }}},{"label":"Progress","crumb":"Stats & trends","key":"p","url":{{ url_for("progress")|tojson }}},{"label":"AI Hub","crumb":"AI study assistant","key":"a","url":{{ url_for("ai_hub")|tojson }}},{"label":"Notes","crumb":"Your study notes","key":"n","url":{{ url_for("notes")|tojson }}},{"label":"Group Workspaces","crumb":"Collaborate","key":"w","url":{{ url_for("collab.workspace_list")|tojson }}},{"label":"Settings","crumb":"Profile & privacy","key":"m","url":{{ url_for("settings")|tojson }}},{"label":"Export data","crumb":"Inside Settings","url":{{ url_for("export_data")|tojson }}},{"label":"About","crumb":"Inside Settings","url":{{ url_for("about")|tojson }}}]'>
+    data-routes='[{"label":"Home","crumb":"Dashboard","key":"d","url":{{ url_for("home")|tojson }}},{"label":"Courses","crumb":"Browse subjects","key":"c","url":{{ url_for("courses")|tojson }}},{"label":"Schedule","crumb":"Calendar, deadlines & focus","key":"s","url":{{ url_for("schedule")|tojson }}},{"label":"Progress","crumb":"Stats & trends","key":"p","url":{{ url_for("progress")|tojson }}},{"label":"AI Hub","crumb":"AI study assistant","key":"a","url":{{ url_for("ai_hub")|tojson }}},{"label":"Stash","crumb":"Turn PDFs & slides into cards","key":"h","url":{{ url_for("stash.library")|tojson }}},{"label":"Notes","crumb":"Your study notes","key":"n","url":{{ url_for("notes")|tojson }}},{"label":"Group Workspaces","crumb":"Collaborate","key":"w","url":{{ url_for("collab.workspace_list")|tojson }}},{"label":"Settings","crumb":"Profile & privacy","key":"m","url":{{ url_for("settings")|tojson }}},{"label":"Export data","crumb":"Inside Settings","url":{{ url_for("export_data")|tojson }}},{"label":"About","crumb":"Inside Settings","url":{{ url_for("about")|tojson }}}]'>
     <div class="palette__backdrop" data-palette-close></div>
     <div class="palette__dialog" role="dialog" aria-modal="true" aria-label="Command palette">
         <input class="palette__input" type="text" placeholder="Jump to a page…" data-palette-input autocomplete="off"

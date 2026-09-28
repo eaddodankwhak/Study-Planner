@@ -422,6 +422,176 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ------------------------------------------------------------- Stash
+-- "Stash" turns uploaded PDF/PPTX study material into a scrollable feed of
+-- bite-size idea cards. These tables are deliberately FK-light (matching the
+-- `ai_connections` convention): SQLite may run without PRAGMA foreign_keys and
+-- account deletion already removes rows manually via delete_user(), so Stash
+-- rows are cleaned up there instead of relying on ON DELETE CASCADE.
+-- JSON payloads are stored as TEXT (mirrors questions_json), and timestamps
+-- use datetime('now') — the Postgres variant swaps that for CURRENT_TIMESTAMP.
+CREATE TABLE IF NOT EXISTS stash_documents (
+    id                 TEXT PRIMARY KEY,
+    user_id            TEXT NOT NULL,
+    course_id          TEXT,
+    title              TEXT NOT NULL,
+    original_filename  TEXT NOT NULL,
+    file_type          TEXT NOT NULL,
+    file_size_bytes    INTEGER NOT NULL DEFAULT 0,
+    storage_key        TEXT NOT NULL,
+    file_sha256        TEXT NOT NULL,
+    page_count         INTEGER,
+    status             TEXT NOT NULL DEFAULT 'queued',
+    progress_percent   INTEGER NOT NULL DEFAULT 0,
+    error_message      TEXT,
+    total_cards        INTEGER NOT NULL DEFAULT 0,
+    prompt_version     TEXT,
+    model_used         TEXT,
+    input_tokens       INTEGER NOT NULL DEFAULT 0,
+    output_tokens      INTEGER NOT NULL DEFAULT 0,
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_stash_documents_user ON stash_documents (user_id);
+CREATE INDEX IF NOT EXISTS idx_stash_documents_user_created ON stash_documents (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_stash_documents_sha ON stash_documents (user_id, file_sha256);
+
+CREATE TABLE IF NOT EXISTS stash_sections (
+    id          TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    parent_id   TEXT,
+    title       TEXT NOT NULL,
+    level       INTEGER NOT NULL DEFAULT 1,
+    position    INTEGER NOT NULL DEFAULT 0,
+    page_start  INTEGER,
+    page_end    INTEGER,
+    card_count  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_stash_sections_doc ON stash_sections (document_id, position);
+
+CREATE TABLE IF NOT EXISTS stash_chunks (
+    id            TEXT PRIMARY KEY,
+    document_id   TEXT NOT NULL,
+    section_id    TEXT NOT NULL,
+    position      INTEGER NOT NULL DEFAULT 0,
+    text          TEXT NOT NULL,
+    page_start    INTEGER,
+    page_end      INTEGER,
+    status        TEXT NOT NULL DEFAULT 'pending',
+    attempts      INTEGER NOT NULL DEFAULT 0,
+    last_error    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_stash_chunks_doc ON stash_chunks (document_id, position);
+CREATE INDEX IF NOT EXISTS idx_stash_chunks_section ON stash_chunks (section_id, position);
+
+CREATE TABLE IF NOT EXISTS stash_cards (
+    id                   TEXT PRIMARY KEY,
+    document_id          TEXT NOT NULL,
+    section_id           TEXT NOT NULL,
+    chunk_id             TEXT,
+    position             INTEGER NOT NULL DEFAULT 0,
+    card_type            TEXT NOT NULL,
+    title                TEXT NOT NULL,
+    body                 TEXT NOT NULL,
+    example              TEXT,
+    key_term             TEXT,
+    key_term_definition  TEXT,
+    source_page_start    INTEGER,
+    source_page_end      INTEGER,
+    source_slide         INTEGER,
+    content_hash         TEXT NOT NULL,
+    is_flagged           INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (document_id, position)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stash_cards_doc ON stash_cards (document_id, position);
+CREATE INDEX IF NOT EXISTS idx_stash_cards_section ON stash_cards (section_id, position);
+CREATE INDEX IF NOT EXISTS idx_stash_cards_doc_hash ON stash_cards (document_id, content_hash);
+
+CREATE TABLE IF NOT EXISTS stash_card_states (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    card_id     TEXT NOT NULL,
+    is_saved    INTEGER NOT NULL DEFAULT 0,
+    status      TEXT,
+    first_seen_at TEXT,
+    last_seen_at TEXT,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, card_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stash_states_user ON stash_card_states (user_id);
+CREATE INDEX IF NOT EXISTS idx_stash_states_user_saved ON stash_card_states (user_id, is_saved);
+CREATE INDEX IF NOT EXISTS idx_stash_states_user_status ON stash_card_states (user_id, status);
+
+CREATE TABLE IF NOT EXISTS stash_highlights (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    card_id      TEXT NOT NULL,
+    field        TEXT NOT NULL DEFAULT 'body',
+    start_offset INTEGER NOT NULL DEFAULT 0,
+    end_offset   INTEGER NOT NULL DEFAULT 0,
+    color        TEXT NOT NULL DEFAULT 'yellow',
+    note         TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_stash_highlights_user ON stash_highlights (user_id, card_id);
+
+CREATE TABLE IF NOT EXISTS stash_notes (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    card_id    TEXT NOT NULL,
+    content    TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, card_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stash_notes_user ON stash_notes (user_id, card_id);
+
+CREATE TABLE IF NOT EXISTS stash_progress (
+    id                 TEXT PRIMARY KEY,
+    user_id            TEXT NOT NULL,
+    document_id        TEXT NOT NULL,
+    last_card_position INTEGER NOT NULL DEFAULT 0,
+    cards_seen         INTEGER NOT NULL DEFAULT 0,
+    cards_got_it       INTEGER NOT NULL DEFAULT 0,
+    last_opened_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, document_id)
+);
+
+CREATE TABLE IF NOT EXISTS stash_jobs (
+    id           TEXT PRIMARY KEY,
+    document_id  TEXT NOT NULL,
+    job_type     TEXT NOT NULL DEFAULT 'process_document',
+    payload      TEXT,
+    status       TEXT NOT NULL DEFAULT 'queued',
+    attempts     INTEGER NOT NULL DEFAULT 0,
+    locked_by    TEXT,
+    locked_at    TEXT,
+    heartbeat_at TEXT,
+    run_after    TEXT NOT NULL DEFAULT (datetime('now')),
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    last_error   TEXT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_stash_jobs_queue ON stash_jobs (status, run_after);
+CREATE INDEX IF NOT EXISTS idx_stash_jobs_doc ON stash_jobs (document_id);
+
+CREATE TABLE IF NOT EXISTS stash_usage (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    day           TEXT NOT NULL,
+    input_tokens  INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (user_id, day)
+);
+
 CREATE INDEX IF NOT EXISTS idx_materials_slug ON materials (slug);
 CREATE INDEX IF NOT EXISTS idx_quizzes_subject  ON quizzes (subject);
 CREATE INDEX IF NOT EXISTS idx_attempts_quiz    ON attempts (quiz_id);
@@ -470,8 +640,11 @@ def connect():
         import pg
         return pg.connect(os.environ["DATABASE_URL"])
     ensure_db_file()
-    conn = sqlite3.connect(DB_PATH)
+    # busy_timeout keeps the Stash worker thread from failing immediately with
+    # "database is locked" when request threads commit at the same moment.
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
@@ -560,6 +733,25 @@ def _migrate_add_columns(conn):
         conn.execute("ALTER TABLE users ADD COLUMN settings_json TEXT")
     if "google_sub" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+
+    if using_postgres():
+        card_state_cols = {
+            r["column_name"] for r in _query_all(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = 'stash_card_states'"
+            )
+        }
+    else:
+        card_state_cols = {
+            r[1] for r in conn.execute(
+                "PRAGMA table_info(stash_card_states)"
+            ).fetchall()
+        }
+    if "updated_at" not in card_state_cols:
+        conn.execute(
+            "ALTER TABLE stash_card_states ADD COLUMN updated_at TEXT"
+            " NOT NULL DEFAULT (datetime('now'))"
+        )
 
 
 def normalize_course_code(value):
@@ -1416,6 +1608,16 @@ def delete_user(user_id):
             "DELETE FROM ai_connections WHERE user_id = ?",
             "DELETE FROM memberships WHERE user_id = ?",
             "DELETE FROM attempts WHERE user_id = ?",
+            "DELETE FROM stash_card_states WHERE user_id = ?",
+            "DELETE FROM stash_highlights WHERE user_id = ?",
+            "DELETE FROM stash_notes WHERE user_id = ?",
+            "DELETE FROM stash_progress WHERE user_id = ?",
+            "DELETE FROM stash_usage WHERE user_id = ?",
+            "DELETE FROM stash_jobs WHERE document_id IN (SELECT id FROM stash_documents WHERE user_id = ?)",
+            "DELETE FROM stash_cards WHERE document_id IN (SELECT id FROM stash_documents WHERE user_id = ?)",
+            "DELETE FROM stash_chunks WHERE document_id IN (SELECT id FROM stash_documents WHERE user_id = ?)",
+            "DELETE FROM stash_sections WHERE document_id IN (SELECT id FROM stash_documents WHERE user_id = ?)",
+            "DELETE FROM stash_documents WHERE user_id = ?",
             "DELETE FROM users WHERE id = ?",
         ):
             conn.execute(sql, (user_id,))

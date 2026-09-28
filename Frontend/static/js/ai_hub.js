@@ -54,6 +54,12 @@
     return div.innerHTML;
   }
 
+  function fromUrlSafeBase64(s) {
+    var padded = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (padded.length % 4) padded += "=";
+    return decodeURIComponent(escape(window.atob(padded)));
+  }
+
   function el(tag, cls, text) {
     var node = document.createElement(tag);
     if (cls) node.className = cls;
@@ -618,6 +624,24 @@
           autosize();
         });
       });
+    }
+
+    // Deep link from Stash: /ai#ask=<urlsafe_base64({text, context})>.
+    // Fill the composer with the quoted card so the user can ask about it.
+    if (location.hash && location.hash.indexOf("#ask=") === 0) {
+      try {
+        var askPayload = JSON.parse(fromUrlSafeBase64(location.hash.slice(5)));
+        var askText = (((askPayload && askPayload.text) || "").trim());
+        if (askText) {
+          els.input.value = askText;
+          els.input.focus();
+          autosize();
+          if (els.input.scrollIntoView) {
+            els.input.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+          history.replaceState(null, "", location.pathname + location.search);
+        }
+      } catch (err) { /* bad payload — leave the page as-is */ }
     }
 
     api("/meta")

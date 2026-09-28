@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Saved cards — Stash — Study Planner{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stash.css') }}">
+{% endblock %}
+
+{% block main %}
+<header class="stash-header">
+    <div>
+        <h1>Saved cards</h1>
+        <p class="text-muted mb-0">The cards you marked for later.</p>
+    </div>
+    <a class="button button--ghost" href="{{ url_for('stash.library') }}">&larr; Library</a>
+</header>
+
+<div class="stash-toolbar">
+    <form action="{{ url_for('stash.saved') }}" method="get">
+        <label class="sr-only" for="saved-course-filter">Filter by course</label>
+        <select id="saved-course-filter" name="course_id" onchange="this.form.submit()">
+            <option value="">All courses</option>
+            {% for course in courses %}
+            <option value="{{ course.id }}" {{ 'selected' if course_id == course.id|string else '' }}>{{ course.title }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<section class="stash-saved">
+    {% for card in cards %}
+    <article class="stash-item stash-item--compact" data-card-id="{{ card.id }}">
+        <header class="stash-item__head">
+            <span class="stash-item__badge">{{ card.card_type }}</span>
+            <span class="stash-item__source">
+                {% if card.source_slide %}slide {{ card.source_slide }}
+                {% elif card.source_page_start %}p. {{ card.source_page_start }}{% endif %}
+            </span>
+        </header>
+        <h2 class="stash-item__title">{{ card.title }}</h2>
+        <div class="stash-item__body">{{ card.body }}</div>
+        {% if card.document_title %}
+        <p class="stash-item__doc text-muted">from {{ card.document_title }}</p>
+        {% endif %}
+        <footer class="stash-item__actions">
+            <a class="stash-item__act" href="{{ url_for('stash.reader', doc_id=card.document_id) }}">Open reader</a>
+            <button class="stash-item__act" type="button" data-unsave="{{ card.id }}">Unsave</button>
+        </footer>
+    </article>
+    {% else %}
+    <div class="stash-empty">
+        <h2>No saved cards yet</h2>
+        <p>Hit <strong>Save</strong> on a card while reading to collect it here.</p>
+        <a class="button button--primary" href="{{ url_for('stash.library') }}">Browse your library</a>
+    </div>
+    {% endfor %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stash/library.js') }}" defer></script>
+{% endblock %}

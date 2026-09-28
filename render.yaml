@@ -35,6 +35,8 @@ services:
       # Users can still connect their own keys from Settings without these.
       - key: OPENAI_API_KEY
         sync: false
+      # Stash card generation uses a real Claude key: set ANTHROPIC_API_KEY
+      # here (shared with the AI Hub) or let each user connect their own.
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: GOOGLE_AI_API_KEY
@@ -42,4 +44,13 @@ services:
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: COPILOT_GITHUB_TOKEN
+        sync: false
+      # Stash tuning (optional; see Backend/.env.example for the full list).
+      - key: STASH_DAILY_TOKEN_CAP
+        sync: false
+      - key: STASH_MAX_PDF_PAGES
+        sync: false
+      - key: STASH_MAX_PPTX_SLIDES
+        sync: false
+      - key: STASH_KEEP_SOURCE_FILES
         sync: false

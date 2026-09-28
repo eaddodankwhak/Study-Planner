@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Processing — Stash — Study Planner{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stash.css') }}">
+{% endblock %}
+
+{% block main %}
+<header class="stash-header">
+    <div>
+        <h1>Generating cards</h1>
+        <p class="text-muted mb-0">Stash is reading these documents and writing idea cards. This happens in the
+            background — you can leave and come back.</p>
+    </div>
+    <a class="button button--ghost" href="{{ url_for('stash.library') }}">&larr; Back to library</a>
+</header>
+
+<section class="stash-queue" data-stash-processing>
+    {% if documents %}
+    {% for doc in documents %}
+    <article class="stash-card" data-doc-id="{{ doc.id }}" data-doc-status="{{ doc.status }}">
+        <h2 class="stash-card__title">{{ doc.title or doc.original_filename }}</h2>
+        <p class="stash-card__meta text-muted">{{ doc.original_filename }}</p>
+        <div class="stash-progress" aria-label="Generating cards" data-progress-bar>
+            <div class="stash-progress__bar" style="width: {{ doc.progress_percent }}%"></div>
+        </div>
+        <p class="stash-card__meta text-muted">{{ 'Queued…' if doc.status == 'queued' else 'Generating…' }}
+            {{ doc.progress_percent }}%</p>
+    </article>
+    {% endfor %}
+    {% else %}
+    <div class="stash-empty">
+        <h2>Nothing is processing right now</h2>
+        <p>Upload a PDF or PowerPoint and it will show up here until its cards are ready.</p>
+        <a class="button button--primary" href="{{ url_for('stash.upload') }}">Upload a document</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stash/upload.js') }}" defer></script>
+{% endblock %}

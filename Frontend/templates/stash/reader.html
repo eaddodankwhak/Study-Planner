@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}{{ document.title or document.original_filename }} — Stash Reader{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stash.css') }}">
+{% endblock %}
+
+{% block main_attr %} data-stash-reader
+    data-doc-id="{{ document.id }}"
+    data-doc-status="{{ document.status }}"
+    data-total={{ document.total_cards }} data-next-cursor={{ cards|length }}
+    data-has-more="{{ 'true' if document.total_cards > cards|length else 'false' }}"
+    data-page-count="{{ page_count or '' }}"
+    data-ask-href="{{ url_for('ai_hub') }}"
+    data-sections='{{ sections|tojson }}'
+    data-highlights='{{ highlights|tojson }}'
+    data-notes='{{ notes|tojson }}'
+    data-progress-last="{{ progress.last_card_position if progress else '' }}"
+{% endblock %}
+
+{% block main %}
+<div class="stash-reader">
+    <header class="stash-reader__topbar">
+        <a class="button button--ghost button--sm" href="{{ url_for('stash.library') }}">&larr; Library</a>
+        <div class="stash-reader__title">
+            <h1>{{ document.title or document.original_filename }}</h1>
+            {% if document.course_title %}<span class="text-muted">{{ document.course_title }}</span>{% endif %}
+        </div>
+        <div class="stash-reader__toolbar">
+            <button class="button button--ghost button--sm" type="button" data-stash-toc aria-expanded="false">Contents</button>
+            <button class="button button--ghost button--sm" type="button" data-stash-font="down" title="Smaller text" aria-label="Make card text smaller">A−</button>
+            <button class="button button--ghost button--sm" type="button" data-stash-font="up" title="Larger text" aria-label="Make card text larger">A+</button>
+            <button class="button button--ghost button--sm" type="button" data-stash-focus aria-pressed="false">Focus</button>
+            <button class="button button--ghost button--sm" type="button" data-stash-quiz>Quiz</button>
+            <button class="button button--ghost button--sm" type="button" data-stash-regenerate>Regenerate</button>
+        </div>
+    </header>
+
+    <div class="stash-reader__progress">
+        <div class="stash-reader__progress-bar" data-progress-bar width="0"></div>
+    </div>
+
+    <nav class="stash-toc" data-toc aria-label="Contents" hidden>
+        <h2>Contents</h2>
+        <ol class="stash-toc__list"></ol>
+    </nav>
+
+    <div class="stash-reader__layout">
+        <main class="stash-cards" id="stash-cards">
+            {% if document.status in ('queued', 'processing') %}
+            <div class="stash-notice" data-stash-generating>
+                Cards are still generating — this page refreshes automatically when they're ready.
+            </div>
+            {% endif %}
+            {% for card in cards %}
+            {% include 'stash/_card.html' %}
+            {% endfor %}
+            <div class="stash-cards__sentinel" data-sentinel></div>
+            <noscript>Turn on JavaScript to read Stash cards.</noscript>
+        </main>
+    </div>
+</div>
+
+{# Note editor #}
+<dialog class="stash-modal" data-note-modal>
+    <form method="dialog" class="stash-modal__head">
+        <h2>Note on this card</h2>
+        <button class="button button--ghost button--sm" value="cancel">Close</button>
+    </form>
+    <p class="stash-modal__sub" data-note-card></p>
+    <textarea class="stash-note-editor" data-note-input rows="6" maxlength="5000"
+        placeholder="Your own words on this card…"></textarea>
+    <div class="stash-modal__actions">
+        <button class="button button--ghost button--sm" type="button" data-note-delete hidden>Remove note</button>
+        <button class="button button--primary button--sm" type="button" data-note-save>Save note</button>
+    </div>
+</dialog>
+
+{# Source reference #}
+<dialog class="stash-modal" data-source-modal>
+    <div class="stash-modal__head">
+        <h2>Where this comes from</h2>
+        <button class="button button--ghost button--sm" data-source-close>Close</button>
+    </div>
+    <p data-source-body></p>
+    <p class="text-muted" data-source-ref></p>
+</dialog>
+
+{# Quiz #}
+<dialog class="stash-modal stash-quiz" data-quiz-modal>
+    <div class="stash-modal__head">
+        <h2>Quick quiz</h2>
+        <button class="button button--ghost button--sm" data-quiz-close>Close</button>
+    </div>
+    <div data-quiz-body></div>
+</dialog>
+
+{# Regenerate #}
+<dialog class="stash-modal" data-regen-modal>
+    <div class="stash-modal__head">
+        <h2>Regenerate cards</h2>
+        <button class="button button--ghost button--sm" data-regen-close>Close</button>
+    </div>
+    <p class="text-muted">Re-running generation costs your daily AI token budget. Choose whole document, or pick
+        chapters below to redo just those.</p>
+    <div class="stash-regen__chapters" data-regen-chapters></div>
+    <div class="stash-modal__actions">
+        <button class="button button--primary button--sm" type="button" data-regen-all>Regenerate everything</button>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stash/reader.js') }}" defer></script>
+{% endblock %}

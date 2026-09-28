@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Upload to Stash — Study Planner{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stash.css') }}">
+{% endblock %}
+
+{% block main %}
+<header class="stash-header">
+    <div>
+        <h1>Upload to Stash</h1>
+        <p class="text-muted mb-0">PDFs up to {{ hints.max_size_mb }}&nbsp;MB (or {{ hints.max_pages }} pages),
+            PowerPoints up to {{ hints.max_slides }} slides.</p>
+    </div>
+    <a class="button button--ghost" href="{{ url_for('stash.library') }}">&larr; Back to library</a>
+</header>
+
+{% if not hints.configured %}
+<div class="stash-notice">No Claude key is configured yet. Uploads are queued and
+    cards are generated as soon as a key is available (server
+    <code>ANTHROPIC_API_KEY</code> or your own AI Hub key).</div>
+{% endif %}
+
+<form class="stash-upload" id="stash-upload-form" method="post" enctype="multipart/form-data">
+    <label class="stash-drop" id="stash-drop" for="stash-file">
+        <input class="sr-only" id="stash-file" type="file" name="file" accept=".pdf,.pptx,application/pdf"
+            data-max-mb="{{ hints.max_size_mb }}">
+        <span class="stash-drop__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M12 16V4m0 0 4 4m-4-4-4 4"></path>
+                <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"></path>
+            </svg>
+        </span>
+        <strong class="stash-drop__title">Drop a PDF or PowerPoint here</strong>
+        <span class="stash-drop__sub" id="stash-file-label">…or click to choose a file</span>
+    </label>
+
+    <div class="stash-upload__row">
+        <select name="course_id" id="stash-course">
+            <option value="">No course (keep it loose)</option>
+            {% for course in courses %}
+            <option value="{{ course.id }}">{{ course.title }}</option>
+            {% endfor %}
+        </select>
+        <button class="button button--primary" id="stash-submit" type="submit" disabled>Upload &amp; generate</button>
+    </div>
+    <p class="stash-upload__hint text-muted mb-0" id="stash-upload-msg">
+        Stash reads the file, splits it into chapters, and writes idea cards — then you read, save, highlight and quiz.
+    </p>
+    <div class="stash-upload__error text-danger" id="stash-upload-error" role="alert" hidden></div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stash/upload.js') }}" defer></script>
+{% endblock %}

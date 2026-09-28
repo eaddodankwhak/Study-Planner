@@ -38,6 +38,11 @@ class AnthropicProvider(AIProvider):
             "max_tokens": request.get("max_tokens", 1500),
             "messages": messages,
         }
+        # Temperature passthrough (added for the Stash card generator, which
+        # needs low determinism. Chat requests never set it, so behaviour is
+        # unchanged there.)
+        if request.get("temperature") is not None:
+            payload["temperature"] = request["temperature"]
         if system:
             payload["system"] = system
         data = post_json(f"{self.base_url}/messages", self._headers(), payload)

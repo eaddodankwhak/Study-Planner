@@ -40,6 +40,7 @@ import planner
 import stats
 import ai as ai_pkg
 import collaboration as collab_pkg
+import stash as stash_pkg
 
 # Ensure tables and any lightweight migrations (e.g. notify_digest) exist.
 db.init_db()
@@ -128,6 +129,13 @@ app.register_blueprint(ai_pkg.get_ai_blueprint())
 
 # Register the Collaborative Workspace blueprint.
 app.register_blueprint(collab_pkg.get_collaboration_blueprint())
+
+# Register the Stash blueprints (pages + API) and start its background worker,
+# unless explicitly disabled (tests, single-shot workers).
+for _bp in stash_pkg.get_stash_blueprints():
+    app.register_blueprint(_bp)
+if os.environ.get("STASH_DISABLE_WORKER", "").lower() not in {"1", "true", "yes"}:
+    stash_pkg.ensure_worker()
 
 # ---------------------------------------------------------------------------
 # AI assistant quick-start affordances (shared by the floating launcher drawer
