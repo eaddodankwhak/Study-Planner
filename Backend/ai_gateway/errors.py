@@ -33,3 +33,11 @@ class JSONValidationError(GatewayError):
         self.message = message
         self.raw_content = raw_content
         super().__init__(message)
+
+
+class QuotaExceededError(GatewayError):
+    """The user has used their per-day request/token budget on the server key."""
+
+
+class AllProvidersFailedError(GatewayError):
+    """Every eligible provider/model failed (after fallback attempts)."""

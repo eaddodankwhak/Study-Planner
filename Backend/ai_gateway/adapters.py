@@ -19,8 +19,6 @@ import json
 
 from ai.providers._http import ProviderHTTPError, post_json
 
-RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
-
 
 def build_adapter(provider, api_key):
     """Return an adapter instance for a registry provider row + resolved key."""

@@ -20,6 +20,8 @@ from .errors import (
     PreferenceError,
     ProviderCallError,
     JSONValidationError,
+    QuotaExceededError,
+    AllProvidersFailedError,
 )
 from .gateway import (
     gateway_enabled,
@@ -28,6 +30,7 @@ from .gateway import (
     generate_json,
     server_key_for,
 )
+from . import cache, health, quotas  # noqa: F401
 
 __all__ = [
     "list_enabled_models",
@@ -41,6 +44,8 @@ __all__ = [
     "PreferenceError",
     "ProviderCallError",
     "JSONValidationError",
+    "QuotaExceededError",
+    "AllProvidersFailedError",
     "gateway_enabled",
     "select_model",
     "generate_text",
