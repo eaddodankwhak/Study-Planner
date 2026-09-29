@@ -28,7 +28,12 @@ def _day():
 
 
 def seed_quota_rules():
-    """Idempotently insert the default quota rules for students."""
+    """Insert the default quota rules for students, once.
+
+    Every column here is an admin-controlled limit, so the conflict action is
+    deliberately ``DO NOTHING``: tuning a limit in the admin panel must not be
+    undone by the next restart or by the usage meter polling this function.
+    """
     conn = db._conn_context()
     try:
         for tier, (reqs, docs, tokens) in _DEFAULTS.items():
@@ -36,10 +41,7 @@ def seed_quota_rules():
                 "INSERT INTO ai_quota_rules "
                 "(id, tier, user_group, daily_requests, daily_documents, daily_tokens) "
                 "VALUES (?, ?, 'students', ?, ?, ?) "
-                "ON CONFLICT(tier, user_group) DO UPDATE SET "
-                "daily_requests = excluded.daily_requests, "
-                "daily_documents = excluded.daily_documents, "
-                "daily_tokens = excluded.daily_tokens",
+                "ON CONFLICT(tier, user_group) DO NOTHING",
                 (uuid.uuid4().hex, tier, reqs, docs or 0, tokens),
             )
         conn.commit()

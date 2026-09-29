@@ -43,14 +43,19 @@ _HINT = (
 
 
 def gateway_enabled(user_id):
-    """True when AI activity is allowed for this user (privacy switch)."""
+    """True when AI activity is allowed for this user (privacy switch).
+
+    Fails closed: if the settings row cannot be read we cannot prove the user
+    consented, so the request is refused rather than silently sending their
+    study material to a provider.
+    """
     import db
 
     try:
         settings = db.get_settings(user_id)
         return bool(settings["privacy"]["ai_activity"])
-    except Exception:  # noqa: BLE001 - a privacy read must never block AI
-        return True
+    except Exception:  # noqa: BLE001 - consent unknown -> refuse
+        return False
 
 
 def _now_day():
@@ -131,17 +136,37 @@ def _eligible_models(user_id):
     return out
 
 
+def _resolve_preferred(preferred):
+    """Accept a model dict, a "provider/model" key, or None; return a row.
+
+    Callers in Phase 5 pass whatever they have lying around (a Stash config
+    value, a picker key), so the gateway normalises here instead of making
+    every call site remember the join.
+    """
+    if preferred is None:
+        return None
+    if isinstance(preferred, dict):
+        if preferred.get("provider_slug") and preferred.get("model_id"):
+            return registry.get_model(preferred["provider_slug"], preferred["model_id"])
+        if preferred.get("provider_id") and preferred.get("model_id"):
+            return registry.get_model(preferred["provider_id"], preferred["model_id"])
+        if preferred.get("id"):
+            return registry.get_model_by_key(preferred["id"])
+        return None
+    return registry.get_model_by_key(str(preferred))
+
+
 def select_model(user_id, preferred=None, feature=None):
     """Auto-select a real model for a user; raises NoProviderAvailableError.
 
-    preferred: a model dict from the registry (the caller may pass the user's
-    stored preference); when None the model list is filtered by feature fit
-    (best_for) and the cheapest/fastest free one wins. This keeps callers
+    preferred: a model dict or "provider/model" key (the caller may pass the
+    user's stored preference); when None the model list is filtered by feature
+    fit (best_for) and the cheapest/fastest free one wins. This keeps callers
     (Stash, AI Hub, list features) able to ask for "any model" and get a real
     one without coupling to provider internals.
     """
     if preferred is not None:
-        m = registry.get_model(preferred.get("provider_id"), preferred.get("model_id"))
+        m = _resolve_preferred(preferred)
         if m and _model_usable(user_id, m):
             return m
         raise PreferenceError(
@@ -155,18 +180,112 @@ def select_model(user_id, preferred=None, feature=None):
     return models[0]
 
 
+def _provider_reachable(user_id, provider):
+    """True when we hold a usable key for this provider for this user."""
+    if not provider or not provider.get("is_enabled"):
+        return False
+    if provider.get("has_server_key"):
+        return True
+    try:
+        import db
+
+        return bool(db.get_ai_connection_key(user_id, provider["slug"]))
+    except Exception:  # noqa: BLE001 - treat an unreadable key store as no key
+        return False
+
+
+def _model_allowed_for_account(m, provider, minor):
+    """Account-level safety gate for a model, independent of health.
+
+    Providers that may train on prompts are withheld from minor accounts
+    unless an admin has explicitly opted them back in with
+    ``allowed_for_minors = 1``. That makes the default the private option and
+    the escape hatch a deliberate admin decision rather than a code change.
+    """
+    if not minor:
+        return True
+    if not provider.get("allowed_for_minors"):
+        return False
+    return not provider.get("may_train_on_data") or bool(
+        provider.get("allowed_for_minors")
+    )
+
+
 def _model_usable(user_id, m):
+    """Full usability check: enabled, reachable, allowed, breaker closed."""
     provider = registry.get_provider(m["provider_slug"])
-    if not provider or not provider["is_enabled"]:
+    if not _provider_reachable(user_id, provider):
         return False
     # Skip providers whose circuit breaker is open (flaky/down).
     if not health.is_available(m["provider_slug"]):
         return False
-    # Providers that may train on prompts are skipped for minors unless the
-    # admin explicitly allowed them (build-prompt default).
-    if not _is_minor(user_id):
-        return True
-    return not provider["may_train_on_data"] and provider["allowed_for_minors"]
+    return _model_allowed_for_account(m, provider, _is_minor(user_id))
+
+
+# -------------------------------------------------------------- preferences
+
+def get_preference(user_id):
+    """Return the student's saved model choice.
+
+    Defaults to auto mode: the gateway picks the model, which is what a student
+    who has never opened Settings expects.
+    """
+    import db
+
+    try:
+        with db._conn_context() as conn:
+            row = conn.execute(
+                "SELECT preferred_model_id, auto_mode FROM ai_user_prefs WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+    except Exception:  # noqa: BLE001 - no prefs row (or table) -> auto mode
+        return {"preferred_model_id": None, "auto_mode": 1}
+    if not row:
+        return {"preferred_model_id": None, "auto_mode": 1}
+    return {
+        "preferred_model_id": row["preferred_model_id"],
+        "auto_mode": 1 if row["auto_mode"] else 0,
+    }
+
+
+def set_preference(user_id, model_key, auto_mode=True):
+    """Persist the student's model choice. model_key=None means auto mode."""
+    import db
+
+    with db._conn_context() as conn:
+        conn.execute(
+            "INSERT INTO ai_user_prefs (user_id, preferred_model_id, auto_mode, updated_at) "
+            "VALUES (?, ?, ?, datetime('now')) "
+            "ON CONFLICT(user_id) DO UPDATE SET "
+            "preferred_model_id = excluded.preferred_model_id, "
+            "auto_mode = excluded.auto_mode, "
+            "updated_at = excluded.updated_at",
+            (user_id, model_key, 1 if auto_mode else 0),
+        )
+        conn.commit()
+    return get_preference(user_id)
+
+
+def preferred_model(user_id):
+    """The student's pinned model, or None when it cannot be used.
+
+    A pin is a *preference*, not a hard requirement: if the model has since been
+    disabled, lost its provider key, or the provider's breaker is open, this
+    returns None and the gateway auto-selects a usable model instead. Failing
+    the whole request would defeat the point of the fallback chain, and the
+    picker already renders the pinned model as unavailable so the student can
+    change it. An explicit per-request model is still a hard requirement and
+    raises PreferenceError in _fallback_chain.
+    """
+    saved = get_preference(user_id)
+    if saved["auto_mode"] or not saved["preferred_model_id"]:
+        return None
+    m = registry.get_model_by_key(saved["preferred_model_id"])
+    if not m or not m.get("is_enabled"):
+        return None
+    if not _model_usable(user_id, m):
+        return None
+    return m
 
 
 def _fallback_chain(user_id, preferred=None, feature=None):
@@ -174,8 +293,13 @@ def _fallback_chain(user_id, preferred=None, feature=None):
     the auto-ranked alternatives. The gateway walks this chain on provider
     failure (up to fallback_max_tries) and records breaker state per provider.
     """
+    if preferred is None:
+        # No explicit choice from the caller: use the student's saved pick if
+        # they made one, otherwise let the ranking decide.
+        preferred = preferred_model(user_id)
+
     if preferred is not None:
-        m = registry.get_model(preferred.get("provider_id"), preferred.get("model_id"))
+        m = _resolve_preferred(preferred)
         if m and _model_usable(user_id, m):
             chain = [m]
         else:
@@ -199,14 +323,17 @@ def _fallback_chain(user_id, preferred=None, feature=None):
 
 
 def _ranked_models(user_id, feature=None):
-    """Auto-ranked usable models (same scoring as select_model) for fallback."""
-    models = _eligible_models(user_id)
+    """Auto-ranked usable models (same scoring as select_model) for fallback.
+
+    Usability is always applied, including when the caller named no feature:
+    an unusable model must never reach the fallback chain just because the
+    scoring pass was skipped.
+    """
+    usable = [m for m in _eligible_models(user_id) if _model_usable(user_id, m)]
     if not feature:
-        return models
+        return usable
     scored = []
-    for m in models:
-        if not _model_usable(user_id, m):
-            continue
+    for m in usable:
         features = (m.get("best_for") or "").split(",")
         in_feature = 1 if (feature in features or "*" in features) else 0
         free = 1 if m.get("tier") == "free" else 0
@@ -350,10 +477,15 @@ def _attempt_chain(user_id, chain, describe, runner):
         provider = registry.get_provider(model["provider_slug"])
         if not provider:
             continue
-        if not health.is_available(provider["slug"]):
-            continue  # breaker open; move to the next model
+        # try_claim (not is_available) reserves the slot: when a tripped
+        # provider's cooldown has elapsed exactly one request in the whole
+        # fleet is allowed to probe it, and the rest move on to the fallback
+        # instead of stampeding a provider we already believe is down.
+        if not health.try_claim(provider["slug"]):
+            continue  # breaker open or a trial is in flight
         api_key, paid_by = _resolve_key(user_id, provider)
         if not api_key:
+            health.record_success(provider["slug"])  # nothing was tried
             continue
         tried += 1
         try:
@@ -390,8 +522,9 @@ def generate_text(user_id, prompt, *, system=None, messages=None,
         if cached is not None:
             chosen = chain[0]
             provider = registry.get_provider(chosen["provider_slug"])
+            _key, paid_by = _resolve_key(user_id, provider)
             return {"content": cached, "model": chosen, "provider": provider,
-                    "paid_by": "server", "cached": True}
+                    "paid_by": paid_by or "server", "cached": True}
 
     def runner(adapter, chosen, provider, paid_by):
         built = list(messages or [])
@@ -443,8 +576,9 @@ def generate_json(user_id, schema, prompt, *, model=None, feature="generate",
         if cached is not None:
             chosen = chain[0]
             provider = registry.get_provider(chosen["provider_slug"])
+            _key, paid_by = _resolve_key(user_id, provider)
             envelope = {"data": cached, "model": chosen, "provider": provider,
-                        "paid_by": "server", "cached": True}
+                        "paid_by": paid_by or "server", "cached": True}
             return envelope if with_meta else cached
 
     def runner(adapter, chosen, provider, paid_by):

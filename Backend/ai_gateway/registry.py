@@ -7,9 +7,11 @@ Two sources of truth feed this module:
 
 ``ensure_seeded()`` runs lazily on first access so a brand-new database works
 immediately, and on every app start the schema migration hook guarantees the
-tables exist. Seed rows are UPSERTs, so admin edits are preserved across
-restarts.
+tables exist. Seed rows are UPSERTs that only refresh display metadata, so
+admin edits to the safety and enablement columns survive restarts.
 """
+
+import uuid
 
 from . import models_seed
 from .config import GatewayConfig
@@ -21,7 +23,14 @@ _seeded = False
 
 
 def ensure_seeded():
-    """Idempotently apply the default provider/model registry."""
+    """Idempotently apply the default provider/model registry.
+
+    Seed rows are inserted once and never fight the admin panel afterwards:
+    the UPSERT refreshes only display metadata (names, sort order, prices) and
+    deliberately leaves the admin-controlled columns alone, so flipping
+    ``is_enabled``, ``may_train_on_data``, ``allowed_for_minors`` or repointing
+    a ``base_url`` in the admin UI sticks across restarts.
+    """
     global _seeded
     if _seeded:
         return
@@ -31,37 +40,34 @@ def ensure_seeded():
         for p in models_seed.PROVIDERS:
             # Values shared between INSERT and the conflict update are put in
             # a single params dict and referenced by name, so SQLite and
-            # Postgres both accept the UPSERT.
+            # Postgres both accept the UPSERT. `id` is generated per insert:
+            # both tables have a TEXT primary key, and Postgres (unlike SQLite)
+            # rejects a NULL there, so the seed must always supply one.
+            params = dict(p, id=uuid.uuid4().hex)
             conn.execute(
                 """
                 INSERT INTO ai_providers
-                (slug, display_name, adapter, base_url, env_key_name,
+                (id, slug, display_name, adapter, base_url, env_key_name,
                  is_enabled, is_free_tier, may_train_on_data, allowed_for_minors,
                  sort_order)
-                VALUES (:slug, :display_name, :adapter, :base_url, :env_key_name,
+                VALUES (:id, :slug, :display_name, :adapter, :base_url, :env_key_name,
                         :is_enabled, :is_free_tier, :may_train_on_data,
                         :allowed_for_minors, :sort_order)
                 ON CONFLICT(slug) DO UPDATE SET
                     display_name = excluded.display_name,
-                    adapter = excluded.adapter,
-                    base_url = excluded.base_url,
-                    env_key_name = excluded.env_key_name,
-                    is_enabled = excluded.is_enabled,
-                    is_free_tier = excluded.is_free_tier,
-                    may_train_on_data = excluded.may_train_on_data,
-                    allowed_for_minors = excluded.allowed_for_minors,
                     sort_order = excluded.sort_order
                 """,
-                p,
+                params,
             )
         for m in models_seed.MODELS:
+            params = dict(m, id=uuid.uuid4().hex)
             conn.execute(
                 """
                 INSERT INTO ai_models
-                (provider_id, model_id, display_name, tier, context_window,
+                (id, provider_id, model_id, display_name, tier, context_window,
                  max_output, supports_json_mode, speed, cost_in_per_million,
                  cost_out_per_million, best_for, sort_order)
-                VALUES (:provider_id, :model_id, :display_name, :tier,
+                VALUES (:id, :provider_id, :model_id, :display_name, :tier,
                         :context_window, :max_output, :supports_json_mode,
                         :speed, :cost_in_per_million, :cost_out_per_million,
                         :best_for, :sort_order)
@@ -77,10 +83,38 @@ def ensure_seeded():
                     best_for = excluded.best_for,
                     sort_order = excluded.sort_order
                 """,
-                m,
+                params,
             )
+        _backfill_missing_ids(conn)
         conn.commit()
     _seeded = True
+
+
+def _backfill_missing_ids(conn):
+    """Give any NULL-id row a primary key.
+
+    An earlier version of the seed omitted ``id``. SQLite quietly accepts a
+    NULL in a TEXT PRIMARY KEY (a historical quirk) so those rows exist in
+    existing dev databases, and the UPSERT above will not repair them because
+    it only touches the display columns. Postgres would have rejected the
+    INSERT outright, so this is an upgrade path rather than a hotfix.
+
+    Rows are addressed by their natural key rather than a synthetic rowid so
+    this works on Postgres too, and each row gets its own fresh uuid.
+    """
+    for table, keys in (
+        ("ai_providers", ("slug",)),
+        ("ai_models", ("provider_id", "model_id")),
+    ):
+        where = " AND ".join(f"{k} = ?" for k in keys)
+        rows = conn.execute(
+            f"SELECT {', '.join(keys)} FROM {table} WHERE id IS NULL"
+        ).fetchall()
+        for row in rows:
+            conn.execute(
+                f"UPDATE {table} SET id = ? WHERE {where}",
+                (uuid.uuid4().hex, *[row[k] for k in keys]),
+            )
 
 
 def _rows(sql, params=()):
@@ -156,6 +190,25 @@ def get_model(provider_slug, model_id):
         (provider_slug, model_id),
     )
     return dict(r) if r else None
+
+
+def model_key(provider_slug, model_id):
+    """Stable public identifier for a model, e.g. "openai/gpt-4o-mini".
+
+    This is what the browser stores as the student's preference. The row uuid
+    is deliberately not used: a public key survives a reseed, and provider
+    slugs never contain "/" while model ids often do, so the split is
+    unambiguous.
+    """
+    return f"{provider_slug}/{model_id}"
+
+
+def get_model_by_key(key):
+    """Resolve a model_key() back to a model row, or None if it is gone."""
+    if not key or "/" not in key:
+        return None
+    provider_slug, _, model_id = key.partition("/")
+    return get_model(provider_slug, model_id)
 
 
 # -------------------------------------------------------------- key checks

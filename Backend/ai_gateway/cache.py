@@ -86,7 +86,7 @@ def set(cache_key, payload, model_id=None):  # noqa: A001 - mirrors dict API
 
 def _prune():
     """Keep the cache from growing without bound (oldest-first eviction)."""
-    cap = GatewayConfig.cache_max_rows_per_user
+    cap = GatewayConfig.cache_max_rows
     if cap <= 0:
         return
     conn = db._conn_context()

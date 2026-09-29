@@ -19,6 +19,13 @@ import json
 
 from ai.providers._http import ProviderHTTPError, post_json
 
+#: Appended to the system prompt whenever a caller asks for JSON. Kept in one
+#: place so the two adapters cannot drift into describing a schema differently.
+_SCHEMA_INSTRUCTION = (
+    "Reply with a single JSON object and nothing else. It must match this "
+    "JSON schema exactly:\n{schema}"
+)
+
 
 def build_adapter(provider, api_key):
     """Return an adapter instance for a registry provider row + resolved key."""
@@ -30,6 +37,29 @@ def build_adapter(provider, api_key):
         return OpenAICompatAdapter(api_key, provider.get("base_url"))
 
     raise ValueError(f"Unknown gateway adapter: {adapter!r}")
+
+
+def _with_schema_in_prompt(messages, schema):
+    """Return messages with the JSON schema stated in the system prompt.
+
+    Every provider we support except OpenAI's own strict ``json_schema`` mode
+    will happily return a perfectly valid JSON object of the wrong shape, so
+    the shape has to be in the prompt. The messages list is copied rather than
+    mutated: the gateway reuses one request dict across retry attempts.
+    """
+    instruction = _SCHEMA_INSTRUCTION.format(schema=json.dumps(schema, indent=2))
+    out = []
+    inserted = False
+    for m in messages:
+        if m.get("role") == "system":
+            content = (m.get("content") or "").rstrip()
+            out.append({**m, "content": f"{content}\n\n{instruction}".strip()})
+            inserted = True
+        else:
+            out.append(dict(m))
+    if not inserted:
+        out.insert(0, {"role": "system", "content": instruction})
+    return out
 
 
 class OpenAICompatAdapter:
@@ -53,9 +83,10 @@ class OpenAICompatAdapter:
         return f"{self.base_url}/chat/completions"
 
     def _payload(self, request, schema=None, stream=False):
+        messages = list(request.get("messages", []))
         payload = {
             "model": request["model"],
-            "messages": request.get("messages", []),
+            "messages": messages,
             "stream": stream,
         }
         if request.get("max_tokens") is not None:
@@ -68,29 +99,7 @@ class OpenAICompatAdapter:
             }
         return payload
 
-    def generate(self, request):
-        """Return {"content", "usage"} using standard chat completions."""
-        data = post_json(
-            self._endpoint(), self._headers(), self._payload(request), timeout=120
-        )
-        content = data["choices"][0]["message"]["content"]
-        usage = data.get("usage", {})
-        return {
-            "content": content or "",
-            "usage": {
-                "inputTokens": usage.get("prompt_tokens", 0),
-                "outputTokens": usage.get("completion_tokens", 0),
-            },
-        }
-
-    def generate_json(self, request, schema=None):
-        """JSON mode: constrain the reply to a single JSON object.
-
-        Uses OpenAI's ``response_format=json_object`` when a schema is given,
-        and relies on the caller to validate the parsed shape.
-        """
-        if schema is None:
-            return self.generate(request)
+    def _post(self, request, schema=None):
         data = post_json(
             self._endpoint(),
             self._headers(),
@@ -106,6 +115,26 @@ class OpenAICompatAdapter:
                 "outputTokens": usage.get("completion_tokens", 0),
             },
         }
+
+    def generate(self, request):
+        """Return {"content", "usage"} using standard chat completions."""
+        return self._post(request)
+
+    def generate_json(self, request, schema=None):
+        """JSON mode: constrain the reply to a single JSON object.
+
+        ``response_format=json_object`` is the widest-supported JSON knob
+        across OpenAI-compatible providers, but it only guarantees *valid
+        JSON*, never the right shape, so the schema is also stated in the
+        system prompt and the gateway re-validates the parsed result.
+        """
+        if schema is None:
+            return self._post(request)
+        request = dict(request)
+        request["messages"] = _with_schema_in_prompt(
+            request.get("messages", []), schema
+        )
+        return self._post(request, schema=schema)
 
     def verify(self):
         """Validate the key against the provider's model list endpoint.
@@ -143,6 +172,13 @@ class AnthropicAdapter:
         }
 
     def _messages(self, request, schema=None):
+        """Split an OpenAI-shaped request into Anthropic's system + messages.
+
+        Anthropic takes the system prompt as a top-level field rather than a
+        message, so the gateway's system message is flattened here. When a
+        schema is supplied it is folded into that same system prompt, because
+        the Messages API has no response_format equivalent.
+        """
         system = ""
         messages = []
         for m in request.get("messages", []):
@@ -152,8 +188,7 @@ class AnthropicAdapter:
                 messages.append({"role": m["role"], "content": m["content"]})
         if schema is not None:
             system = (
-                f"{system}\n\nReply with a single JSON object only. The object "
-                f"must match this JSON schema:\n{json.dumps(schema)}"
+                f"{system}\n\n{_SCHEMA_INSTRUCTION.format(schema=json.dumps(schema, indent=2))}"
             ).strip()
         return system, messages
 
@@ -162,8 +197,8 @@ class AnthropicAdapter:
             return self.base_url
         return f"{self.base_url}/v1/messages"
 
-    def generate(self, request):
-        system, messages = self._messages(request)
+    def _post(self, request, schema=None):
+        system, messages = self._messages(request, schema=schema)
         payload = {
             "model": request["model"],
             "max_tokens": request.get("max_tokens", 1500),
@@ -185,9 +220,20 @@ class AnthropicAdapter:
             },
         }
 
+    def generate(self, request):
+        return self._post(request)
+
     def generate_json(self, request, schema=None):
-        """JSON mode via a prompt-level schema + caller-side validation."""
-        return self.generate(request)
+        """JSON mode via a prompt-level schema + caller-side validation.
+
+        The Messages API has no response_format equivalent, so the schema is
+        appended to the system prompt. Passing it through here (rather than
+        dropping it, which would leave the model guessing the shape) is what
+        makes Claude usable for the structured Stash/quiz payloads.
+        """
+        if schema is None:
+            return self._post(request)
+        return self._post(request, schema=schema)
 
     def verify(self):
         from ai.providers._http import get_json

@@ -29,6 +29,9 @@ from .gateway import (
     generate_text,
     generate_json,
     server_key_for,
+    get_preference,
+    set_preference,
+    preferred_model,
 )
 from . import cache, health, quotas  # noqa: F401
 
@@ -51,4 +54,7 @@ __all__ = [
     "generate_text",
     "generate_json",
     "server_key_for",
+    "get_preference",
+    "set_preference",
+    "preferred_model",
 ]

@@ -40,12 +40,14 @@ class GatewayConfig:
         # Number of days a free/standard/premium tier's quota window spans.
         self.quota_window_days = _env_int("AI_GATEWAY_QUOTA_WINDOW_DAYS", 1)
 
-        # Cache: JSON responses are cached by (model, prompt) key to cut
-        # provider cost and latency on repeated read-heavy calls.
+        # Cache: shared document-generation responses are cached by a
+        # content-hash key so re-uploading the same textbook costs nothing.
+        # ai_cache is a single global table (the payload is content, not
+        # personal data), so the cap is a global row count, not per user.
         self.cache_enabled = os.getenv("AI_GATEWAY_CACHE_ENABLED", "1") not in (
             "0", "false", "no"
         )
-        self.cache_max_rows_per_user = _env_int("AI_GATEWAY_CACHE_MAX_ROWS", 500)
+        self.cache_max_rows = _env_int("AI_GATEWAY_CACHE_MAX_ROWS", 500)
         self.cache_ttl_seconds = _env_int("AI_GATEWAY_CACHE_TTL_SECONDS", 24 * 3600)
 
         # Fallback: try the first healthy enabled model, then the next.
