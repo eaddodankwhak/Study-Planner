@@ -76,5 +76,19 @@ class GatewayConfig:
             "COPILOT_GITHUB_TOKEN": os.getenv("COPILOT_GITHUB_TOKEN") or os.getenv("GH_TOKEN"),
         }
 
+        # Admin console allow-list: comma-separated account emails. Empty by
+        # default, so the whole admin surface fails closed until a deployment
+        # names its admins — nobody is an admin just by signing up.
+        self.admin_emails = {
+            e.strip().lower()
+            for e in (os.getenv("AI_GATEWAY_ADMIN_EMAILS") or "").split(",")
+            if e.strip()
+        }
+
 
 GatewayConfig = GatewayConfig()  # noqa: E305  (module-level singleton)
+
+
+def is_admin_email(email):
+    """True when ``email`` is on the admin console allow-list."""
+    return bool(email) and email.strip().lower() in GatewayConfig.admin_emails

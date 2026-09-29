@@ -73,3 +73,10 @@ def get_gateway_blueprint():
     from .api import gateway_api
 
     return gateway_api
+
+
+def get_admin_blueprint():
+    """The admin console blueprint, imported lazily for the same reason."""
+    from .admin import admin_api
+
+    return admin_api

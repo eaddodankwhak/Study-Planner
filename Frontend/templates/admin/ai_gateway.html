@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}AI Gateway admin - Study Planner{% endblock %}
+
+{% block head %}
+<style>
+    .admin-page {
+        display: grid;
+        gap: var(--space-6);
+        max-width: 72rem;
+    }
+
+    .admin-page__intro {
+        max-width: 60ch;
+        margin: var(--space-2) 0 0;
+        color: var(--color-muted);
+    }
+
+    .admin-status:empty {
+        display: none;
+    }
+
+    .admin-status {
+        padding: var(--space-3) var(--space-4);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md, 8px);
+        background: var(--color-surface-alt, var(--color-surface));
+        color: var(--color-muted);
+    }
+
+    .admin-panel {
+        padding: var(--space-5);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg, 12px);
+        background: var(--color-surface);
+    }
+
+    .admin-panel__hint {
+        margin: var(--space-1) 0 var(--space-4);
+        color: var(--color-muted);
+        font-size: 0.9rem;
+    }
+
+    .admin-list {
+        display: grid;
+        gap: var(--space-3);
+    }
+
+    .admin-card {
+        display: grid;
+        gap: var(--space-3);
+        padding: var(--space-4);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md, 8px);
+        background: var(--color-surface-alt, var(--color-surface));
+    }
+
+    .admin-card__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+    }
+
+    .admin-card__title {
+        margin: 0;
+        font-size: 1.05rem;
+    }
+
+    .admin-card__meta {
+        color: var(--color-muted);
+        font-size: 0.85rem;
+    }
+
+    .admin-toggles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4) var(--space-5);
+    }
+
+    .admin-toggle {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-size: 0.9rem;
+    }
+
+    .admin-toggle input[type="checkbox"] {
+        width: 1.15rem;
+        height: 1.15rem;
+        accent-color: var(--color-accent, var(--color-primary, #3985e6));
+    }
+
+    .admin-warnings {
+        display: grid;
+        gap: var(--space-2);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .admin-warning {
+        padding: var(--space-2) var(--space-3);
+        border-left: 3px solid var(--color-warning, #c97a00);
+        border-radius: var(--radius-sm, 6px);
+        background: var(--color-warning-soft, rgb(201 122 0 / 0.12));
+        color: var(--color-text, inherit);
+        font-size: 0.85rem;
+    }
+
+    .admin-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: capitalize;
+        background: var(--color-border, #cbd4dc);
+        color: var(--color-text, inherit);
+    }
+
+    .admin-badge--closed { background: var(--color-accent-soft, #d6e6ff); }
+    .admin-badge--open { background: var(--color-danger-soft, #ffd9d9); }
+    .admin-badge--half_open { background: var(--color-warning-soft, #ffe8c2); }
+    .admin-badge--muted { background: var(--color-border, #cbd4dc); opacity: 0.7; }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .admin-table th,
+    .admin-table td {
+        padding: var(--space-2) var(--space-3);
+        border-bottom: 1px solid var(--color-border);
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .admin-table th {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-muted);
+    }
+
+    .admin-table input[type="number"] {
+        width: 8rem;
+        padding: 4px 6px;
+        border: 1px solid var(--color-border-strong, var(--color-border));
+        border-radius: var(--radius-sm, 6px);
+        background: var(--color-surface);
+        color: inherit;
+    }
+
+    .admin-error {
+        color: var(--color-danger, #c0392b);
+        font-size: 0.9rem;
+    }
+
+    .admin-placeholder {
+        color: var(--color-muted);
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block main %}
+<div class="admin-page">
+    <header class="admin-page__header">
+        <h1>AI Gateway admin</h1>
+        <p class="admin-page__intro">
+            Manage which providers and models the gateway may use, the daily
+            quotas that gate server-funded requests, and each provider's
+            circuit-breaker state. Changes take effect immediately and are
+            recorded in the audit log.
+        </p>
+    </header>
+
+    <div class="admin-status" data-admin-status role="status" aria-live="polite"></div>
+
+    <section class="admin-panel" aria-labelledby="admin-providers-title">
+        <h2 id="admin-providers-title">Providers</h2>
+        <p class="admin-panel__hint">
+            A provider with no server key is unavailable to students until a key
+            is set in the environment. Disabling a provider removes it from
+            selection everywhere.
+        </p>
+        <div class="admin-list" data-admin-providers>
+            <p class="admin-placeholder">Loading providers…</p>
+        </div>
+    </section>
+
+    <section class="admin-panel" aria-labelledby="admin-models-title">
+        <h2 id="admin-models-title">Models</h2>
+        <p class="admin-panel__hint">
+            Disabling a model hides it from the student picker; a student who had
+            it selected is moved to auto-selection on their next message.
+        </p>
+        <div data-admin-models>
+            <p class="admin-placeholder">Loading models…</p>
+        </div>
+    </section>
+
+    <section class="admin-panel" aria-labelledby="admin-quotas-title">
+        <h2 id="admin-quotas-title">Daily quotas</h2>
+        <p class="admin-panel__hint">
+            Per-day limits for server-funded requests, keyed by model tier and
+            user group. BYOK (personal-key) requests never count against these.
+            Leave a field blank to keep its current value.
+        </p>
+        <div data-admin-quotas>
+            <p class="admin-placeholder">Loading quotas…</p>
+        </div>
+    </section>
+
+    <section class="admin-panel" aria-labelledby="admin-health-title">
+        <h2 id="admin-health-title">Provider health</h2>
+        <p class="admin-panel__hint">
+            The circuit breaker skips a provider after repeated failures. Reset
+            closes the circuit immediately after you have fixed the underlying
+            problem.
+        </p>
+        <div data-admin-health>
+            <p class="admin-placeholder">Loading health…</p>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ai_gateway_admin.js') }}" defer></script>
+{% endblock %}

@@ -236,3 +236,86 @@ def provider_key_slug(provider):
         ).get(name):
             return alias
     return name
+
+
+# ---------------------------------------------------------------- admin writes
+
+#: Columns an admin may edit on a provider. Everything else (slug, adapter,
+#: env_key_name) is structural and owned by the seed, so the admin console
+#: cannot repoint a provider at an unexpected adapter or key name.
+PROVIDER_EDITABLE = {
+    "display_name", "base_url", "is_enabled", "may_train_on_data",
+    "allowed_for_minors", "sort_order",
+}
+
+#: Columns an admin may edit on a model.
+MODEL_EDITABLE = {
+    "display_name", "tier", "context_window", "max_output", "supports_json_mode",
+    "speed", "cost_in_per_million", "cost_out_per_million", "best_for",
+    "is_enabled", "sort_order",
+}
+
+#: Columns the app compares as truthy/falsey; coerced to INTEGER 0/1 so the
+#: same SQL runs on SQLite and Postgres.
+_BOOL_COLUMNS = {
+    "is_enabled", "may_train_on_data", "allowed_for_minors", "supports_json_mode",
+}
+
+
+def _coerce(column, value):
+    if column in _BOOL_COLUMNS:
+        return 1 if value in (True, 1, "1", "true", "True") else 0
+    return value
+
+
+def update_provider(slug, fields):
+    """Apply whitelisted admin edits to a provider.
+
+    Returns the refreshed row, or None when the slug is unknown so the caller
+    can 404 rather than silently creating a provider. A call with no recognised
+    fields returns the current row unchanged.
+    """
+    import db
+
+    ensure_seeded()
+    if get_provider(slug) is None:
+        return None
+    columns = [k for k in fields if k in PROVIDER_EDITABLE]
+    if columns:
+        assignments = ", ".join(f"{k} = ?" for k in columns)
+        values = [_coerce(k, fields[k]) for k in columns]
+        conn = db._conn_context()
+        try:
+            conn.execute(
+                f"UPDATE ai_providers SET {assignments}, updated_at = datetime('now') "
+                "WHERE slug = ?",
+                (*values, slug),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return get_provider(slug)
+
+
+def update_model(provider_slug, model_id, fields):
+    """Apply whitelisted admin edits to a model; None when it does not exist."""
+    import db
+
+    ensure_seeded()
+    if get_model(provider_slug, model_id) is None:
+        return None
+    columns = [k for k in fields if k in MODEL_EDITABLE]
+    if columns:
+        assignments = ", ".join(f"{k} = ?" for k in columns)
+        values = [_coerce(k, fields[k]) for k in columns]
+        conn = db._conn_context()
+        try:
+            conn.execute(
+                f"UPDATE ai_models SET {assignments} "
+                "WHERE provider_id = ? AND model_id = ?",
+                (*values, provider_slug, model_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return get_model(provider_slug, model_id)
