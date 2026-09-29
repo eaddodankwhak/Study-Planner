@@ -673,7 +673,8 @@ def generate_json(user_id, schema, prompt, *, model=None, feature="generate",
             provider = registry.get_provider(chosen["provider_slug"])
             _key, paid_by = _resolve_key(user_id, provider)
             envelope = {"data": cached, "model": chosen, "provider": provider,
-                        "paid_by": paid_by or "server", "cached": True}
+                        "paid_by": paid_by or "server", "cached": True,
+                        "usage": {"inputTokens": 0, "outputTokens": 0}}
             return envelope if with_meta else cached
 
     def runner(adapter, chosen, provider, paid_by):
@@ -714,7 +715,8 @@ def generate_json(user_id, schema, prompt, *, model=None, feature="generate",
             problems = validate_schema(parsed, schema) if schema else []
             if not problems:
                 return {"data": parsed, "model": chosen, "provider": provider,
-                        "paid_by": paid_by, "cached": False}
+                        "paid_by": paid_by, "cached": False,
+                        "usage": result["usage"]}
             last_error = "Validation problems: " + "; ".join(problems)
 
         from .errors import JSONValidationError
