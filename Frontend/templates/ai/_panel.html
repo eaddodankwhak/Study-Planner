@@ -27,12 +27,19 @@ can never drift apart. #}
     <header class="ai-panel__header">
       <h2 class="ai-panel__title" id="ai-conv-title">AI assistant</h2>
       <div class="ai-panel__toolbar">
-        <span class="ai-panel__mock" id="ai-mock-hint" hidden>connect your account</span>
-        <div class="ai-panel__model-toggle" role="group" aria-label="Model" title="Model">
-          <div class="ai-panel__model-icons" id="ai-model-list"></div>
-        </div>
+        {# Plain-language status, not a call to action: AI is included with the
+           account, so there is nothing here for a student to go and fix. #}
+        <span class="ai-panel__mock" id="ai-mock-hint" hidden></span>
+        {# Gateway-backed model picker. "Auto" is the default and the only
+           option a student ever needs; the rest are optional preferences. #}
+        <label class="ai-panel__picker" for="ai-model-picker">
+          <span class="ai-panel__picker-label">Model</span>
+          <select id="ai-model-picker" class="ai-panel__picker-select"
+            aria-describedby="ai-model-note"></select>
+        </label>
       </div>
     </header>
+    <p class="ai-panel__note" id="ai-model-note" hidden></p>
 
     <div class="ai-modes" id="ai-modes" role="tablist" aria-label="Task modes"></div>
 

@@ -100,18 +100,25 @@ class AILauncherTest(unittest.TestCase):
         self.assertNotIn("ai-suggestion", html)
         self.assertNotIn("Pick a task below", html)
 
-    def test_provider_picker_is_an_inline_icon_toolbar_not_a_dropdown(self):
+    def test_provider_picker_is_a_compact_select_hydrated_by_the_gateway(self):
         r = self.client.get("/dashboard")
         html = r.data.decode()
-        # Compact icon-only toggle group hydrated by JS from /api/ai/meta, not
-        # a collapsed listbox and not 3 always-visible radio cards.
-        self.assertIn('id="ai-model-list"', html)
-        self.assertIn('class="ai-panel__model-toggle"', html)
-        self.assertIn('role="group"', html)
+        # One native <select> fed by /api/ai-gateway/models. The gateway owns the
+        # roster, so a growing provider list must not become a wall of icon
+        # buttons, an anchored dropdown, or always-visible radio cards.
+        self.assertIn('id="ai-model-picker"', html)
+        self.assertIn('class="ai-panel__picker-select"', html)
+        self.assertIn('for="ai-model-picker"', html)
+        self.assertNotIn('id="ai-model-list"', html)
+        self.assertNotIn("ai-panel__model-toggle", html)
         self.assertNotIn('role="listbox"', html)
         self.assertNotIn('id="ai-model-trigger"', html)
         self.assertNotIn("ai-model-option", html)
         self.assertNotIn('role="radiogroup"', html)
+        # A status line explains what the gateway picked or why nothing is
+        # available; it is not a call to action.
+        self.assertIn('id="ai-model-note"', html)
+        self.assertIn('aria-describedby="ai-model-note"', html)
 
     def test_quota_is_a_status_separate_from_clear_action(self):
         r = self.client.get("/dashboard")
@@ -148,7 +155,9 @@ class AILauncherTest(unittest.TestCase):
         html = r.data.decode()
         self.assertIn("How can I help you study today?", html)
         self.assertIn("Pick a starting point, or just start typing.", html)
-        self.assertIn('aria-label="Model"', html)
+        # Labelled by a wrapping <label for=...>, not a JS-built aria-label.
+        self.assertIn('for="ai-model-picker"', html)
+        self.assertIn(">Model<", html)
         # No all-caps placeholder conversation empty text server-side.
         self.assertNotIn("NO CONVERSATIONS YET", html)
 
@@ -259,16 +268,16 @@ class AIContainmentTest(unittest.TestCase):
         self.assertIn("min-width: 0", stage)
 
     def test_model_toggle_is_an_inline_toolbar_group(self):
-        # Compact icon buttons, not an anchored overlay: inline-flex, no
-        # absolute positioning, no dropdown layering, hairline dividers.
-        toggle = _css_rule(self.ai_css, ".ai-panel__model-toggle {")
-        self.assertIn("display: inline-flex", toggle)
-        self.assertNotIn("position: absolute", toggle)
-        self.assertNotIn("z-index", toggle)
-        btn = _css_rule(self.ai_css, ".ai-panel__model-toggle-btn {")
-        self.assertIn("width: 26px", btn)
-        divider = _css_rule(self.ai_css, ".ai-panel__model-toggle-btn + .ai-panel__model-toggle-btn {")
-        self.assertIn("border-left: 1px solid var(--color-border)", divider)
+        # Compact single select in the header toolbar: inline, bounded width,
+        # no absolute positioning and no overlay/dropdown layering.
+        picker = _css_rule(self.ai_css, ".ai-panel__picker {")
+        self.assertIn("display: inline-flex", picker)
+        self.assertNotIn("position: absolute", picker)
+        self.assertNotIn("z-index", picker)
+        select = _css_rule(self.ai_css, ".ai-panel__picker-select {")
+        self.assertIn("max-width: 15rem", select)
+        self.assertIn("cursor: pointer", select)
+        self.assertIn("border: 1px solid var(--color-border)", select)
 
     def test_open_drawer_locks_page_and_hides_launcher(self):
         # Background must not scroll while the drawer is open.

@@ -57,4 +57,17 @@ __all__ = [
     "get_preference",
     "set_preference",
     "preferred_model",
+    "get_gateway_blueprint",
 ]
+
+
+def get_gateway_blueprint():
+    """The student-facing blueprint, imported lazily.
+
+    Imported on demand rather than at package import time so that server-side
+    callers (``generate_text`` and friends) do not drag Flask's request
+    context into a plain Python/worker process.
+    """
+    from .api import gateway_api
+
+    return gateway_api

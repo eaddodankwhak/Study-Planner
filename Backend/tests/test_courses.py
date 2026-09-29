@@ -334,8 +334,11 @@ class CoursesPageModernizationTest(unittest.TestCase):
         self.assertIn('class="color-swatch color-swatch--auto"', html)
         for hue in ("navy", "teal", "orange", "green", "purple", "red"):
             self.assertIn('data-color="%s"' % hue, html, hue)
-        # No native <select> for the card colour (or anywhere on the page).
-        self.assertNotIn("<select", html)
+        # No native <select> inside the course form. Scope this to the modal:
+        # the page also renders the shared AI drawer, whose gateway-backed model
+        # picker is a legitimate <select> and is covered by test_ai_launcher.
+        form = html[html.index('id="add-course-modal"'):html.index("</main>")]
+        self.assertNotIn("<select", form)
 
     def test_live_preview_updates_with_typed_values(self):
         html = self._page()

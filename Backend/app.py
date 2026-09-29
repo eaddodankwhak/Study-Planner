@@ -39,6 +39,7 @@ import google_auth
 import planner
 import stats
 import ai as ai_pkg
+import ai_gateway as ai_gateway_pkg
 import collaboration as collab_pkg
 import stash as stash_pkg
 
@@ -126,6 +127,11 @@ app.jinja_env.globals["course_url"] = courses_mod.course_url
 
 # Register the AI Learning Hub API blueprint.
 app.register_blueprint(ai_pkg.get_ai_blueprint())
+
+# Register the AI Gateway's student-facing endpoints (model picker, usage
+# meter, saved preference). The gateway is a library first and a web surface
+# second: this is the only place a browser talks to it.
+app.register_blueprint(ai_gateway_pkg.get_gateway_blueprint())
 
 # Register the Collaborative Workspace blueprint.
 app.register_blueprint(collab_pkg.get_collaboration_blueprint())
