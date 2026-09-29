@@ -20,6 +20,10 @@ if os.path.dirname(os.path.dirname(os.path.abspath(__file__))) not in sys.path:
 
 import db
 
+from ai_gateway import errors as gw_errors
+from ai_gateway import gateway as gw
+from ai_gateway import registry as gw_registry
+
 from . import files as file_processor
 from . import limits
 from . import models as model_registry
@@ -48,6 +52,74 @@ _SERVER_KEY_ENVS = (
     ("deepseek", ("DEEPSEEK_API_KEY",)),
     ("copilot", ("COPILOT_GITHUB_TOKEN", "GH_TOKEN")),
 )
+
+#: Legacy AI Hub model ids -> gateway composite keys, for requests that still
+#: arrive with the old names (Phase 5 bridge). New clients send the composite
+#: key ("openai/gpt-5-mini") or "auto", which the picker already uses.
+_LEGACY_MODEL_KEYS = {
+    "claude": "anthropic/claude-sonnet-4-5",
+    "gpt": "openai/gpt-5-mini",
+    "gemini": "google/gemini-3.8-flash",
+    "deepseek": "deepseek/deepseek-v4-flash",
+    "copilot": "copilot/gpt-5-mini",
+}
+
+#: AI Hub modes -> gateway ranking feature used to order and pick a model.
+_FEATURE_BY_MODE = {
+    "quiz": "quiz",
+    "flashcards": "cards",
+    "explain": "explain",
+    "summarize": "summarize",
+    "simplify": "simplify",
+    "solve": "solve",
+}
+
+
+def _gateway_feature(mode):
+    """Map an AI Hub mode to a gateway ranking feature (default: chat)."""
+    return _FEATURE_BY_MODE.get(mode, "chat")
+
+
+def _is_valid_gateway_key(value):
+    """True when `value` is a registry-known composite key ("openai/gpt-5-mini")."""
+    return isinstance(value, str) and "/" in value and bool(gw_registry.get_model_by_key(value))
+
+
+def _normalize_model_choice(model):
+    """Legacy id, gateway composite key, or none -> the stored conversation label."""
+    value = (model or "").strip()
+    if not value or value in ("auto", ""):
+        return "auto"
+    if model_registry.get_model(value) or _is_valid_gateway_key(value):
+        return value
+    return "claude"
+
+
+def _soft_model_key(user_id, requested):
+    """Turn an AI Hub model field into a *soft* gateway preference (or None).
+
+    Accepts a Phase 4 composite key ("openai/gpt-5-mini") or a legacy id
+    ("claude"); empty/"auto" falls through to the account preference. The
+    requested model is honored only while it is usable, otherwise the gateway
+    auto-selects — the same behavior students see in the picker.
+    """
+    pick = (requested or "").strip()
+    if not pick or pick == "auto":
+        return None
+    key = pick if "/" in pick else _LEGACY_MODEL_KEYS.get(pick)
+    if not key:
+        return None
+    model = gw_registry.get_model_by_key(key)
+    if model is None or not gw._model_usable(user_id, model):
+        return None
+    return key
+
+
+def _persisted_model(resolved_model, requested_model):
+    """Gateway model row -> storage-safe model key (requested key as fallback)."""
+    if isinstance(resolved_model, dict) and resolved_model.get("provider_slug") and resolved_model.get("model_id"):
+        return gw_registry.model_key(resolved_model["provider_slug"], resolved_model["model_id"])
+    return requested_model or ""
 
 
 def _server_env_set(envs):
@@ -245,10 +317,8 @@ def list_conversations():
 def create_conversation():
     uid = session["user_id"]
     body = request.get_json(silent=True) or {}
-    model = body.get("model") or "claude"
+    model = _normalize_model_choice(body.get("model"))
     mode = body.get("mode") or "ask"
-    if not model_registry.get_model(model):
-        model = "claude"
     conv = storage.create_conversation(uid, model=model, mode=mode)
     return jsonify({"conversation": conv}), 201
 
@@ -269,9 +339,10 @@ def update_conversation(conversation_id):
     if "title" in body:
         ok = storage.rename_conversation(uid, conversation_id, str(body["title"])[:80])
     elif "model" in body:
-        if not model_registry.get_model(body["model"]):
+        raw = body["model"]
+        if raw and raw != "auto" and not model_registry.get_model(raw) and not _is_valid_gateway_key(raw):
             return jsonify({"error": "unknown model"}), 400
-        ok = storage.set_conversation_model(uid, conversation_id, body["model"])
+        ok = storage.set_conversation_model(uid, conversation_id, _normalize_model_choice(raw))
     else:
         return jsonify({"error": "nothing to update"}), 400
     if not ok:
@@ -319,8 +390,9 @@ def send_message(conversation_id):
         return jsonify({"error": "Message is too long."}), 400
 
     mode = body.get("mode") or conv.get("mode") or "ask"
-    model_id = body.get("model") or conv.get("model") or "claude"
-    model = model_registry.get_model(model_id) or model_registry.get_model("claude")
+    requested_model = body.get("model") or conv.get("model") or ""
+    model_key = _soft_model_key(uid, requested_model)
+    gw_feature = _gateway_feature(mode)
 
     # Optional study material reference.
     material_text = None
@@ -335,48 +407,66 @@ def send_message(conversation_id):
         return jsonify({"error": str(exc)}), 429
 
     # Persist the user message first.
-    storage.add_message(uid, conversation_id, "user", question, model=model_id, metadata={"mode": mode, "materialId": material_id})
+    storage.add_message(uid, conversation_id, "user", question, model=requested_model or "", metadata={"mode": mode, "materialId": material_id})
 
     history = conv.get("messages", [])
 
-    request_dict = service.build_provider_request(
+    # Build the same system/user prompts the legacy router used, then hand the
+    # turn to the gateway: server key first, the student's own key as fallback,
+    # and the student's saved pick auto-applied when no explicit model is sent.
+    system_prompt, user_prompt = service.prepare_messages(
         mode=mode,
         question=question,
         material_text=file_processor.truncate_for_context(material_text),
         user=_load_users().get(uid, {}),
         conversation_messages=history[:-1],  # exclude the just-added user message
-        model_id=model_id,
         subject_title=body.get("subject"),
     )
-
-    # Use the user's own BYOK key when connected; otherwise the provider falls
-    # back to the server-level key (or the mock provider when neither exists).
-    personal_key = db.get_ai_connection_key(uid, model["provider"])
+    gateway_messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in history[:-1]
+        if m["role"] in ("user", "assistant")
+    ]
+    gateway_messages.append({"role": "user", "content": user_prompt})
 
     streaming = request.args.get("stream") in ("1", "true")
 
     if streaming:
         def generate():
             accumulated = []
-
-            def chunks():
-                for ch in service.stream_reply(request_dict, api_key=personal_key):
-                    accumulated.append(ch)
-                    yield ch
-
+            meta = None
             try:
-                for ch in chunks():
-                    yield ch
+                for item in gw.stream_text(
+                    uid,
+                    question,
+                    system=system_prompt,
+                    messages=gateway_messages,
+                    model=model_key,
+                    feature=gw_feature,
+                    max_tokens=limits.MAX_OUTPUT_TOKENS,
+                ):
+                    if isinstance(item, dict):
+                        # Final metadata: the model/usage actually billed.
+                        meta = item
+                        continue
+                    accumulated.append(item)
+                    yield item
             except Exception as exc:  # noqa: BLE001
-                msg = service.handle_error(exc)
-                yield "[[AI_ERROR]]" + msg
+                yield "[[AI_ERROR]]" + service.handle_error(exc)
                 return
 
             full = "".join(accumulated)
-            storage.add_message(uid, conversation_id, "assistant", full, model=model_id, metadata={"mode": mode})
-            storage.record_usage(uid, model=model_id, mode=mode)
-            db.log_audit(uid, "ai_reply", f"mode={mode} model={model_id}")
-            # Note: tokens unknown in streaming (mock) — usage recorded without token counts.
+            used_model = _persisted_model((meta or {}).get("model"), model_key or requested_model)
+            usage = (meta or {}).get("usage") or {}
+            storage.add_message(uid, conversation_id, "assistant", full, model=used_model, metadata={"mode": mode})
+            storage.record_usage(
+                uid,
+                model=used_model,
+                mode=mode,
+                input_tokens=usage.get("inputTokens", 0),
+                output_tokens=usage.get("outputTokens", 0),
+            )
+            db.log_audit(uid, "ai_reply", f"mode={mode} model={used_model}")
 
         def sse_gen():
             started = False
@@ -393,21 +483,25 @@ def send_message(conversation_id):
 
     # Non-streaming path.
     try:
-        result = service.generate_reply(request_dict, api_key=personal_key)
+        result = gw.generate_text(
+            uid,
+            question,
+            system=system_prompt,
+            messages=gateway_messages,
+            model=model_key,
+            feature=gw_feature,
+            max_tokens=limits.MAX_OUTPUT_TOKENS,
+        )
+    except gw_errors.QuotaExceededError as exc:
+        return jsonify({"error": str(exc)}), 429
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": service.handle_error(exc)}), 502
 
     content = result["content"]
-    usage = result.get("usage", {})
-    storage.add_message(uid, conversation_id, "assistant", content, model=model_id, metadata={"mode": mode})
-    storage.record_usage(
-        uid,
-        model=model_id,
-        mode=mode,
-        input_tokens=usage.get("inputTokens", 0),
-        output_tokens=usage.get("outputTokens", 0),
-    )
-    db.log_audit(uid, "ai_reply", f"mode={mode} model={model_id}")
+    used_model = _persisted_model(result.get("model"), model_key or requested_model)
+    storage.add_message(uid, conversation_id, "assistant", content, model=used_model, metadata={"mode": mode})
+    storage.record_usage(uid, model=used_model, mode=mode)
+    db.log_audit(uid, "ai_reply", f"mode={mode} model={used_model}")
     return jsonify({"reply": content, "conversation": storage.get_conversation(uid, conversation_id)})
 
 

@@ -132,7 +132,7 @@ class AiGatewaySeedTest(unittest.TestCase):
         self.assertTrue(models)
         for m in models:
             self.assertIn(m["provider_id"], {p["slug"] for p in self.reg.list_providers(enabled_only=False)})
-            self.assertIn(m["adapter"], ("openai_compat", "anthropic"))
+            self.assertIn(m["adapter"], ("openai_compat", "anthropic", "copilot"))
             self.assertIn(m["tier"], ("free", "standard", "premium"))
             for expected_key in (
                 "model_id",

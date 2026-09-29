@@ -5,6 +5,8 @@ into a single generate_reply() entry point used by the API routes. Keeps route
 handlers thin and provider logic isolated.
 """
 
+from ai_gateway import errors as gw_errors
+
 from . import context as ctx
 from . import limits
 from . import models as model_registry
@@ -83,6 +85,9 @@ def handle_error(exc):
     if isinstance(exc, limits.RateLimitError):
         return str(exc)
     if isinstance(exc, limits.ValidationError):
+        return str(exc)
+    if isinstance(exc, gw_errors.GatewayError):
+        # Gateway messages are user-safe by construction.
         return str(exc)
     if isinstance(exc, ProviderHTTPError):
         return _PROVIDER_ERRORS.get(

@@ -73,6 +73,7 @@ class GatewayConfig:
             "MISTRAL_API_KEY": os.getenv("MISTRAL_API_KEY"),
             "OPENROUTER_API_KEY": os.getenv("OPENROUTER_API_KEY"),
             "CEREBRAS_API_KEY": os.getenv("CEREBRAS_API_KEY"),
+            "COPILOT_GITHUB_TOKEN": os.getenv("COPILOT_GITHUB_TOKEN") or os.getenv("GH_TOKEN"),
         }
 
 

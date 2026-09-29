@@ -23,6 +23,9 @@ AIDisabledError and is enforced here so every gateway caller gets it for free.
 """
 
 import uuid
+from urllib.error import URLError
+
+from ai.providers._http import ProviderHTTPError
 
 from . import cache, health, quotas, registry
 from .config import GatewayConfig
@@ -549,6 +552,98 @@ def generate_text(user_id, prompt, *, system=None, messages=None,
     if cache_key:
         cache.set(cache_key, out["content"], model_id=out["model"]["model_id"])
     return out
+
+
+def stream_text(user_id, prompt, *, system=None, messages=None, model=None,
+                feature="chat", max_tokens=None, temperature=None,
+                require_privacy=True):
+    """Stream a reply token by token, yielding text deltas as they arrive.
+
+    The AI Hub has always streamed, and students notice when it stops, so the
+    gateway does this rather than falling back to a blocking call.
+
+    Fallback is deliberately one-sided: a provider may be swapped only while
+    nothing has been sent to the client yet. Once the first token is out, a
+    failure has to surface, because silently restarting on another provider
+    would splice two different answers together.
+
+    The final element yielded is a dict ``{"model", "provider", "paid_by",
+    "usage"}`` so the caller can persist and bill the completed turn; the
+    text elements before it are plain strings.
+    """
+    if require_privacy and not gateway_enabled(user_id):
+        raise AIDisabledError(
+            "AI activity is turned off in your privacy settings. Turn it on in "
+            "Settings → Privacy to use AI features."
+        )
+    chain = _fallback_chain(user_id, preferred=model, feature=feature)
+
+    built = list(messages or [])
+    if system and not any(m.get("role") == "system" for m in built):
+        built.insert(0, {"role": "system", "content": system})
+    if not any(m.get("role") == "user" for m in built):
+        built.append({"role": "user", "content": prompt})
+
+    tried = 0
+    last_error = None
+    for chosen in chain:
+        if tried >= GatewayConfig.fallback_max_tries:
+            break
+        provider = registry.get_provider(chosen["provider_slug"])
+        if not provider:
+            continue
+        if not health.try_claim(provider["slug"]):
+            continue
+        api_key, paid_by = _resolve_key(user_id, provider)
+        if not api_key:
+            health.record_success(provider["slug"])
+            continue
+        tried += 1
+        quotas.check(user_id, chosen.get("tier", "free"), paid_by,
+                     estimated_tokens=len(prompt) // 3)
+        request = {"model": chosen["model_id"], "messages": built}
+        if max_tokens is not None:
+            request["max_tokens"] = max_tokens
+        if temperature is not None:
+            request["temperature"] = temperature
+        adapter = build_adapter(provider, api_key)
+
+        emitted = False
+        try:
+            for delta in adapter.stream(request):
+                if delta:
+                    emitted = True
+                    yield delta
+        except ProviderHTTPError as exc:
+            if emitted:
+                # Half a reply is already on screen; restarting would splice
+                # two answers together.
+                health.record_failure(provider["slug"], str(exc))
+                raise
+            health.record_failure(provider["slug"], str(exc))
+            last_error = exc
+            continue
+        except (URLError, TimeoutError, OSError) as exc:
+            if emitted:
+                health.record_failure(provider["slug"], str(exc))
+                raise
+            health.record_failure(provider["slug"], str(exc))
+            last_error = exc
+            continue
+
+        usage = adapter.last_usage
+        _record_usage(user_id, chosen, provider, feature, usage, paid_by)
+        health.record_success(provider["slug"])
+        yield {"model": chosen, "provider": provider, "paid_by": paid_by,
+               "usage": usage}
+        return
+
+    if last_error is not None:
+        raise AllProvidersFailedError(
+            "AI is temporarily unavailable across all providers. Try again in a "
+            "moment."
+        ) from last_error
+    raise NoProviderAvailableError(_HINT)
 
 
 def generate_json(user_id, schema, prompt, *, model=None, feature="generate",

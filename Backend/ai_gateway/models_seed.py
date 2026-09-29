@@ -16,17 +16,19 @@ warning when doing so).
 """
 
 #: Server environment key aliases accepted in addition to each provider's
-#: primary env var (keeps the existing GOOGLE_AI_API_KEY/GEMINI_API_KEY legacy
-#: working).
+#: primary env var, keyed by that primary name. Copilot needs no entry here
+#: because GatewayConfig.server_keys already folds GH_TOKEN into
+#: COPILOT_GITHUB_TOKEN.
 ENV_ALIASES = {
     "google": "GOOGLE_AI_API_KEY",
 }
 
 #: Which adapters exist. 'openai_compat' covers OpenAI, Gemini, DeepSeek, Groq,
-#: Mistral, OpenRouter, Cerebras and friends; 'anthropic' is the native Claude
-#: Messages API.
+#: Mistral, OpenRouter and Cerebras; 'anthropic' is the native Claude
+#: Messages API; 'copilot' is OpenAI-compatible with GitHub's required headers.
 ADAPTER_OPENAI_COMPAT = "openai_compat"
 ADAPTER_ANTHROPIC = "anthropic"
+ADAPTER_COPILOT = "copilot"
 
 #: Tier identifiers shared with quota rules.
 TIER_FREE = "free"
@@ -133,6 +135,21 @@ PROVIDERS = [
         "may_train_on_data": 0,
         "allowed_for_minors": 1,
         "sort_order": 8,
+    },
+    {
+        # Copilot speaks the OpenAI chat-completions shape but authenticates
+        # with a GitHub token and rejects requests that do not look like they
+        # came from an editor, so it needs the CopilotAdapter header set.
+        "slug": "copilot",
+        "display_name": "GitHub Copilot",
+        "adapter": ADAPTER_COPILOT,
+        "base_url": "https://api.githubcopilot.com",
+        "env_key_name": "COPILOT_GITHUB_TOKEN",
+        "is_enabled": 1,
+        "is_free_tier": 0,
+        "may_train_on_data": 1,
+        "allowed_for_minors": 0,
+        "sort_order": 9,
     },
 ]
 
@@ -259,6 +276,21 @@ MODELS = [
         "cost_in_per_million": 0.0,
         "cost_out_per_million": 0.0,
         "best_for": "explain,summarize,solve,chat,quiz",
+        "sort_order": 1,
+    },
+    # GitHub Copilot (reached with a GitHub token, never a paid API key).
+    {
+        "provider_id": "copilot",
+        "model_id": "gpt-5-mini",
+        "display_name": "Copilot Mini",
+        "tier": TIER_STANDARD,
+        "context_window": 128000,
+        "max_output": 16384,
+        "supports_json_mode": 0,
+        "speed": "fast",
+        "cost_in_per_million": 0.0,
+        "cost_out_per_million": 0.0,
+        "best_for": "chat,explain,solve,simplify",
         "sort_order": 1,
     },
 ]

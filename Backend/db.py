@@ -609,7 +609,7 @@ CREATE TABLE IF NOT EXISTS ai_providers (
     id                 TEXT PRIMARY KEY,
     slug               TEXT NOT NULL UNIQUE,
     display_name       TEXT NOT NULL,
-    adapter            TEXT NOT NULL,                -- 'openai_compat' | 'anthropic'
+    adapter            TEXT NOT NULL,                -- 'openai_compat' | 'anthropic' | 'copilot'
     base_url           TEXT,
     env_key_name       TEXT NOT NULL,
     is_enabled         INTEGER NOT NULL DEFAULT 1,
