@@ -31,14 +31,11 @@ services:
       # (Set "Value" -> "needs manual value") and click "Save".
       - key: DATABASE_URL
         sync: false
-      # Optional: enable the AI Hub's server-side provider keys.
-      # Users can still connect their own keys from Settings without these.
-      - key: OPENAI_API_KEY
-        sync: false
-      # Stash uses whichever server key is set, in this order: Anthropic,
-      # OpenAI, Gemini, DeepSeek, Copilot. Set one or more here, or let each
-      # user connect their own key from Settings. Which one Stash prefers by
-      # default is controlled with STASH_PROVIDER.
+      # Server-side provider keys, shared by the AI Hub and Stash. Stash uses
+      # whichever key is set, in this order: Anthropic, OpenAI, Gemini,
+      # DeepSeek, Copilot. Set one or more here, or let each user connect their
+      # own key from Settings. Which one Stash prefers by default is
+      # controlled with STASH_PROVIDER.
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: OPENAI_API_KEY
@@ -67,6 +64,13 @@ services:
       # to disable the console entirely (it fails closed).
       - key: AI_GATEWAY_ADMIN_EMAILS
         sync: false
+      # Uploaded files (profile photos, course materials, Stash sources, AI Hub
+      # material text) go into the file_blobs table so they survive a redeploy
+      # and are shared across devices and gunicorn workers. The container disk is
+      # ephemeral on the free plan, so the default "database" backend is what you
+      # want. Only set "local" for local development.
+      - key: FILE_STORAGE_BACKEND
+        value: database
       # Optional AI Gateway tuning (see Backend/.env.example for the full list).
       - key: AI_GATEWAY_FREE_DAILY_REQUESTS
         sync: false

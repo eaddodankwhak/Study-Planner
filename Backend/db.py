@@ -597,6 +597,36 @@ CREATE TABLE IF NOT EXISTS stash_usage (
     UNIQUE (user_id, day)
 );
 
+-- --------------------------------------------------------- File storage
+-- Uploaded bytes live here, next to the rows that reference them, so they
+-- survive a redeploy and are identical on every device and gunicorn worker.
+-- The host filesystem is ephemeral (Render wipes it on each deploy), which used
+-- to leave `users.avatar_path` and `materials.filename` pointing at files that
+-- no longer existed.
+--
+-- `storage_key` is the logical location the rest of the app already uses
+-- ("<user_id>/<doc_id>.pdf" for Stash, "uploads/<slug>/notes.pdf" for course
+-- materials, "profile/<user_id>.png" for avatars) and stays stable whether the
+-- bytes live in this table or in an object store. `content` is a BLOB in SQLite
+-- and a BYTEA in Postgres -- both are just bytes to a bytearray in Python.
+--
+-- No FOREIGN KEY on purpose: account deletion is manual (delete_user()) and
+-- SQLite may run without PRAGMA foreign_keys, matching the `ai_connections` and
+-- Stash convention.
+CREATE TABLE IF NOT EXISTS file_blobs (
+    key          TEXT PRIMARY KEY,
+    user_id      TEXT,
+    filename     TEXT,
+    content_type TEXT,
+    size_bytes   INTEGER NOT NULL DEFAULT 0,
+    sha256       TEXT,
+    content      BLOB,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_file_blobs_user ON file_blobs (user_id);
+
 -- ------------------------------------------------------------- AI Gateway
 -- The AI Gateway gives every student-facing AI feature one no-key entry point:
 -- the server holds provider keys (environment only, never in the DB or the
@@ -725,9 +755,15 @@ def using_postgres():
 # PostgreSQL variant of the schema: only the id generator and timestamp
 # default differ, everything else is shared. Postgres additionally relies on
 # the created_at columns (added above) for insertion-order queries.
-_SCHEMA_PG = _SCHEMA.replace(
-    "INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY"
-).replace("datetime('now')", "CURRENT_TIMESTAMP")
+_SCHEMA_PG = (
+    _SCHEMA.replace(
+        "INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY"
+    )
+    .replace("datetime('now')", "CURRENT_TIMESTAMP")
+    # SQLite BLOB and Postgres BYTEA are both "arbitrary bytes", but the
+    # Postgres parser rejects the bare SQLite spelling.
+    .replace("content      BLOB", "content      BYTEA")
+)
 
 
 def ensure_db_file():
@@ -1392,6 +1428,113 @@ def add_material(slug, filename, uploader_id):
     )
 
 
+# ------------------------------------------------------------ file blobs
+
+def save_file_blob(key, content, *, user_id=None, filename=None,
+                   content_type=None, sha256=None):
+    """Store (or replace) the bytes for ``key`` in the file_blobs table.
+
+    The key is the same logical location the filesystem used to hold, so the
+    rest of the app keeps deriving paths the way it always did. Replacing is a
+    single upsert: uploading a new profile photo overwrites the old bytes
+    instead of accumulating rows.
+    """
+    blob = bytes(content or b"")
+    conn = _conn_context()
+    try:
+        conn.execute(
+            "INSERT INTO file_blobs "
+            "(key, user_id, filename, content_type, size_bytes, sha256, content) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT (key) DO UPDATE SET "
+            "user_id = excluded.user_id, "
+            "filename = excluded.filename, "
+            "content_type = excluded.content_type, "
+            "size_bytes = excluded.size_bytes, "
+            "sha256 = excluded.sha256, "
+            "content = excluded.content, "
+            "updated_at = CURRENT_TIMESTAMP",
+            (key, user_id, filename, content_type, len(blob),
+             sha256, sqlite3.Binary(blob)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return key
+
+
+def get_file_blob(key):
+    """Return the bytes stored for ``key``, or None when nothing is stored.
+
+    The content column comes back as ``bytes`` from SQLite and as ``memoryview``
+    from psycopg2, so it is normalised to ``bytes`` here for every caller.
+    """
+    row = _query_one(
+        "SELECT content, filename, content_type, size_bytes FROM file_blobs "
+        "WHERE key = ?",
+        (key,),
+    )
+    if not row or row["content"] is None:
+        return None
+    content = row["content"]
+    if isinstance(content, memoryview):
+        content = content.tobytes()
+    elif not isinstance(content, bytes):
+        content = bytes(content)
+    return {
+        "content": content,
+        "filename": row["filename"],
+        "content_type": row["content_type"],
+        "size_bytes": row["size_bytes"] or len(content),
+    }
+
+
+def file_blob_exists(key):
+    """True when a blob row exists for ``key`` (used to skip re-writing)."""
+    row = _query_one("SELECT 1 AS present FROM file_blobs WHERE key = ?", (key,))
+    return row is not None
+
+
+def delete_file_blob(key):
+    _execute("DELETE FROM file_blobs WHERE key = ?", (key,))
+
+
+def list_file_blob_keys(prefix=""):
+    """Return every stored key, optionally restricted to a ``prefix``."""
+    if prefix:
+        rows = _query_all(
+            "SELECT key FROM file_blobs WHERE key LIKE ? ORDER BY key",
+            (prefix.replace("%", r"\%") + "%",),
+        )
+    else:
+        rows = _query_all("SELECT key FROM file_blobs ORDER BY key")
+    return [r["key"] for r in rows]
+
+
+def delete_file_blobs_for_user(user_id):
+    """Drop every blob belonging to a user, including shared course materials
+    they uploaded. Use :func:`delete_private_file_blobs` for account deletion."""
+    _execute("DELETE FROM file_blobs WHERE user_id = ?", (user_id,))
+
+
+#: Key prefixes that hold one user's private uploads. Mirrors the constants in
+#: storage.py; duplicated here so db.py stays importable on its own.
+_PRIVATE_BLOB_PREFIXES = ("profile/", "stash/", "ai-materials/")
+
+
+def delete_private_file_blobs(user_id):
+    """Drop only the user's private uploads (avatar, Stash, AI Hub material).
+
+    Course materials live under "uploads/<slug>/" and are shared with the rest of
+    the class, so they survive the uploader deleting their own account.
+    """
+    for prefix in _PRIVATE_BLOB_PREFIXES:
+        _execute(
+            "DELETE FROM file_blobs WHERE user_id = ? AND key LIKE ?",
+            (user_id, prefix.replace("%", r"\%") + "%"),
+        )
+
+
 def list_quizzes(slug):
     rows = _query_all("SELECT * FROM quizzes WHERE subject = ? ORDER BY rowid", (slug,))
     return [_quiz_from_row(r) for r in rows]
@@ -1782,6 +1925,10 @@ def delete_user(user_id):
         conn.commit()
     finally:
         conn.close()
+    # Private uploads are namespaced per user, so they go with the account.
+    # Course materials (uploads/<slug>/...) are deliberately left alone: they
+    # belong to the subject and are shared with everyone else taking it.
+    delete_private_file_blobs(user_id)
 
 
 # --------------------------------------------------------------- study notes

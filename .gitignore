@@ -13,6 +13,7 @@ Database/planner.json
 Database/uploads/
 Database/ai.json
 Database/ai_uploads/
+Database/profile_uploads/
 
 # Local runtime logs
 *.log

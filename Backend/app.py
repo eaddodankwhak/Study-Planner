@@ -19,12 +19,12 @@ import uuid
 
 from flask import (
     Flask,
+    Response,
     flash,
     jsonify,
     redirect,
     render_template,
     request,
-    send_from_directory,
     session,
     url_for,
 )
@@ -35,6 +35,7 @@ from werkzeug.utils import secure_filename
 import collab
 import courses as courses_mod
 import db
+import storage
 import google_auth
 import planner
 import stats
@@ -99,6 +100,9 @@ _DUMMY_PASSWORD_HASH = generate_password_hash("study-planner-dummy-account")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(BASE_DIR, "..", "Database")
+# Uploaded bytes go through storage.py (the database by default) because the
+# host filesystem is ephemeral on Render. These paths are only the fallback used
+# when FILE_STORAGE_BACKEND=local.
 UPLOADS_DIR = os.path.join(DATABASE_DIR, "uploads")
 PROFILE_UPLOADS_DIR = os.path.join(DATABASE_DIR, "profile_uploads")
 MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024
@@ -340,11 +344,21 @@ def get_subject(slug):
 
 
 def get_subject_files(subject):
-    """Return a sorted list of uploaded material filenames for a subject."""
-    folder = os.path.join(UPLOADS_DIR, subject["slug"])
-    if not os.path.isdir(folder):
-        return []
-    return sorted(os.listdir(folder))
+    """Return a sorted list of uploaded material filenames for a subject.
+
+    Read from storage rather than the directory listing, so the list is the
+    same on every device and survives a redeploy.
+    """
+    prefix = storage.material_prefix(subject["slug"])
+    names = []
+    for key in storage.list_keys(prefix):
+        if not key.startswith(prefix):
+            continue
+        name = key[len(prefix):]
+        # Only direct children, matching the old per-subject folder listing.
+        if name and "/" not in name:
+            names.append(name)
+    return sorted(names)
 
 
 def user_name(user_id, users=None):
@@ -861,9 +875,12 @@ def settings_avatar():
     user = current_user()
     uploaded = request.files.get("avatar")
     remove = request.form.get("remove") == "1"
-    folder = PROFILE_UPLOADS_DIR
-    os.makedirs(folder, exist_ok=True)
     if remove:
+        # Delete the bytes too, not just the pointer, so a removed photo stops
+        # taking up storage.
+        old = user.get("avatar_path")
+        if old:
+            storage.delete(storage.profile_key(user["id"], _avatar_ext(old)))
         db.update_user(user["id"], {"avatar_path": None})
         flash("Profile photo removed.", "success")
         return redirect(url_for("settings"))
@@ -886,10 +903,26 @@ def settings_avatar():
         "image/webp": "webp",
     }[uploaded.mimetype]
     filename = f"{user['id']}.{extension}"
-    uploaded.save(os.path.join(folder, filename))
+    # Drop any previous photo stored under a different extension, otherwise
+    # changing a .png to a .jpg leaves the old bytes behind.
+    previous = user.get("avatar_path")
+    if previous and previous != filename:
+        storage.delete(storage.profile_key(user["id"], _avatar_ext(previous)))
+    storage.save(
+        storage.profile_key(user["id"], extension),
+        uploaded.stream.read(),
+        user_id=user["id"],
+        filename=filename,
+        content_type=uploaded.mimetype,
+    )
     db.update_user(user["id"], {"avatar_path": filename})
     flash("Profile photo updated.", "success")
     return redirect(url_for("settings"))
+
+
+def _avatar_ext(filename):
+    """Extension stored in users.avatar_path, e.g. "png" for "u1.png"."""
+    return (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
 
 
 @app.get("/profile/avatar/<path:filename>")
@@ -899,7 +932,13 @@ def profile_avatar(filename):
     user = current_user()
     if filename != user.get("avatar_path"):
         return ("", 404)
-    return send_from_directory(PROFILE_UPLOADS_DIR, filename)
+    stored = storage.load_meta(storage.profile_key(user["id"], _avatar_ext(filename)))
+    if not stored:
+        return ("", 404)
+    return Response(
+        stored["content"],
+        mimetype=stored.get("content_type") or "application/octet-stream",
+    )
 
 
 @app.post("/settings/notifications")
@@ -1499,50 +1538,67 @@ def subject_upload(slug):
         flash("That file type is not allowed.", "error")
         return redirect(url_for("subject", slug=slug, tool="resources"))
 
-    folder = os.path.join(UPLOADS_DIR, slug)
-    os.makedirs(folder, exist_ok=True)
-
     filename = secure_filename(file.filename)
-    dest = os.path.join(folder, filename)
+    if not filename:
+        flash("That file name is not usable.", "error")
+        return redirect(url_for("subject", slug=slug, tool="resources"))
 
-    # Avoid overwriting an existing file.
+    # Avoid clobbering an existing material.
     uniqued = filename
     count = 1
-    while os.path.exists(os.path.join(folder, uniqued)):
+    while storage.exists(storage.material_key(slug, uniqued)):
         stem, ext = os.path.splitext(filename)
         uniqued = f"{stem}_{count}{ext}"
         count += 1
 
-    file.save(os.path.join(folder, uniqued))
+    storage.save(
+        storage.material_key(slug, uniqued),
+        file.read(),
+        user_id=current_user()["id"],
+        filename=uniqued,
+        content_type=file.mimetype,
+    )
     collab.add_material(slug, uniqued, current_user()["id"])
     flash(f"Uploaded '{uniqued}' successfully.", "success")
     return redirect(url_for("subject", slug=slug, tool="resources"))
+
+
+def _material_response(slug, filepath, as_attachment):
+    """Shared body for the download and inline-preview routes."""
+    subject_info = get_subject(slug)
+    if not subject_info:
+        flash("Subject not found.", "error")
+        return redirect(url_for("home"))
+
+    stored = storage.load_meta(storage.material_key(slug, filepath))
+    if not stored:
+        flash("That file is no longer available.", "error")
+        return redirect(url_for("subject", slug=slug, tool="resources"))
+
+    response = Response(
+        stored["content"],
+        mimetype=stored.get("content_type") or "application/octet-stream",
+    )
+    name = stored.get("filename") or filepath
+    disposition = "attachment" if as_attachment else "inline"
+    response.headers["Content-Disposition"] = (
+        f'{disposition}; filename="{name}"'
+    )
+    return response
 
 
 @app.get("/subject/<slug>/download/<path:filepath>")
 @login_required
 def subject_download(slug, filepath):
     """Serve an uploaded course material file for download."""
-    subject_info = get_subject(slug)
-    if not subject_info:
-        flash("Subject not found.", "error")
-        return redirect(url_for("home"))
-
-    folder = os.path.join(UPLOADS_DIR, slug)
-    return send_from_directory(folder, filepath, as_attachment=True)
+    return _material_response(slug, filepath, as_attachment=True)
 
 
 @app.get("/subject/<slug>/open/<path:filepath>")
 @login_required
 def subject_open(slug, filepath):
-    """Open a course material inline when the browser supports previewing it."""
-    subject_info = get_subject(slug)
-    if not subject_info:
-        flash("Subject not found.", "error")
-        return redirect(url_for("home"))
-
-    folder = os.path.join(UPLOADS_DIR, slug)
-    return send_from_directory(folder, filepath, as_attachment=False)
+    """Open an uploaded course material inline when the browser supports previewing it."""
+    return _material_response(slug, filepath, as_attachment=False)
 
 
 @app.post("/subject/<slug>/personal-quiz/import")

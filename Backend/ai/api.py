@@ -20,6 +20,10 @@ if os.path.dirname(os.path.dirname(os.path.abspath(__file__))) not in sys.path:
 
 import db
 
+# The durable file store at the Backend root. Aliased because ``.storage``
+# below is the AI Hub's conversation store, and both are needed here.
+import storage as file_store
+
 from ai_gateway import errors as gw_errors
 from ai_gateway import gateway as gw
 from ai_gateway import registry as gw_registry
@@ -126,13 +130,6 @@ def _server_env_set(envs):
     """True when any of the given server env names holds a value."""
     return any(os.getenv(env) for env in envs)
 
-UPLOAD_ROOT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "Database",
-    "ai_uploads",
-)
-
-
 def _require_user_id():
     uid = session.get("user_id")
     if not uid:
@@ -193,15 +190,21 @@ def _event_stream_from(callback):
 
 
 def _material_text(material_id, user_id):
-    """Return stored material text (and user's own upload) or None."""
+    """Return stored material text (and user's own upload) or None.
+
+    Read through the durable store so a material uploaded before a redeploy is
+    still usable afterwards. Keys are namespaced by ``user_id``, so one student
+    cannot read another's material even by guessing an id.
+    """
     if not material_id:
         return None
     safe = os.path.basename(str(material_id))
-    path = os.path.join(UPLOAD_ROOT, user_id, safe + ".txt")
-    if not os.path.exists(path):
+    if not safe:
         return None
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+    data = file_store.load(file_store.ai_material_key(user_id, safe))
+    if data is None:
+        return None
+    return data.decode("utf-8", errors="replace")
 
 
 def _server_provider_keys_available():
@@ -522,10 +525,13 @@ def upload_material():
 
     # Persist extracted text for later attachment to a message.
     material_id = uuid.uuid4().hex
-    folder = os.path.join(UPLOAD_ROOT, uid)
-    os.makedirs(folder, exist_ok=True)
-    with open(os.path.join(folder, material_id + ".txt"), "w", encoding="utf-8") as out:
-        out.write(result["text"])
+    file_store.save(
+        file_store.ai_material_key(uid, material_id),
+        result["text"].encode("utf-8"),
+        user_id=uid,
+        filename=f"{material_id}.txt",
+        content_type="text/plain; charset=utf-8",
+    )
 
     return jsonify({
         "materialId": material_id,
