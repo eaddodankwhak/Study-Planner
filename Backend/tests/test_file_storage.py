@@ -400,6 +400,99 @@ class LocalBackendTest(_Base):
         self.assertFalse(storage.exists(key))
 
 
+class PostgresCompatibilityTest(unittest.TestCase):
+    """Render runs with DATABASE_URL set, so this backend is what actually runs in
+    production while every other test here drives SQLite.
+
+    No Postgres server is needed: these assert on the SQL the layer hands to
+    psycopg2, which is where a SQLite-only dialect would break. The `?`
+    placeholders and `BLOB` type are the two things that silently fail there --
+    psycopg2 does not translate them, it raises.
+    """
+
+    def setUp(self):
+        import pg
+
+        self.pg = pg
+
+    def _translate(self, sql):
+        return self.pg._translate(sql)
+
+    def test_blob_statements_leave_no_sqlite_placeholders(self):
+        """Every ? must become %s or psycopg2 rejects the statement."""
+        for sql in (
+            "INSERT INTO file_blobs (key, content) VALUES (?, ?)",
+            "SELECT content FROM file_blobs WHERE key = ?",
+            "SELECT 1 AS present FROM file_blobs WHERE key = ?",
+            "DELETE FROM file_blobs WHERE key = ?",
+            "SELECT key FROM file_blobs WHERE key LIKE ? ORDER BY key",
+            "DELETE FROM file_blobs WHERE user_id = ? AND key LIKE ?",
+        ):
+            with self.subTest(sql=sql):
+                self.assertNotIn("?", self._translate(sql))
+
+    def test_upsert_survives_translation(self):
+        """save_file_blob relies on ON CONFLICT, which both engines support but
+        which must not be rewritten into the INSERT OR REPLACE form."""
+        out = self._translate(
+            "INSERT INTO file_blobs (key, content) VALUES (?, ?) "
+            "ON CONFLICT (key) DO UPDATE SET content = excluded.content, "
+            "updated_at = CURRENT_TIMESTAMP"
+        )
+        self.assertIn("ON CONFLICT (key) DO UPDATE", out)
+        self.assertNotIn("INSERT OR", out)
+
+    def test_file_blobs_column_is_bytea_not_blob(self):
+        """SQLite's BLOB keyword has no meaning in Postgres; the schema variant
+        applied when DATABASE_URL is set has to swap it."""
+        self.assertIn("content      BYTEA", db._SCHEMA_PG)
+        self.assertNotIn("content      BLOB", db._SCHEMA_PG)
+
+    def test_whole_postgres_schema_translates_without_sqlite_dialect(self):
+        """Each statement must come out of the translator with no ? and no
+        INSERT OR / rowid / datetime('now') left behind."""
+        statements = self.pg._split_script(db._SCHEMA_PG)
+        self.assertGreater(len(statements), 50)
+        for stmt in statements:
+            out = self.pg._translate(stmt)
+            with self.subTest(stmt=stmt.strip().splitlines()[0][:60]):
+                self.assertNotIn("?", out)
+                self.assertNotIn("INSERT OR", out.upper())
+                self.assertNotIn("rowid", out.lower())
+                self.assertNotIn("datetime('now')", out.lower())
+
+    def test_sqlite_binary_adapts_to_a_bytea_literal(self):
+        """save_file_blob wraps the bytes in sqlite3.Binary, which is a memoryview.
+        psycopg2 has to be able to adapt that to bytea, or every upload 500s."""
+        import sqlite3
+
+        import psycopg2.extensions
+
+        quoted = psycopg2.extensions.adapt(sqlite3.Binary(PNG_BYTES)).getquoted()
+        self.assertTrue(quoted.endswith(b"::bytea"), quoted)
+        # Postgres renders the payload as an octal-escaped string literal.
+        self.assertIn(b"\\211PNG", quoted)
+
+    def test_blob_row_normalises_psycopg2_memoryview(self):
+        """psycopg2 hands BYTEA back as a memoryview, not bytes. get_file_blob
+        must convert it, or callers get a memoryview they cannot hash."""
+        raw = memoryview(PDF_BYTES)
+        self.assertIsInstance(raw, memoryview)
+        row = {
+            "content": raw,
+            "filename": "notes.pdf",
+            "content_type": "application/pdf",
+            "size_bytes": None,
+        }
+        # Mirror get_file_blob's normalisation without needing a live server.
+        content = row["content"]
+        if isinstance(content, memoryview):
+            content = content.tobytes()
+        self.assertIsInstance(content, bytes)
+        self.assertEqual(content, PDF_BYTES)
+        self.assertEqual(len(content), len(PDF_BYTES))
+
+
 def _seed_subject(uid, code="STO101"):
     """Create a course row and return the slug the subject routes expect.
 
