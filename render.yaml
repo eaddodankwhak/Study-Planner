@@ -64,6 +64,13 @@ services:
       # to disable the console entirely (it fails closed).
       - key: AI_GATEWAY_ADMIN_EMAILS
         sync: false
+      # Uploaded files (profile photos, course materials, Stash sources, AI Hub
+      # material text) go into the file_blobs table so they survive a redeploy
+      # and are shared across devices and gunicorn workers. The container disk is
+      # ephemeral on the free plan, so the default "database" backend is what you
+      # want. Only set "local" for local development.
+      - key: FILE_STORAGE_BACKEND
+        value: database
       # Optional AI Gateway tuning (see Backend/.env.example for the full list).
       - key: AI_GATEWAY_FREE_DAILY_REQUESTS
         sync: false

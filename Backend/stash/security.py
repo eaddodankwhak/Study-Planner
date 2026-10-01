@@ -2,15 +2,28 @@
 
 Validates size limits and real file type via magic bytes (never trusts the
 client's extension alone), computes a SHA-256 for duplicate detection, and
-stores uploads under a per-user, per-document path with a random file name so
-nothing user-controlled touches the filesystem directly.
+stores uploads under a per-user, per-document key with a random file name so
+nothing user-controlled touches the path directly.
+
+Bytes go through the durable store at the Backend root (``file_store``) rather
+than the host filesystem, which is ephemeral on Render: a source file uploaded
+before a redeploy is still readable after it.
 """
 
 import hashlib
 import io
 import os
+import sys
 
 from werkzeug.utils import secure_filename
+
+# Make the Backend root importable so `storage` resolves (this package lives at
+# Backend/stash/ and is imported as `stash.security`).
+_BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _BACKEND_ROOT not in sys.path:
+    sys.path.insert(0, _BACKEND_ROOT)
+
+import storage as file_store  # noqa: E402
 
 from .config import StashConfig
 
@@ -102,41 +115,56 @@ def safe_title(filename):
 
 
 def path_for(user_id, doc_id, ext):
-    user_dir = os.path.join(StashConfig.upload_dir, user_id)
-    return user_dir, os.path.join(user_dir, f"{doc_id}.{ext}")
+    """The user-scoped storage key and legacy on-disk path for a source file.
+
+    The key (``<user_id>/<doc_id>.<ext>``) is what goes in
+    ``stash_documents.storage_key`` and is unchanged by the move to the durable
+    store, so existing rows keep working. The path is only used by the local
+    storage backend.
+    """
+    # Forward slashes always: this key is a storage identifier, not a native
+    # path, and must compare equal across Windows and Linux.
+    key = f"{user_id}/{doc_id}.{ext}"
+    return key, os.path.join(StashConfig.upload_dir, key.replace("/", os.sep))
 
 
 def save_source(data, user_id, doc_id, ext):
     """Persist an upload; returns the storage key (user-scoped path)."""
-    user_dir, full = path_for(user_id, doc_id, ext)
-    os.makedirs(user_dir, exist_ok=True)
-    with open(full, "wb") as fh:
-        fh.write(data)
-    return os.path.join(user_id, f"{doc_id}.{ext}")
+    key = file_store.stash_key(user_id, doc_id, ext)
+    file_store.save(
+        key,
+        data,
+        user_id=user_id,
+        filename=f"{doc_id}.{ext}",
+    )
+    # Keep the historical key shape (forward-slashed "<user_id>/<doc_id>.<ext>")
+    # so stash_documents.storage_key stays comparable with rows written before
+    # this change.
+    return f"{user_id}/{doc_id}.{ext}"
 
 
 def load_source(storage_key):
     """Return the raw bytes of a stored source file, or None."""
     if not storage_key:
         return None
-    full = os.path.join(StashConfig.upload_dir, storage_key)
-    if not os.path.isfile(full):
-        return None
-    try:
-        with open(full, "rb") as fh:
-            return fh.read()
-    except OSError:
-        return None
+    return file_store.load(_blob_key(storage_key))
 
 
 def delete_source(storage_key):
     if not storage_key:
         return
-    full = os.path.join(StashConfig.upload_dir, storage_key)
-    try:
-        os.remove(full)
-    except OSError:
-        pass
+    file_store.delete(_blob_key(storage_key))
+
+
+def _blob_key(storage_key):
+    """Translate a stored Stash key into the durable store's key.
+
+    Tolerates a key that is already fully qualified so re-saving is idempotent.
+    """
+    key = storage_key.replace("\\", "/")
+    if key.startswith(file_store.STASH_PREFIX):
+        return key
+    return f"{file_store.STASH_PREFIX}{key}"
 
 
 def _human(size):
