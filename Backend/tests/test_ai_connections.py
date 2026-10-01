@@ -2,8 +2,8 @@
 
 Covers the storage layer (obfuscated keys, per-user isolation, upsert, delete),
 the /api/ai/connections endpoints (verification is monkeypatched so tests stay
-hermetic — no network), the meta payload, per-user key routing on send_message,
-and the Settings page panel.
+hermetic — no network), the meta payload, gateway routing on send_message
+(JSON + SSE), and the Settings page panel.
 """
 
 import os
@@ -159,27 +159,118 @@ class AIConnectionsAPITest(unittest.TestCase):
         data = self.client.get("/api/ai/meta").get_json()
         self.assertFalse(data["mockMode"])
 
-    def test_send_message_uses_personal_key_for_routing(self):
+    def test_send_message_routes_through_gateway(self):
         db.set_ai_connection(self.UID, "anthropic", "sk-personal-claude")
         captured = {}
-        from ai.providers import MockProvider
 
-        def fake_get_provider(provider_id, api_key=None):
-            captured["provider"] = provider_id
-            captured["api_key"] = api_key
-            return MockProvider()
+        def fake_generate_text(user_id, prompt, **kwargs):
+            captured["user_id"] = user_id
+            captured["model"] = kwargs.get("model")
+            captured["feature"] = kwargs.get("feature")
+            return {
+                "content": "The gateway replies.",
+                "model": {"provider_slug": "anthropic", "model_id": "claude-sonnet-4-5"},
+            }
+
+        conv = self.client.post(
+            "/api/ai/conversations", json={"model": "auto", "mode": "ask"}
+        ).get_json()["conversation"]
+        with mock.patch("ai.api.gw.generate_text", side_effect=fake_generate_text):
+            r = self.client.post(
+                f"/api/ai/conversations/{conv['id']}/messages",
+                json={"message": "Explain recursion please", "model": "anthropic/claude-sonnet-4-5"},
+            )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json()["reply"], "The gateway replies.")
+        self.assertEqual(captured["user_id"], self.UID)
+        self.assertEqual(captured["model"], "anthropic/claude-sonnet-4-5")
+        self.assertEqual(captured["feature"], "chat")
+
+    def test_send_message_maps_legacy_model_id(self):
+        db.set_ai_connection(self.UID, "anthropic", "sk-personal-claude")
+        captured = {}
+
+        def fake(user_id, prompt, **kwargs):
+            captured["model"] = kwargs.get("model")
+            return {"content": "ok", "model": {"provider_slug": "anthropic", "model_id": "claude-sonnet-4-5"}}
 
         conv = self.client.post(
             "/api/ai/conversations", json={"model": "claude", "mode": "ask"}
         ).get_json()["conversation"]
-        with mock.patch("ai.service.get_provider", side_effect=fake_get_provider):
+        with mock.patch("ai.api.gw.generate_text", side_effect=fake):
             r = self.client.post(
                 f"/api/ai/conversations/{conv['id']}/messages",
-                json={"message": "Explain recursion please", "model": "claude"},
+                json={"message": "Explain", "model": "claude"},
             )
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(captured["provider"], "anthropic")
-        self.assertEqual(captured["api_key"], "sk-personal-claude")
+        self.assertEqual(captured["model"], "anthropic/claude-sonnet-4-5")
+
+    def test_send_message_streams_through_gateway(self):
+        db.set_ai_connection(self.UID, "openai", "sk-personal-openai")
+        conv = self.client.post(
+            "/api/ai/conversations", json={"model": "auto", "mode": "ask"}
+        ).get_json()["conversation"]
+
+        def fake_stream(user_id, prompt, **kwargs):
+            yield "Hello"
+            yield " world"
+            yield {
+                "model": {"provider_slug": "openai", "model_id": "gpt-5-mini"},
+                "provider": {},
+                "paid_by": "personal",
+                "usage": {"inputTokens": 9, "outputTokens": 2},
+            }
+
+        with mock.patch("ai.api.gw.stream_text", side_effect=fake_stream):
+            r = self.client.post(
+                f"/api/ai/conversations/{conv['id']}/messages?stream=1",
+                json={"message": "Hi there", "model": "auto"},
+            )
+        self.assertEqual(r.status_code, 200)
+        body = r.get_data(as_text=True)
+        self.assertIn("Hello", body)
+        self.assertIn("world", body)
+        self.assertIn("[DONE]", body)
+
+    def test_send_message_stream_error_emits_sse_error(self):
+        from ai_gateway import errors as gw_errors
+
+        conv = self.client.post(
+            "/api/ai/conversations", json={"model": "auto", "mode": "ask"}
+        ).get_json()["conversation"]
+
+        def boom(user_id, prompt, **kwargs):
+            raise gw_errors.AIDisabledError(
+                "AI activity is turned off in your privacy settings."
+            )
+
+        with mock.patch("ai.api.gw.stream_text", side_effect=boom):
+            r = self.client.post(
+                f"/api/ai/conversations/{conv['id']}/messages?stream=1",
+                json={"message": "Hi", "model": "auto"},
+            )
+        self.assertEqual(r.status_code, 200)
+        body = r.get_data(as_text=True)
+        self.assertIn('"error"', body)
+        self.assertIn("privacy", body)
+
+    def test_send_message_json_quota_exceeded_is_429(self):
+        from ai_gateway import errors as gw_errors
+
+        conv = self.client.post(
+            "/api/ai/conversations", json={"model": "auto", "mode": "ask"}
+        ).get_json()["conversation"]
+
+        def boom(user_id, prompt, **kwargs):
+            raise gw_errors.QuotaExceededError("Your daily AI budget is used up.")
+
+        with mock.patch("ai.api.gw.generate_text", side_effect=boom):
+            r = self.client.post(
+                f"/api/ai/conversations/{conv['id']}/messages",
+                json={"message": "Hi", "model": "auto"},
+            )
+        self.assertEqual(r.status_code, 429)
+        self.assertIn("budget", r.get_json()["error"])
 
 
 class AIConnectionsSettingsTest(unittest.TestCase):

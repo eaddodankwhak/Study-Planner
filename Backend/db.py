@@ -597,6 +597,107 @@ CREATE TABLE IF NOT EXISTS stash_usage (
     UNIQUE (user_id, day)
 );
 
+-- ------------------------------------------------------------- AI Gateway
+-- The AI Gateway gives every student-facing AI feature one no-key entry point:
+-- the server holds provider keys (environment only, never in the DB or the
+-- browser), students pick a friendly model, and the gateway accounts usage,
+-- enforces quotas, and falls back between providers. These tables follow the
+-- repo conventions: TEXT uuids, user FKs are TEXT to match users.id, no FOREIGN
+-- KEY constraints (account deletion is manual in delete_user()), and BOOL
+-- columns are INTEGER 0/1 so the schema is identical on SQLite and Postgres.
+CREATE TABLE IF NOT EXISTS ai_providers (
+    id                 TEXT PRIMARY KEY,
+    slug               TEXT NOT NULL UNIQUE,
+    display_name       TEXT NOT NULL,
+    adapter            TEXT NOT NULL,                -- 'openai_compat' | 'anthropic' | 'copilot'
+    base_url           TEXT,
+    env_key_name       TEXT NOT NULL,
+    is_enabled         INTEGER NOT NULL DEFAULT 1,
+    is_free_tier       INTEGER NOT NULL DEFAULT 0,
+    may_train_on_data  INTEGER NOT NULL DEFAULT 0,
+    allowed_for_minors INTEGER NOT NULL DEFAULT 1,
+    sort_order         INTEGER NOT NULL DEFAULT 0,
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS ai_models (
+    id                   TEXT PRIMARY KEY,
+    provider_id          TEXT NOT NULL,
+    model_id             TEXT NOT NULL,              -- provider-specific API id
+    display_name         TEXT NOT NULL,              -- student-friendly name
+    tier                 TEXT NOT NULL DEFAULT 'free', -- free|standard|premium
+    context_window       INTEGER NOT NULL DEFAULT 8000,
+    max_output           INTEGER NOT NULL DEFAULT 4000,
+    supports_json_mode   INTEGER NOT NULL DEFAULT 1,
+    speed                TEXT NOT NULL DEFAULT 'medium', -- fast|medium|slow
+    cost_in_per_million  REAL NOT NULL DEFAULT 0,
+    cost_out_per_million REAL NOT NULL DEFAULT 0,
+    is_enabled           INTEGER NOT NULL DEFAULT 1,
+    best_for             TEXT NOT NULL DEFAULT 'chat',
+    sort_order           INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (provider_id, model_id)
+);
+
+CREATE TABLE IF NOT EXISTS ai_user_prefs (
+    user_id            TEXT PRIMARY KEY,
+    preferred_model_id TEXT,
+    auto_mode          INTEGER NOT NULL DEFAULT 1,
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Per-user, per-day, per-model, per-feature usage accounting. Named
+-- ai_gateway_usage instead of ai_usage: the AI Hub already owns an unrelated
+-- ai_usage table (a legacy JSON blob keyed by user) that must not be clobbered.
+CREATE TABLE IF NOT EXISTS ai_gateway_usage (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    day           TEXT NOT NULL,
+    model_id      TEXT,
+    feature       TEXT NOT NULL,
+    requests      INTEGER NOT NULL DEFAULT 0,
+    input_tokens  INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    est_cost      REAL NOT NULL DEFAULT 0,
+    used_own_key  INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (user_id, day, model_id, feature, used_own_key)
+);
+
+CREATE TABLE IF NOT EXISTS ai_quota_rules (
+    id              TEXT PRIMARY KEY,
+    tier            TEXT NOT NULL,
+    user_group      TEXT NOT NULL DEFAULT 'students',
+    daily_requests  INTEGER NOT NULL DEFAULT 25,
+    daily_documents INTEGER NOT NULL DEFAULT 5,
+    daily_tokens    INTEGER NOT NULL DEFAULT 200000,
+    UNIQUE (tier, user_group)
+);
+
+-- Shared-content cache (document card generation only; never personal text
+-- such as notes, chat messages, or saved cards).
+CREATE TABLE IF NOT EXISTS ai_cache (
+    id         TEXT PRIMARY KEY,
+    cache_key  TEXT NOT NULL UNIQUE,
+    payload    TEXT NOT NULL,
+    model_id   TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    hits       INTEGER NOT NULL DEFAULT 0
+);
+
+-- Per-provider circuit-breaker / health state.
+CREATE TABLE IF NOT EXISTS ai_provider_health (
+    provider_id TEXT PRIMARY KEY,
+    state       TEXT NOT NULL DEFAULT 'closed', -- closed|open|half_open
+    failures    INTEGER NOT NULL DEFAULT 0,
+    opened_at   TEXT,
+    last_error  TEXT,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_models_provider ON ai_models (provider_id);
+CREATE INDEX IF NOT EXISTS idx_ai_gateway_usage_user ON ai_gateway_usage (user_id, day);
+CREATE INDEX IF NOT EXISTS idx_ai_cache_key ON ai_cache (cache_key);
+
 CREATE INDEX IF NOT EXISTS idx_materials_slug ON materials (slug);
 CREATE INDEX IF NOT EXISTS idx_quizzes_subject  ON quizzes (subject);
 CREATE INDEX IF NOT EXISTS idx_attempts_quiz    ON attempts (quiz_id);
@@ -738,6 +839,10 @@ def _migrate_add_columns(conn):
         conn.execute("ALTER TABLE users ADD COLUMN settings_json TEXT")
     if "google_sub" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+    if "role" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT ''")
+    if "user_group" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN user_group TEXT NOT NULL DEFAULT 'students'")
 
     if using_postgres():
         card_state_cols = {
@@ -1659,6 +1764,8 @@ def delete_user(user_id):
             "DELETE FROM stash_notes WHERE user_id = ?",
             "DELETE FROM stash_progress WHERE user_id = ?",
             "DELETE FROM stash_usage WHERE user_id = ?",
+            "DELETE FROM ai_user_prefs WHERE user_id = ?",
+            "DELETE FROM ai_gateway_usage WHERE user_id = ?",
             "DELETE FROM stash_jobs WHERE document_id IN (SELECT id FROM stash_documents WHERE user_id = ?)",
             "DELETE FROM stash_cards WHERE document_id IN (SELECT id FROM stash_documents WHERE user_id = ?)",
             "DELETE FROM stash_chunks WHERE document_id IN (SELECT id FROM stash_documents WHERE user_id = ?)",

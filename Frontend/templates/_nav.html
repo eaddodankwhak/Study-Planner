@@ -56,6 +56,10 @@
             <div class="profile-menu__links">
                 <a class="profile-menu__link" role="menuitem" href="{{ url_for('collab.workspace_list') }}">Group
                     Workspaces</a>
+                {% if is_admin %}
+                <a class="profile-menu__link{{ ' is-active' if active_nav == 'admin' else '' }}" role="menuitem"
+                    href="{{ url_for('ai_gateway_admin_page') }}">AI Gateway admin</a>
+                {% endif %}
                 <a class="profile-menu__link{{ ' is-active' if active_nav == 'settings' else '' }}" role="menuitem"
                     href="{{ url_for('settings') }}">Settings</a>
                 <a class="profile-menu__link" role="menuitem" href="{{ url_for('export_data') }}">Export my data</a>

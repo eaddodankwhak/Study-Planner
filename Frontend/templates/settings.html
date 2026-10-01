@@ -568,10 +568,11 @@
         <div class="settings-panel__header">
             <h3 class="card__title" id="ai-accounts-heading">AI accounts</h3>
         </div>
-        <p class="settings-panel__intro">Connect your own Claude, ChatGPT, Gemini, DeepSeek, or GitHub Copilot
-            account so your AI chats use your key for that model. Keys are encrypted, stored with your account, and
-            only ever sent to the provider when you send a message — they are never shown back to you or anyone
-            else.</p>
+        <p class="settings-panel__intro">You do not need an API key to use AI here — it is included with your
+            account. Connecting your own Claude, ChatGPT, Gemini, DeepSeek, or GitHub Copilot key is optional, and
+            only worth it if you would rather pay your own provider directly. Keys are encrypted, stored with your
+            account, and only ever sent to the provider when you send a message — they are never shown back to you
+            or anyone else.</p>
         {% set short_placeholders = {'anthropic': 'Paste Claude API key', 'openai': 'Paste ChatGPT (OpenAI) API key', 'google': 'Paste Gemini API key', 'deepseek': 'Paste DeepSeek API key', 'copilot': 'Paste GitHub token (Copilot chat requests)'} %}
         {% for provider, label, key_url, key_label in [
         ('anthropic','Claude','https://platform.claude.com/settings/keys','Claude API key'),
@@ -586,7 +587,7 @@
                 {% if conn %}
                 <small class="text-muted">Connected{% if conn.key_hint %} · key ends {{ conn.key_hint }}{% endif %}</small>
                 {% else %}
-                <small class="text-muted">Not connected — {{ label }} chats use the built-in assistant instead.</small>
+                <small class="text-muted">Not connected — requests for {{ label }} use the included assistant.</small>
                 {% endif %}
             </div>
             {% if conn %}
@@ -624,11 +625,12 @@
         </div>
         {% endfor %}
         <div class="settings-row">
-            <div class="settings-row__copy"><strong>How it works</strong><small>Click <strong>Connect</strong> and a
-                    new tab opens the provider's official key page — create a key there, copy it, paste it back here,
-                    and connect. <em>GitHub Copilot</em> has no API keys: create a fine-grained personal access token
-                    with the <em>Copilot requests</em> permission. Once connected, your chat uses that model family with
-                    your key, no server key needed. Disconnect anytime.</small></div>
+            <div class="settings-row__copy"><strong>How it works</strong><small>Leave this alone and AI just works on
+                    the included models. If you would rather use your own key, click <strong>Connect</strong> and a
+                    new tab opens the provider's official key page — create a key there, copy it, paste it back
+                    here, and connect. <em>GitHub Copilot</em> has no API keys: create a fine-grained personal access
+                    token with the <em>Copilot requests</em> permission. Once connected, requests for that model
+                    family use your key and no longer count against your included daily limit. Disconnect anytime.</small></div>
         </div>
     </section>
 

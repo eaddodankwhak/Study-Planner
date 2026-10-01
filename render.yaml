@@ -62,3 +62,23 @@ services:
         sync: false
       - key: STASH_KEEP_SOURCE_FILES
         sync: false
+      # AI Gateway admin console: comma-separated account emails allowed to open
+      # /admin/ai-gateway and the /api/ai-gateway/admin/* endpoints. Leave unset
+      # to disable the console entirely (it fails closed).
+      - key: AI_GATEWAY_ADMIN_EMAILS
+        sync: false
+      # Optional AI Gateway tuning (see Backend/.env.example for the full list).
+      - key: AI_GATEWAY_FREE_DAILY_REQUESTS
+        sync: false
+      - key: AI_GATEWAY_STANDARD_DAILY_REQUESTS
+        sync: false
+      - key: AI_GATEWAY_PREMIUM_DAILY_REQUESTS
+        sync: false
+      - key: AI_GATEWAY_CACHE_ENABLED
+        sync: false
+      - key: AI_GATEWAY_CIRCUIT_THRESHOLD
+        sync: false
+      - key: AI_GATEWAY_CIRCUIT_OPEN_SECONDS
+        sync: false
+      - key: AI_GATEWAY_TIMEOUT_SECONDS
+        sync: false

@@ -10,14 +10,16 @@
   "use strict";
 
   var API = "/api/ai";
+  var GATEWAY_API = "/api/ai-gateway";
   var panel = document.querySelector("[data-ai-panel]");
   if (!panel) return;
 
   var state = {
     meta: { models: [], modes: [], preferences: { model: "claude", level: "intermediate" }, usage: { used: 0, limit: 0 }, mockMode: true },
+    gateway: null,
     conversations: [],
     current: null,
-    model: "claude",
+    model: "auto",
     mode: "ask",
     streaming: false,
     material: null,
@@ -27,7 +29,8 @@
     panel: panel,
     sidebar: document.getElementById("ai-sidebar"),
     convList: document.getElementById("ai-conv-list"),
-    modelList: document.getElementById("ai-model-list"),
+    modelPicker: document.getElementById("ai-model-picker"),
+    modelNote: document.getElementById("ai-model-note"),
     mockHint: document.getElementById("ai-mock-hint"),
     modes: document.getElementById("ai-modes"),
     chat: document.getElementById("ai-chat"),
@@ -119,45 +122,127 @@
     return state.meta.models.find(function (m) { return m.id === id; }) || null;
   }
 
-  // Minimal brand-ish glyphs, one per model family. Small stroke icons in a
-  // 24px viewBox so the whole toggle group reads as a VS Code-style toolbar
-  // cluster: no text, no descriptions, just an icon + tooltip per model.
-  var MODEL_ICONS = {
-    claude: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L15.2 8.8 L21 12 L15.2 15.2 L12 21 L8.8 15.2 L3 12 L8.8 8.8 Z"/></svg>',
-    gpt: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.2" r="3.6"/><circle cx="18.8" cy="8.1" r="3.6"/><circle cx="18.8" cy="15.9" r="3.6"/><circle cx="12" cy="19.8" r="3.6"/><circle cx="5.2" cy="15.9" r="3.6"/><circle cx="5.2" cy="8.1" r="3.6"/></svg>',
-    gemini: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z"/></svg>',
-    deepseek: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5 C6 6.5 9 6.5 11.5 8.5 S17 10.5 19.5 8.5"/><path d="M3.5 15.5 C6 13.5 9 13.5 11.5 15.5 S17 17.5 19.5 15.5"/></svg>',
-    copilot: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2"/><path d="M12 12 L12 3.5 M12 12 L4.6 7.8 M12 12 L19.4 7.8"/></svg>',
-  };
+  /*
+   * Gateway model picker.
+   *
+   * The gateway is the only source of truth for which models exist, so this
+   * replaces the old hard-coded icon toolbar (which listed vendor ids the
+   * gateway never used). "Auto" is the default and is deliberately first: a
+   * student who never touches this control still gets a working assistant,
+   * because the gateway picks a healthy model for them.
+   */
+  function renderModelPicker(payload) {
+    state.gateway = payload;
+    var select = els.modelPicker;
+    if (!select) return;
+    select.innerHTML = "";
 
-  function renderModels() {
-    // Hydrate the compact icon toolbar from /api/ai/meta models.
-    els.modelList.innerHTML = "";
-    state.meta.models.forEach(function (m) {
-      var active = m.id === state.model;
-      var btn = el("button", "ai-panel__model-toggle-btn" + (active ? " is-active" : ""));
-      btn.type = "button";
-      btn.setAttribute("data-provider", m.id);
-      btn.setAttribute("aria-pressed", String(active));
-      btn.setAttribute("aria-label", m.displayName || m.id);
-      btn.title = (m.displayName || m.id) + (active ? " (active model)" : "");
-      btn.innerHTML = MODEL_ICONS[m.id] || MODEL_ICONS.gemini;
-      btn.addEventListener("click", function () {
-        setModel(m.id);
-      });
-      els.modelList.appendChild(btn);
+    var auto = el("option", null, "Auto (recommended)");
+    auto.value = "";
+    select.appendChild(auto);
+
+    var available = payload.models.filter(function (m) { return m.available; });
+    var groups = {};
+    available.forEach(function (m) {
+      (groups[m.tierLabel] = groups[m.tierLabel] || []).push(m);
     });
+    Object.keys(groups).forEach(function (label) {
+      var group = document.createElement("optgroup");
+      group.label = label;
+      groups[label].forEach(function (m) {
+        // "Your key" marks models billed to the student's own provider key
+        // instead of the quota included with the account, so an unexpected
+        // personal charge is visible before they send a message.
+        var opt = el("option", null, m.name + " · " + m.provider
+          + (m.paidBy === "personal" ? " (your key)" : ""));
+        opt.value = m.id;
+        group.appendChild(opt);
+      });
+
+      select.appendChild(group);
+    });
+
+    // Unavailable models stay visible but disabled, with the reason as the
+    // tooltip. Hiding them would make the picker silently reshuffle itself
+    // when a provider has an outage, which reads as a bug to a student.
+    var unavailable = payload.models.filter(function (m) { return !m.available; });
+    if (unavailable.length) {
+      var ug = document.createElement("optgroup");
+      ug.label = "Unavailable right now";
+      unavailable.forEach(function (m) {
+        var opt = el("option", null, m.name);
+        opt.value = m.id;
+        opt.disabled = true;
+        opt.title = m.unavailableReason || "Not available right now";
+        ug.appendChild(opt);
+      });
+      select.appendChild(ug);
+    }
+
+    select.value = payload.autoMode ? "" : (payload.preferredModelId || "");
+
+    var pinned = select.value ? findGatewayModel(select.value) : null;
+    if (els.modelNote) {
+      var note = "";
+      if (pinned) {
+        note = pinned.tierLabel + " · " + pinned.bestFor.replace(/,/g, ", ");
+      } else if (available.length === 0) {
+        note = "No AI models are available right now. Please try again shortly.";
+      } else {
+        note = "We'll pick a working model for you.";
+      }
+      els.modelNote.textContent = note;
+      els.modelNote.hidden = !note;
+    }
+  }
+
+  function findGatewayModel(id) {
+    if (!state.gateway) return null;
+    var found = state.gateway.models.filter(function (m) { return m.id === id; });
+    return found.length ? found[0] : null;
+  }
+
+  /*
+   * What to print under an answer. Students should never see a vendor model
+   * id: in auto mode the gateway chose, so the honest label is the name of
+   * whatever it picked, and failing that we say "Auto".
+   */
+  function friendlyModelName() {
+    if (state.model && state.model !== "auto") {
+      var pinned = findGatewayModel(state.model);
+      if (pinned) return pinned.name;
+    }
+    if (state.gateway && state.gateway.autoMode) {
+      var usable = state.gateway.models.filter(function (m) { return m.available; });
+      if (usable.length) return usable[0].name;
+    }
+    return "Auto";
+  }
+
+  function loadGatewayModels() {
+    return fetch(GATEWAY_API + "/models", { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        renderModelPicker(data);
+        renderUsage(data.usage);
+      })
+      .catch(function () { /* the panel still works without the picker */ });
   }
 
   function setModel(id) {
-    state.model = id;
-    renderModels();
-    if (state.current) {
-      api("/conversations/" + state.current.id, { method: "PATCH", body: { model: id } }).then(function () {
-        state.current.model = id;
-      }).catch(function () { });
-    }
-    api("/preferences", { method: "PUT", body: { model: id } }).catch(function () { });
+    // An empty id means auto mode: the gateway chooses. Persisted server-side
+    // so the choice survives a reload, a new conversation and a new device.
+    state.model = id || "auto";
+    renderModelPicker(state.gateway);
+    fetch(GATEWAY_API + "/models", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(id ? { modelId: id, autoMode: false } : { autoMode: true }),
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) { if (data) renderUsage(data.usage); })
+      .catch(function () { });
   }
 
   // ------------------------------------------------------------- modes
@@ -244,10 +329,11 @@
     api("/conversations/" + id)
       .then(function (d) {
         state.current = d.conversation;
-        state.model = state.current.model || state.model;
+        // The model is deliberately NOT restored from the conversation: the
+        // gateway preference is a single account-wide choice, so switching
+        // conversations must not silently change the model under the student.
         state.mode = state.current.mode || state.mode;
         els.title.textContent = state.current.title;
-        renderModels();
         renderModes();
         renderChatFromMessages(state.current.messages || []);
         renderConvList();
@@ -441,12 +527,15 @@
         var m = aiMsgNode.querySelector(".ai-msg__meta");
         m.textContent = "";
         m.appendChild(aiTag());
-        m.appendChild(document.createTextNode(payload.model || state.model));
+        m.appendChild(document.createTextNode(payload.model || friendlyModelName()));
         addFollowUps(aiMsgNode);
         loadConversations();
       } else {
         aiMsgNode.remove();
       }
+      // One request was just spent, so pull the real number rather than
+      // incrementing a local guess.
+      refreshUsage();
       scrollBottom();
     }
 
@@ -559,33 +648,44 @@
 
   // ------------------------------------------------------------------ usage
 
-  function renderUsage(m) {
-    state.meta = m;
-    var used = m.usage.used;
-    var limit = m.usage.limit;
-    var isUnlimited = limit === 0;
+  /*
+   * Quota meter, fed by the gateway (real server-side numbers) rather than
+   * the AI Hub's placeholder counter. A null limit means "no cap configured",
+   * which is shown as an unlimited state instead of a divide-by-zero.
+   */
+  function renderUsage(usage) {
+    if (!els.usage || !usage) return;
+    var used = usage.requestsUsed || 0;
+    var limit = usage.requestsLimit;
+    var isUnlimited = !limit;
     var pct = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
     els.usage.innerHTML = "";
-    var label = el("span", "ai-panel__quota-label", "AI requests today: " + used + " of " + (isUnlimited ? "∞" : limit));
+
+    var text = isUnlimited
+      ? "AI requests today: " + used
+      : "AI requests today: " + used + " of " + limit;
+    var label = el("span", "ai-panel__quota-label", text);
+    if (!isUnlimited && used >= limit) {
+      label.classList.add("ai-panel__quota-label--spent");
+    }
+
     var bar = el("div", "ai-panel__quota-track");
     bar.setAttribute("role", "progressbar");
     bar.setAttribute("aria-valuemin", "0");
-    bar.setAttribute("aria-valuemax", String(isUnlimited ? 1 : limit));
-    bar.setAttribute("aria-valuenow", String(isUnlimited ? 0 : used));
+    bar.setAttribute("aria-valuemax", String(isUnlimited ? Math.max(1, used) : limit));
+    bar.setAttribute("aria-valuenow", String(used));
+    bar.setAttribute("aria-label", text);
     var fill = el("div", "ai-panel__quota-fill" + (pct >= 90 ? " ai-panel__quota-fill--warn" : ""));
-    fill.style.width = pct + "%";
+    fill.style.width = (isUnlimited ? 100 : pct) + "%";
     bar.appendChild(fill);
     els.usage.append(label, bar);
+  }
 
-    if (els.mockHint) {
-      var model = findModel(state.model) || {};
-      var keyEnv = { claude: "anthropic", gpt: "openai", gemini: "google", deepseek: "deepseek", copilot: "copilot" }[model.id];
-      var connected = (state.meta.connections || []).some(function (c) { return c.provider === keyEnv; });
-      var serverKeyed = (state.meta.serverKeys || []).indexOf(keyEnv) >= 0;
-      els.mockHint.hidden = false;
-      els.mockHint.textContent = connected ? "connected to your account"
-        : serverKeyed ? "server-provided" : "connect your account";
-    }
+  function refreshUsage() {
+    return fetch(GATEWAY_API + "/usage", { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) { if (data) renderUsage(data); })
+      .catch(function () { });
   }
 
   // ------------------------------------------------------------------ init
@@ -603,6 +703,11 @@
     });
     els.input.addEventListener("input", autosize);
     els.send.addEventListener("click", function () { sendMessage(); });
+    if (els.modelPicker) {
+      els.modelPicker.addEventListener("change", function () {
+        setModel(els.modelPicker.value);
+      });
+    }
     els.newConv.addEventListener("click", createConversation);
     els.clearConv.addEventListener("click", function () {
       if (!state.current) return;
@@ -646,11 +751,13 @@
 
     api("/meta")
       .then(function (m) {
-        renderUsage(m);
-        state.model = m.preferences.model || "claude";
+        // The AI Hub's own meta still drives the task modes and the
+        // conversation list; models and quota now come from the gateway.
         state.mode = "ask";
-        renderModels();
         renderModes();
+        // Kick off in parallel: neither blocks the other, and a picker failure
+        // must not stop the chat from loading.
+        loadGatewayModels();
         return loadConversations();
       })
       .then(function () {

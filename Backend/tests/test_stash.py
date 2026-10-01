@@ -19,6 +19,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 os.environ.setdefault("STASH_DISABLE_WORKER", "1")
 os.environ.setdefault("DATABASE_PATH", os.path.join(tempfile.mkdtemp(), "stash-test.db"))
@@ -34,6 +35,7 @@ db.init_db()
 
 from app import app  # noqa: E402
 import ai.models as model_registry  # noqa: E402
+from ai_gateway import errors as gw_errors  # noqa: E402
 from stash import quiz, repository, schemas, security, service  # noqa: E402
 from stash.ai import client, validator  # noqa: E402
 from stash.parsing import build_structure, parse_document  # noqa: E402
@@ -204,7 +206,7 @@ class StashTestBase(unittest.TestCase):
             "paid_by": paid_by,
         }
         client._generate_json = (
-            lambda provider, model_id, user_prompt, describe="": (
+            lambda uid, generation, user_prompt, describe="": (
                 (int(fake.usage["inputTokens"]), int(fake.usage["outputTokens"])),
                 fake.reply(user_prompt),
             )
@@ -780,6 +782,99 @@ class StashUploadTest(StashTestBase):
         html = c.get("/stash/upload").get_data(as_text=True)
         self.assertIn("Stash needs an AI key", html)
         self.assertIn('data-max-mb="50"', html)
+
+
+class StashGatewayRoutingTest(StashTestBase):
+    """Stash must reach models only through the gateway, never a provider."""
+
+    def _generation(self, paid_by="server"):
+        model = dict(model_registry.get_model("claude"))
+        return {
+            "provider": object(),  # unused once routing goes through the gateway
+            "provider_id": "anthropic",
+            "model": model,
+            "model_id": model["model_id"],
+            "paid_by": paid_by,
+        }
+
+    def test_generate_chunk_cards_routes_through_gateway(self):
+        generation = self._generation()
+        captured = {}
+
+        def fake_generate_json(user_id, schema, prompt, **kwargs):
+            captured["user_id"] = user_id
+            captured["schema"] = schema
+            captured["model"] = kwargs.get("model")
+            captured["feature"] = kwargs.get("feature")
+            captured["with_meta"] = kwargs.get("with_meta")
+            return {
+                "data": {"cards": [_ok_card(
+                    "Mitosis",
+                    "Mitosis is the process by which a single cell divides into "
+                    "two genetically identical daughter cells ensuring growth.",
+                )]},
+                "model": {"provider_slug": "anthropic", "model_id": "claude-sonnet-4-5"},
+                "provider": {"slug": "anthropic"},
+                "paid_by": "personal",
+                "cached": False,
+                "usage": {"inputTokens": 321, "outputTokens": 123},
+            }
+
+        document = {"title": "Biology", "page_count": 6}
+        section = {"id": "s1", "title": "Chapter One"}
+        chunk = {"id": "c1", "text": (
+            "Mitosis is the process by which a single cell divides into two "
+            "genetically identical daughter cells ensuring growth and repair "
+            "across the whole body over time."
+        )}
+
+        with mock.patch("ai_gateway.gateway.generate_json", side_effect=fake_generate_json):
+            cards, (tin, tout) = client.generate_chunk_cards(
+                self.UID_A, generation, document, section, chunk
+            )
+
+        self.assertEqual(captured["user_id"], self.UID_A)
+        self.assertEqual(captured["model"], "anthropic/claude-sonnet-4-5")
+        self.assertEqual(captured["feature"], "cards")
+        self.assertIs(captured["schema"], schemas.CARDS_SCHEMA)
+        self.assertTrue(captured["with_meta"])
+        self.assertEqual((tin, tout), (321, 123))
+        # The funding the gateway reports wins over the resolve-time estimate.
+        self.assertEqual(generation["paid_by"], "personal")
+        self.assertTrue(cards)
+        self.assertEqual(cards[0]["title"], "Mitosis")
+
+    def test_gateway_privacy_block_surfaces_as_stash_error(self):
+        generation = self._generation()
+
+        def boom(user_id, schema, prompt, **kwargs):
+            raise gw_errors.AIDisabledError(
+                "AI activity is turned off in your privacy settings."
+            )
+
+        with mock.patch("ai_gateway.gateway.generate_json", side_effect=boom):
+            with self.assertRaises(client.PrivacyBlockedError):
+                client._generate_json(self.UID_A, generation, "prompt")
+
+    def test_gateway_quota_block_surfaces_as_daily_limit(self):
+        generation = self._generation()
+
+        def boom(user_id, schema, prompt, **kwargs):
+            raise gw_errors.QuotaExceededError("Daily AI budget spent.")
+
+        with mock.patch("ai_gateway.gateway.generate_json", side_effect=boom):
+            with self.assertRaises(client.DailyLimitError):
+                client._generate_json(self.UID_A, generation, "prompt")
+
+    def test_gateway_no_provider_surfaces_as_no_provider(self):
+        generation = self._generation()
+
+        def boom(user_id, schema, prompt, **kwargs):
+            raise gw_errors.NoProviderAvailableError("No provider.")
+
+        with mock.patch("ai_gateway.gateway.generate_json", side_effect=boom):
+            with self.assertRaises(client.NoProviderError):
+                client._generate_json(self.UID_A, generation, "prompt")
 
 
 if __name__ == "__main__":

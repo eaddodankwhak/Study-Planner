@@ -313,50 +313,46 @@ body.ai-drawer-open .ai-launcher {
   gap: var(--space-3);
 }
 
-/* Icon-only model toggle group — VS Code title-bar style: a recessed cluster
-   of small square buttons with hairline dividers. No dropdown, no description
-   text, no cards — the whole control sits inline in the header toolbar. */
-.ai-panel__model-toggle {
+/* Model picker: one compact select in the header toolbar.
+   The gateway owns the model list, so this stays a single control rather than
+   a row of per-vendor buttons — a growing provider roster should not turn the
+   header into a wall of icons. */
+.ai-panel__picker {
   display: inline-flex;
   align-items: center;
-  padding: 2px;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ai-panel__picker-label {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.ai-panel__picker-select {
+  max-width: 15rem;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--color-text);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-}
-
-.ai-panel__model-icons {
-  display: inline-flex;
-  align-items: center;
-}
-
-.ai-panel__model-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: calc(var(--radius-sm) - 1px);
-  background: transparent;
-  color: var(--color-muted);
   cursor: pointer;
 }
 
-.ai-panel__model-toggle-btn + .ai-panel__model-toggle-btn {
-  border-left: 1px solid var(--color-border);
+.ai-panel__picker-select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
-.ai-panel__model-toggle-btn:hover {
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.ai-panel__model-toggle-btn.is-active,
-.ai-panel__model-toggle-btn:active {
-  background: var(--color-primary-light);
-  color: var(--color-text-inverse);
+/* One line of context under the header: what the gateway picked, or why
+   nothing is available. Status only, never a call to action. */
+.ai-panel__note {
+  margin: 0;
+  padding: 0 var(--space-6) var(--space-2);
+  font-size: 0.78rem;
+  color: var(--color-muted);
 }
 
 .ai-panel__mock {
@@ -733,7 +729,6 @@ body.ai-drawer-open .ai-launcher {
 .ai-send:focus-visible,
 .ai-conv-link:focus-visible,
 .ai-iconbtn:focus-visible,
-.ai-panel__model-toggle-btn:focus-visible,
 .ai-launcher:focus-visible,
 .ai-newchat:focus-visible {
   outline: 2px solid var(--color-accent);

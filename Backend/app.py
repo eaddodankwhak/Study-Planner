@@ -39,8 +39,10 @@ import google_auth
 import planner
 import stats
 import ai as ai_pkg
+import ai_gateway as ai_gateway_pkg
 import collaboration as collab_pkg
 import stash as stash_pkg
+from ai_gateway.config import is_admin_email
 
 # Ensure tables and any lightweight migrations (e.g. notify_digest) exist.
 db.init_db()
@@ -127,6 +129,17 @@ app.jinja_env.globals["course_url"] = courses_mod.course_url
 # Register the AI Learning Hub API blueprint.
 app.register_blueprint(ai_pkg.get_ai_blueprint())
 
+# Register the AI Gateway's student-facing endpoints (model picker, usage
+# meter, saved preference). The gateway is a library first and a web surface
+# second: this is the only place a browser talks to it.
+app.register_blueprint(ai_gateway_pkg.get_gateway_blueprint())
+
+# Register the AI Gateway's admin console API (provider/model registry, quota
+# rules, circuit-breaker health). Gated by the AI_GATEWAY_ADMIN_EMAILS
+# allow-list, which is empty by default, so no account is an admin unless the
+# deployment names one.
+app.register_blueprint(ai_gateway_pkg.get_admin_blueprint())
+
 # Register the Collaborative Workspace blueprint.
 app.register_blueprint(collab_pkg.get_collaboration_blueprint())
 
@@ -155,6 +168,15 @@ AI_PROVIDERS = [
     {"id": "gpt", "name": "GPT", "tagline": "Versatile general-purpose study assistant."},
     {"id": "gemini", "name": "Gemini", "tagline": "Great for multimodal and broad study tasks."},
 ]
+
+
+def _is_admin():
+    """True when the signed-in account is on the gateway admin allow-list."""
+    uid = session.get("user_id")
+    if not uid:
+        return False
+    user = db.get_user(uid) or {}
+    return is_admin_email(user.get("email"))
 
 
 @app.context_processor
@@ -188,6 +210,7 @@ def inject_ai_launcher():
         "quick_actions": quick_actions,
         "providers": AI_PROVIDERS,
         "user_settings": db.get_settings(session["user_id"]) if session.get("user_id") else None,
+        "is_admin": _is_admin(),
     }
 
 
@@ -2163,6 +2186,23 @@ def ai_hub():
     point; this route just lets someone pin the AI to a full browser tab.
     """
     return render_template("ai_hub.html", user=current_user())
+
+
+@app.get("/admin/ai-gateway")
+@login_required
+def ai_gateway_admin_page():
+    """Admin console for the AI Gateway (providers, models, quotas, health).
+
+    A non-admin is redirected Home rather than shown a forbidden page: the link
+    is never offered to them, and confirming the route exists tells a student
+    nothing useful. The API endpoints still answer 403 on their own, so this is
+    ergonomics, not the security boundary.
+    """
+    if not _is_admin():
+        return redirect(url_for("home"))
+    return render_template(
+        "admin/ai_gateway.html", user=current_user(), active_nav="admin"
+    )
 
 
 # ---------------------------------------------------------------------------
