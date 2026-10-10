@@ -7,8 +7,8 @@ their academic life.
 
 ## Features
 
-- **Welcome splash** — opening the app always shows the `welcome` landing (a two-slide intro), with
-  a dynamic CTA: *Start* for new users, *Go to dashboard* for returning ones.
+- **Welcome splash** — opening the app shows a responsive landing page with clear paths to sign up,
+  sign in, or return to the planner.
 - **Authentication** — sign up, log in, and log out with stored (hashed) passwords.
 - **Onboarding wizard** — a short flow (`school`, `program`, `courses`, `goals`, `available_hours`)
   on `/onboarding`; `available_hours` is used for planning estimates.
@@ -113,7 +113,7 @@ Or just double-click `run.bat` from the project root — it starts the server an
 Then:
 
 1. The app opens on the **welcome** splash.
-2. Click **Start** and create an account.
+2. Choose **Build my study plan** to create an account, or **Sign in** if you already have one.
 3. Complete the **onboarding** wizard with your school, program, courses, goals and daily availability.
 4. Land on your **dashboard** (`/dashboard`) and click any subject card to explore it, or use the
    **Courses / Calendar / Deadlines / Tasks / Progress** links to plan your work.

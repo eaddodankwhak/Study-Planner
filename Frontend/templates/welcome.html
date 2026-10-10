@@ -4,207 +4,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome — My Study Planner</title>
+    <meta name="theme-color" content="#10172f">
+    <title>Study Planner — Make space for what matters</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/welcome.css') }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon-64.png') }}">
-    <style>
-        .welcome {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            isolation: isolate;
-            background: linear-gradient(180deg, rgba(7, 33, 48, 0.86), rgba(7, 33, 48, 0.72)),
-            url("{{ url_for('static', filename='images/woman-8601818_1280.jpg') }}") center / cover no-repeat;
-            color: var(--color-text-inverse);
-            font-family: var(--font-sans);
-            overflow: hidden;
-        }
-
-        .welcome__scene,
-        .welcome__scrim {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        .welcome__scene {
-            z-index: 0;
-            background: radial-gradient(circle at 72% 32%, rgba(113, 170, 205, 0.25), transparent 38%),
-                linear-gradient(135deg, #0a2c3e, #102b4b 48%, #123d50);
-        }
-
-        .welcome__scrim {
-            z-index: 1;
-            background: linear-gradient(90deg, rgba(7, 33, 48, 0.92) 0%, rgba(7, 33, 48, 0.76) 52%, rgba(7, 33, 48, 0.58) 100%);
-        }
-
-        .welcome__slide {
-            position: relative;
-            z-index: 2;
-            max-width: 44rem;
-            margin: 0 1.5rem;
-            text-align: center;
-            padding: var(--space-8);
-            background: rgba(7, 33, 48, 0.55);
-            border: 1px solid rgb(255 255 255 / 0.25);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-md);
-            backdrop-filter: blur(6px);
-        }
-
-        .welcome__brand {
-            font-size: 0.85rem;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            color: var(--color-accent);
-            margin-bottom: var(--space-2);
-        }
-
-        .welcome__logo {
-            display: inline-block;
-            max-width: 15rem;
-            height: auto;
-            margin-bottom: var(--space-3);
-            border-radius: var(--radius-sm);
-            box-shadow: var(--shadow-md);
-        }
-
-        .welcome__title {
-            font-size: clamp(2rem, 5vw, 3rem);
-            line-height: 1.15;
-            margin: 0 0 var(--space-4);
-        }
-
-        .welcome__text {
-            font-size: 1.1rem;
-            line-height: 1.6;
-            opacity: 0.95;
-            margin: 0 auto var(--space-8);
-            max-width: 34rem;
-        }
-
-        .welcome__features {
-            list-style: none;
-            margin: 0 auto var(--space-8);
-            padding: 0;
-            max-width: 30rem;
-            text-align: left;
-        }
-
-        .welcome__features li {
-            display: flex;
-            gap: var(--space-3);
-            align-items: flex-start;
-            padding: var(--space-2) 0;
-            border-bottom: 1px solid rgb(255 255 255 / 0.15);
-        }
-
-        .welcome__features li::before {
-            content: "✓";
-            color: var(--color-accent);
-            font-weight: 700;
-            flex-shrink: 0;
-        }
-
-        .welcome .button {
-            min-width: 10rem;
-        }
-
-        .welcome__dots {
-            display: flex;
-            gap: var(--space-2);
-            justify-content: center;
-            margin-top: var(--space-6);
-        }
-
-        .welcome__dot {
-            width: 0.5rem;
-            height: 0.5rem;
-            border-radius: 999px;
-            background: rgb(255 255 255 / 0.4);
-            border: none;
-            cursor: pointer;
-        }
-
-        .welcome__dot.is-active {
-            background: var(--color-accent);
-        }
-    </style>
 </head>
 
-<body>
+<body class="welcome-page">
     {% include '_toast.html' %}
-    <main class="welcome" id="welcome">
-        <canvas class="welcome__scene" data-hero-scene aria-hidden="true"></canvas>
-        <div class="welcome__scrim" aria-hidden="true"></div>
-        <!-- Slide 1: Welcome hero -->
-        <section class="welcome__slide" id="slide-1">
-            <img class="welcome__logo" src="{{ url_for('static', filename='img/logo.png') }}"
-                alt="My Study Planner">
-            <h1 class="welcome__title">Welcome to<br>My Study Planner</h1>
-            <p class="welcome__text">
-                Your personal companion for turning busy school days into a clear,
-                achievable study routine.
-            </p>
-            <button type="button" class="button button--primary" id="next-btn">Next</button>
-            <div class="welcome__dots" role="group" aria-label="Welcome slides">
-                <button class="welcome__dot is-active" type="button" data-slide="1" aria-label="Show welcome slide"
-                    aria-current="true"></button>
-                <button class="welcome__dot" type="button" data-slide="2" aria-label="Show feature slide"></button>
+    <a class="welcome-skip" href="#main-content">Skip to main content</a>
+
+    <header class="welcome-nav">
+        <a class="welcome-brand" href="{{ url_for('landing') }}" aria-label="Study Planner home">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="">
+            <span>Study Planner</span>
+        </a>
+        <nav class="welcome-nav__actions" aria-label="Account">
+            {% if user %}
+                <span class="welcome-nav__greeting">Welcome back, {{ user.display_name or user.name or 'Student' }}</span>
+                <a class="welcome-nav__link welcome-nav__link--button" href="{{ url_for('home') }}">Open my planner <span aria-hidden="true">&rarr;</span></a>
+            {% else %}
+                <span class="welcome-nav__prompt">Already have an account?</span>
+                <a class="welcome-nav__link" href="{{ url_for('login') }}">Sign in</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main id="main-content" class="welcome-main">
+        <section class="welcome-hero" aria-labelledby="welcome-title">
+            <canvas class="welcome-hero__scene" data-hero-scene aria-hidden="true"></canvas>
+            <div class="welcome-hero__glow welcome-hero__glow--one" aria-hidden="true"></div>
+            <div class="welcome-hero__glow welcome-hero__glow--two" aria-hidden="true"></div>
+
+            <div class="welcome-hero__copy">
+                <p class="welcome-eyebrow"><span class="welcome-eyebrow__spark" aria-hidden="true">✦</span> A calmer way to study</p>
+                <h1 id="welcome-title">Big goals.<br><span>Clear next steps.</span></h1>
+                <p class="welcome-hero__description">
+                    Bring your courses, deadlines, and study sessions together.
+                    Make a plan that fits your life — and feel good about moving forward.
+                </p>
+                <div class="welcome-hero__actions">
+                    {% if user %}
+                        <a class="welcome-button welcome-button--primary" href="{{ url_for('home') }}">Go to my planner <span aria-hidden="true">&rarr;</span></a>
+                        <a class="welcome-button welcome-button--quiet" href="#features">See what you can do</a>
+                    {% else %}
+                        <a class="welcome-button welcome-button--primary" href="{{ url_for('signup') }}">Build my study plan <span aria-hidden="true">&rarr;</span></a>
+                        <a class="welcome-button welcome-button--quiet" href="{{ url_for('login') }}">I already have an account</a>
+                    {% endif %}
+                </div>
+                <p class="welcome-hero__note"><span aria-hidden="true">✓</span> Your courses. Your pace. Your plan.</p>
+            </div>
+
+            <div class="welcome-hero__visual">
+                <img
+                    class="welcome-hero__image"
+                    src="{{ url_for('static', filename='images/woman-8601818_1280.jpg') }}"
+                    alt="A student focused on her notes at a desk"
+                    fetchpriority="high">
+                <div class="welcome-visual__wash" aria-hidden="true"></div>
+                <aside class="planner-preview" aria-label="A preview of your study planner">
+                    <div class="planner-preview__top">
+                        <div>
+                            <span class="planner-preview__overline">YOUR WEEK, AT A GLANCE</span>
+                            <h2>A little progress adds up.</h2>
+                        </div>
+                        <span class="planner-preview__spark" aria-hidden="true">✦</span>
+                    </div>
+                    <div class="planner-preview__task">
+                        <span class="planner-preview__check" aria-hidden="true">✓</span>
+                        <span><strong>Review lecture notes</strong><small>Biology · 25 min</small></span>
+                        <span class="planner-preview__tag">UP NEXT</span>
+                    </div>
+                    <div class="planner-preview__task planner-preview__task--muted">
+                        <span class="planner-preview__check planner-preview__check--empty" aria-hidden="true"></span>
+                        <span><strong>Practice problem set</strong><small>Statistics · 40 min</small></span>
+                    </div>
+                    <div class="planner-preview__footer"><span>Made for real student life</span><span aria-hidden="true">✦</span></div>
+                </aside>
+                <span class="welcome-visual__badge"><span aria-hidden="true">✦</span> Find your focus</span>
             </div>
         </section>
 
-        <!-- Slide 2: What the app does -->
-        <section class="welcome__slide" id="slide-2" hidden>
-            <p class="welcome__brand">What you'll get</p>
-            <h1 class="welcome__title">Study smarter, every day</h1>
-            <ul class="welcome__features">
-                <li>Organize your courses and program in one place</li>
-                <li>Get a study routine built around your own school, courses and goals</li>
-                <li>Track your progress and stay on top of every subject</li>
-                <li>Collaborate with classmates and share materials and quizzes</li>
-            </ul>
-            <a class="button button--primary" href="{{ url_for('home') if user else url_for('signup') }}">{{ 'Go to
-                dashboard' if user else 'Start' }}</a>
-            <div class="welcome__dots" role="group" aria-label="Welcome slides">
-                <button class="welcome__dot" type="button" data-slide="1" aria-label="Show welcome slide"></button>
-                <button class="welcome__dot is-active" type="button" data-slide="2" aria-label="Show feature slide"
-                    aria-current="true"></button>
-            </div>
+        <section class="welcome-features" id="features" aria-label="Study Planner features">
+            <article class="welcome-feature">
+                <span class="welcome-feature__icon welcome-feature__icon--blue" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4m8-4v4M4 10h16m-11 4h3m-3 3h6"/></svg>
+                </span>
+                <div><h2>Everything in one place</h2><p>Keep courses, notes, and deadlines within easy reach.</p></div>
+            </article>
+            <article class="welcome-feature">
+                <span class="welcome-feature__icon welcome-feature__icon--violet" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M4 18.5V14m5 4.5V9m5 9.5V5m5 13.5v-7"/><path d="M3 21h18"/></svg>
+                </span>
+                <div><h2>A plan that feels doable</h2><p>Shape a study routine around your goals and time.</p></div>
+            </article>
+            <article class="welcome-feature">
+                <span class="welcome-feature__icon welcome-feature__icon--orange" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 3.5 14.6 9l5.9.8-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.2 5.9-.8L12 3.5Z"/></svg>
+                </span>
+                <div><h2>Progress worth celebrating</h2><p>See what you have finished and choose your next step.</p></div>
+            </article>
         </section>
+
+        <footer class="welcome-footer">
+            <span>Made for your next chapter.</span>
+            <a href="#features">Explore the features <span aria-hidden="true">&uarr;</span></a>
+        </footer>
     </main>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
     <script src="{{ url_for('static', filename='js/hero-scene.js') }}"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const slide1 = document.getElementById('slide-1');
-            const slide2 = document.getElementById('slide-2');
-            const dots = document.querySelectorAll('.welcome__dot');
-
-            function showSlide(n) {
-                slide1.hidden = n !== 1;
-                slide2.hidden = n !== 2;
-                dots.forEach((d) => {
-                    const active = Number(d.dataset.slide) === n;
-                    d.classList.toggle('is-active', active);
-                    if (active) {
-                        d.setAttribute('aria-current', 'true');
-                    } else {
-                        d.removeAttribute('aria-current');
-                    }
-                });
-            }
-
-            document.getElementById('next-btn').addEventListener('click', () => showSlide(2));
-            dots.forEach((d) => d.addEventListener('click', () => showSlide(Number(d.dataset.slide))));
-        });
-    </script>
 </body>
 
 </html>
