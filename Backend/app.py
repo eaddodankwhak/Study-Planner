@@ -30,6 +30,7 @@ from flask import (
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 import collab
@@ -871,53 +872,93 @@ def settings_preferences():
 @app.post("/settings/avatar")
 @login_required
 def settings_avatar():
-    """Store a small profile image locally; replace/remove is immediately visible."""
+    """Store a small profile image; replace/remove is immediately visible."""
     user = current_user()
     uploaded = request.files.get("avatar")
     remove = request.form.get("remove") == "1"
     if remove:
-        # Delete the bytes too, not just the pointer, so a removed photo stops
-        # taking up storage.
         old = user.get("avatar_path")
-        if old:
-            storage.delete(storage.profile_key(user["id"], _avatar_ext(old)))
-        db.update_user(user["id"], {"avatar_path": None})
+        try:
+            db.update_user(user["id"], {"avatar_path": None})
+            if old:
+                storage.delete(storage.profile_key(user["id"], _avatar_ext(old)))
+        except Exception:
+            app.logger.exception("Could not remove profile photo for user %s", user["id"])
+            flash("We couldn't completely remove your profile photo. Please try again.", "error")
+            return redirect(url_for("settings"))
         flash("Profile photo removed.", "success")
         return redirect(url_for("settings"))
     if not uploaded or not uploaded.filename:
         flash("Choose an image first.", "error")
         return redirect(url_for("settings"))
-    if uploaded.mimetype not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+    extension_by_type = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/gif": "gif",
+        "image/webp": "webp",
+    }
+    if uploaded.mimetype not in extension_by_type:
         flash("Please choose a JPG, PNG, GIF, or WebP image.", "error")
         return redirect(url_for("settings"))
     uploaded.stream.seek(0, os.SEEK_END)
     size = uploaded.stream.tell()
     uploaded.stream.seek(0)
+    if size == 0:
+        flash("That image is empty. Please choose another photo.", "error")
+        return redirect(url_for("settings"))
     if size > MAX_PROFILE_IMAGE_BYTES:
         flash("That image is larger than 5 MB. Please choose a smaller file.", "error")
         return redirect(url_for("settings"))
-    extension = secure_filename(uploaded.filename).rsplit(".", 1)[-1].lower() if "." in uploaded.filename else {
-        "image/jpeg": "jpg",
-        "image/png": "png",
-        "image/gif": "gif",
-        "image/webp": "webp",
-    }[uploaded.mimetype]
+    extension = extension_by_type[uploaded.mimetype]
+    content = uploaded.stream.read()
+    signatures = {
+        "image/jpeg": lambda data: data.startswith(b"\xff\xd8\xff"),
+        "image/png": lambda data: data.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/gif": lambda data: data.startswith((b"GIF87a", b"GIF89a")),
+        "image/webp": lambda data: (
+            len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP"
+        ),
+    }
+    if not signatures[uploaded.mimetype](content):
+        flash("We couldn't read that file as an image. Please choose a valid JPG, PNG, GIF, or WebP photo.", "error")
+        return redirect(url_for("settings"))
     filename = f"{user['id']}.{extension}"
-    # Drop any previous photo stored under a different extension, otherwise
-    # changing a .png to a .jpg leaves the old bytes behind.
     previous = user.get("avatar_path")
+    try:
+        storage.save(
+            storage.profile_key(user["id"], extension),
+            content,
+            user_id=user["id"],
+            filename=filename,
+            content_type=uploaded.mimetype,
+        )
+        db.update_user(user["id"], {"avatar_path": filename})
+    except Exception:
+        app.logger.exception("Could not save profile photo for user %s", user["id"])
+        if not previous or previous != filename:
+            try:
+                storage.delete(storage.profile_key(user["id"], extension))
+            except Exception:
+                app.logger.exception("Could not clean up failed profile photo upload for user %s", user["id"])
+        flash("We couldn't save your profile photo. Please try again.", "error")
+        return redirect(url_for("settings"))
     if previous and previous != filename:
-        storage.delete(storage.profile_key(user["id"], _avatar_ext(previous)))
-    storage.save(
-        storage.profile_key(user["id"], extension),
-        uploaded.stream.read(),
-        user_id=user["id"],
-        filename=filename,
-        content_type=uploaded.mimetype,
-    )
-    db.update_user(user["id"], {"avatar_path": filename})
+        try:
+            storage.delete(storage.profile_key(user["id"], _avatar_ext(previous)))
+        except Exception:
+            app.logger.exception("Could not clean up replaced profile photo for user %s", user["id"])
+            flash("Your new photo was saved, but we couldn't clean up the previous photo.", "error")
+            return redirect(url_for("settings"))
     flash("Profile photo updated.", "success")
     return redirect(url_for("settings"))
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_too_large(error):
+    if request.path == "/settings/avatar":
+        flash("That image is larger than 5 MB. Please choose a smaller file.", "error")
+        return redirect(url_for("settings"))
+    return error
 
 
 def _avatar_ext(filename):

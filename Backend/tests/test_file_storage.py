@@ -12,10 +12,12 @@ its own session, and a read through a brand-new storage handle -- rather than by
 re-importing the app, which would still share one SQLite file.
 """
 
+import html
 import io
 import os
 import sys
 import unittest
+from unittest import mock
 
 os.environ.setdefault(
     "DATABASE_PATH", os.path.join(os.path.expanduser("~"), "file-storage-test.db")
@@ -249,6 +251,63 @@ class CrossDeviceTest(_Base):
         got = device_b.get(f"/profile/avatar/{UID}.png")
         self.assertEqual(got.status_code, 200)
         self.assertEqual(got.data, PNG_BYTES)
+
+    def test_avatar_upload_uses_a_clear_error_for_unsupported_files(self):
+        response = self._client(UID).post(
+            "/settings/avatar",
+            data={"avatar": (io.BytesIO(b"not an image"), "notes.txt")},
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Please choose a JPG, PNG, GIF, or WebP image.", response.data)
+        self.assertIsNone(db.get_user(UID)["avatar_path"])
+
+    def test_avatar_upload_rejects_empty_or_invalid_images_with_clear_errors(self):
+        client = self._client(UID)
+        for content, filename, message in (
+            (b"", "empty.png", b"That image is empty."),
+            (b"not really a PNG", "broken.png", b"read that file as an image"),
+        ):
+            with self.subTest(filename=filename):
+                response = client.post(
+                    "/settings/avatar",
+                    data={"avatar": (io.BytesIO(content), filename)},
+                    content_type="multipart/form-data",
+                    follow_redirects=True,
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(message, response.data)
+                self.assertIsNone(db.get_user(UID)["avatar_path"])
+
+    def test_avatar_upload_rejects_images_over_five_megabytes(self):
+        response = self._client(UID).post(
+            "/settings/avatar",
+            data={"avatar": (io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"x" * (5 * 1024 * 1024)), "large.png")},
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"That image is larger than 5 MB.", response.data)
+        self.assertIsNone(db.get_user(UID)["avatar_path"])
+
+    def test_avatar_upload_reports_storage_failures_without_exposing_details(self):
+        db.update_user(UID, {"onboarded": 1})
+        with mock.patch.object(storage, "save", side_effect=OSError("storage unavailable")):
+            response = self._client(UID).post(
+                "/settings/avatar",
+                data={"avatar": (io.BytesIO(PNG_BYTES), "me.png")},
+                content_type="multipart/form-data",
+                follow_redirects=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        rendered_text = html.unescape(response.get_data(as_text=True))
+        self.assertIn("We couldn't save your profile photo. Please try again.", rendered_text)
+        self.assertNotIn("storage unavailable", rendered_text)
+        self.assertIsNone(db.get_user(UID)["avatar_path"])
 
     def test_avatar_survives_logout_and_login(self):
         import app as app_module

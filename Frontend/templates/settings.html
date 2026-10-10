@@ -409,7 +409,8 @@
             <div class="settings-avatar__actions">
                 <form method="post" action="{{ url_for('settings_avatar') }}" enctype="multipart/form-data">
                     <label class="button button--primary settings-avatar__drop" for="avatar">Upload photo</label>
-                    <input id="avatar" name="avatar" type="file" accept="image/*" hidden>
+                    <input id="avatar" name="avatar" type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp" hidden>
                     <small>JPG, PNG, GIF, or WebP · up to 5 MB. Photos are cropped to a centered square
                         automatically.</small>
                 </form>
@@ -761,8 +762,6 @@
         var avatarForm = avatarInput && avatarInput.closest('form');
         var avatarDrop = document.querySelector('.settings-avatar__drop');
 
-        if (!(window.FileReader && window.File)) return finishSetup();
-
         function finishSetup() {
             wireAvatar();
             wireDirtyForms();
@@ -788,31 +787,56 @@
                 });
             });
             avatarInput.addEventListener('change', uploadAvatar);
+            function showAvatarError(message) {
+                if (window.StudyPlannerToast && window.StudyPlannerToast.error) {
+                    window.StudyPlannerToast.error(message);
+                } else {
+                    window.alert(message);
+                }
+            }
             function uploadAvatar() {
                 var file = avatarInput.files[0];
                 if (!file) return;
                 if (file.size > 5 * 1024 * 1024) {
                     avatarInput.value = '';
-                    window.alert('Please choose an image smaller than 5 MB.');
+                    showAvatarError('That image is larger than 5 MB. Please choose a smaller file.');
+                    return;
+                }
+                if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+                    avatarInput.value = '';
+                    showAvatarError('Please choose a JPG, PNG, GIF, or WebP image.');
                     return;
                 }
                 var submitCropped = function (blob) {
-                    var cropped = new File([blob], file.name, { type: blob.type || file.type });
-                    var transfer = new DataTransfer();
-                    transfer.items.add(cropped);
-                    avatarInput.files = transfer.files;
-                    avatarForm.submit();
+                    try {
+                        var cropped = new File([blob], file.name, { type: blob.type || file.type });
+                        var transfer = new DataTransfer();
+                        transfer.items.add(cropped);
+                        avatarInput.files = transfer.files;
+                        avatarForm.submit();
+                    } catch (error) {
+                        showAvatarError('We couldn’t prepare that photo for upload. Please try another image.');
+                    }
                 };
-                if (!window.createImageBitmap) { avatarForm.submit(); return; }
+                if (!window.createImageBitmap || !window.DataTransfer || !window.File) {
+                    avatarForm.submit();
+                    return;
+                }
                 createImageBitmap(file).then(function (image) {
                     var side = Math.min(image.width, image.height);
                     var canvas = document.createElement('canvas');
                     canvas.width = 512; canvas.height = 512;
-                    canvas.getContext('2d').drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 512, 512);
+                    var context = canvas.getContext('2d');
+                    if (!context) throw new Error('Image cropping is unavailable.');
+                    context.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 512, 512);
+                    image.close();
                     canvas.toBlob(function (blob) {
                         if (blob) submitCropped(blob); else avatarForm.submit();
-                    }, file.type, 0.9);
-                }).catch(function () { avatarForm.submit(); });
+                    }, file.type === 'image/gif' ? 'image/png' : file.type, 0.9);
+                }).catch(function () {
+                    avatarInput.value = '';
+                    showAvatarError('We couldn’t read that photo. Try a JPG, PNG, GIF, or WebP image.');
+                });
             }
         }
 
@@ -998,6 +1022,8 @@
                 }
             });
         }
+
+        finishSetup();
     });
 
     (function () {
