@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Settings - Study Planner{% endblock %}
+{% block body_tag %}class="settings-page"{% endblock %}
 
 {% block head %}
 <style>
@@ -390,6 +391,19 @@
     <span class="text-muted">Control your account, study experience, privacy, and notifications.</span>
 </div>
 
+<nav class="settings-nav" aria-label="Settings sections">
+    <a href="#account-heading">Account</a>
+    <a href="#signin-heading">Sign-in</a>
+    <a href="#notifications-heading">Notifications</a>
+    <a href="#study-heading">Study preferences</a>
+    <a href="#ai-accounts-heading">AI accounts</a>
+    <a href="#appearance-heading">Appearance</a>
+    <a href="#privacy-heading">Privacy</a>
+    <a href="#security-heading">Security</a>
+    <a href="#groups-heading">Groups</a>
+    <a href="#danger-heading">Danger zone</a>
+</nav>
+
 <div class="settings-grid">
     <section class="card settings-panel" aria-labelledby="account-heading">
         <div class="settings-panel__header">
@@ -503,7 +517,7 @@
                         }}</small></span><input type="checkbox" name="{{ key }}" {% if settings.notifications[key]
                     %}checked{% endif %}></label>
             {% endfor %}
-            <div class="settings-controls"><label for="deadline_days">Deadline timing</label><select class="form-input"
+            <div class="settings-controls settings-notification-controls"><label for="deadline_days">Deadline timing</label><select class="form-input"
                     id="deadline_days" name="deadline_days">
                     <option value="1" {% if settings.notifications.deadline_days=='1' %}selected{% endif %}>1 day
                         before</option>

@@ -5,7 +5,7 @@ const SHELL = [
   "/static/js/palette.js",
   "/static/manifest.json",
   "/static/icon-192.png",
-  "/static/img/logo.png"
+  "/static/img/study-planner-mark.svg"
 ];
 
 self.addEventListener("install", (event) => {

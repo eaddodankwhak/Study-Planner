@@ -39,6 +39,9 @@
     saved && typeof saved.x === "number" ? saved.x : window.innerWidth - 80,
     saved && typeof saved.y === "number" ? saved.y : window.innerHeight - 100
   );
+  window.addEventListener("resize", function () {
+    applyPosition(launcher.offsetLeft, launcher.offsetTop);
+  });
 
   function persist(snapX, y) {
     try {
